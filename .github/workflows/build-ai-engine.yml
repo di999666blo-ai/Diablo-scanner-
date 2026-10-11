@@ -18,10 +18,14 @@ jobs:
 
       - name: Install Android build tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android NDK and CMake
         run: |
-          sdkmanager "ndk;27.2.12479018" "cmake;3.31.6"
+          sdkmanager --install \
+            "ndk;27.2.12479018" \
+            "cmake;3.31.6"
 
       - name: Download llama.cpp source
         uses: actions/checkout@v4
@@ -57,16 +61,18 @@ jobs:
       - name: Check compiled libraries
         run: |
           find llama.cpp/build -type f -name "*.so" -print
-          test -f llama.cpp/build/bin/libllama.so
-          test -f llama.cpp/build/bin/libmtmd.so
+          find llama.cpp/build -type f -name "libllama.so" \
+            | grep -q .
+          find llama.cpp/build -type f -name "libmtmd.so" \
+            | grep -q .
 
       - name: Package AI libraries and headers
         run: |
           mkdir -p ai-engine/include
           mkdir -p ai-engine/lib/arm64-v8a
 
-          cp llama.cpp/build/bin/*.so \
-            ai-engine/lib/arm64-v8a/
+          find llama.cpp/build -type f -name "*.so" \
+            -exec cp {} ai-engine/lib/arm64-v8a/ \;
 
           cp llama.cpp/include/llama.h \
             ai-engine/include/
