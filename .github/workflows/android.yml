@@ -1,4 +1,4 @@
-name: Build DIABLO SCANNER APK
+ name: Build DIABLO SCANNER APK
 
 on:
 workflow_dispatch:
