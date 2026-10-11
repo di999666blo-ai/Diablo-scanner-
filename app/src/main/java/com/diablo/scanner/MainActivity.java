@@ -14,9 +14,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -38,6 +40,12 @@ public class MainActivity extends Activity {
     private static final String PREFS = "diablo_scanner";
     private static final String HISTORY = "history";
     private static final String THRESHOLD = "threshold";
+
+    public static final String TRADE_DURATION_MS =
+            "trade_duration_ms";
+
+    public static final long DEFAULT_TRADE_DURATION_MS =
+            60000L;
 
     private LinearLayout root;
     private TextView signalText;
@@ -175,7 +183,7 @@ public class MainActivity extends Activity {
         );
 
         addButton(
-                "SETTINGS / SENSITIVITY",
+                "SETTINGS / TRADE DURATION",
                 v -> showSettings()
         );
 
@@ -183,15 +191,13 @@ public class MainActivity extends Activity {
 
         instructions.setText(
                 "HOW TO USE\n\n" +
-                "1. Open a trading chart.\n" +
+                "1. Open your trading chart.\n" +
                 "2. Tap START LIVE SCREEN CAPTURE.\n" +
-                "3. Read Android's screen-capture warning.\n" +
-                "4. Approve capture only if you agree.\n" +
-                "5. Use STOP SCREEN CAPTURE to stop it.\n\n" +
-                "For a saved screenshot, tap ANALYSE SAVED CHART.\n\n" +
-                "The floating bubble displays the latest saved " +
-                "result. Live chart analysis depends on the " +
-                "screen-capture service working correctly."
+                "3. Approve Android's screen-capture request.\n" +
+                "4. Tap START FLOATING BUBBLE.\n" +
+                "5. Set your preferred trade duration in Settings.\n" +
+                "6. Use STOP SCREEN CAPTURE when finished.\n\n" +
+                "You can also analyse a saved chart screenshot."
         );
 
         instructions.setTextColor(Color.LTGRAY);
@@ -203,11 +209,11 @@ public class MainActivity extends Activity {
 
         warning.setText(
                 "TRADING RISK WARNING\n\n" +
-                "Screenshot analysis compares red-like and " +
-                "green-like pixels. It cannot reliably predict " +
-                "market direction or guarantee profit.\n\n" +
-                "The visual score is not a probability of profit. " +
-                "Live capture must be tested on your device.\n\n" +
+                "The scanner compares red-like and green-like " +
+                "pixels on the screen. It does not understand " +
+                "every candle, indicator, or market condition.\n\n" +
+                "Its visual score is not a probability of profit. " +
+                "No signal guarantees a winning trade.\n\n" +
                 "DIABLO SCANNER does not place trades."
         );
 
@@ -360,7 +366,7 @@ public class MainActivity extends Activity {
 
             Toast.makeText(
                     this,
-                    "Screen capture service start requested.",
+                    "Screen capture start requested.",
                     Toast.LENGTH_LONG
             ).show();
 
@@ -368,7 +374,7 @@ public class MainActivity extends Activity {
 
             Toast.makeText(
                     this,
-                    "Could not start capture. Check service and manifest.",
+                    "Could not start capture. Check the service and manifest.",
                     Toast.LENGTH_LONG
             ).show();
         }
@@ -403,8 +409,7 @@ public class MainActivity extends Activity {
 
                 Toast.makeText(
                         this,
-                        "Open Settings and allow DIABLO SCANNER " +
-                        "to display over other apps.",
+                        "Allow DIABLO SCANNER to display over other apps.",
                         Toast.LENGTH_LONG
                 ).show();
             }
@@ -547,7 +552,7 @@ public class MainActivity extends Activity {
     }
 
     // =====================================================
-    // IMPROVED SCREENSHOT COLOUR ANALYSIS
+    // SCREENSHOT COLOUR ANALYSIS
     // =====================================================
 
     private void analyseBitmap(Bitmap bitmap) {
@@ -653,7 +658,6 @@ public class MainActivity extends Activity {
 
             signal = "WAIT";
             colour = Color.YELLOW;
-
             score = (int) Math.round(difference * 100);
 
             detail =
@@ -918,10 +922,181 @@ public class MainActivity extends Activity {
     }
 
     // =====================================================
-    // SENSITIVITY SETTINGS
+    // SETTINGS: TRADE DURATION AND SENSITIVITY
     // =====================================================
 
     private void showSettings() {
+
+        String[] options = {
+                "Set trade duration",
+                "Set visual sensitivity"
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("DIABLO SETTINGS")
+                .setItems(options, (dialog, which) -> {
+
+                    if (which == 0) {
+                        showTradeDurationSettings();
+                    } else {
+                        showSensitivitySettings();
+                    }
+                })
+                .setNegativeButton("CLOSE", null)
+                .show();
+    }
+
+    private void showTradeDurationSettings() {
+
+        String[] options = {
+                "5 seconds",
+                "15 seconds",
+                "30 seconds",
+                "1 minute",
+                "5 minutes",
+                "Custom duration (seconds)"
+        };
+
+        long current = prefs.getLong(
+                TRADE_DURATION_MS,
+                DEFAULT_TRADE_DURATION_MS
+        );
+
+        int selected =
+                current == 5000L ? 0 :
+                current == 15000L ? 1 :
+                current == 30000L ? 2 :
+                current == 60000L ? 3 :
+                current == 300000L ? 4 : -1;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Trade duration")
+                .setMessage(
+                        "Current: " + formatDuration(current) +
+                        "\nChoose your preferred tracking duration."
+                )
+                .setSingleChoiceItems(
+                        options,
+                        selected,
+                        (dialog, which) -> {
+
+                            if (which == 5) {
+                                dialog.dismiss();
+                                showCustomTradeDuration();
+                                return;
+                            }
+
+                            long duration =
+                                    which == 0 ? 5000L :
+                                    which == 1 ? 15000L :
+                                    which == 2 ? 30000L :
+                                    which == 3 ? 60000L :
+                                    300000L;
+
+                            prefs.edit()
+                                    .putLong(
+                                            TRADE_DURATION_MS,
+                                            duration
+                                    )
+                                    .apply();
+
+                            dialog.dismiss();
+
+                            Toast.makeText(
+                                    this,
+                                    "Trade duration saved: " +
+                                            formatDuration(duration),
+                                    Toast.LENGTH_LONG
+                            ).show();
+                        }
+                )
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private void showCustomTradeDuration() {
+
+        EditText input = new EditText(this);
+
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setHint("Enter seconds (1 to 3600)");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Custom trade duration")
+                .setMessage(
+                        "Enter the duration in seconds, from 1 to 3600."
+                )
+                .setView(input)
+                .setNegativeButton("CANCEL", null)
+                .setPositiveButton("SAVE", (dialog, which) -> {
+
+                    String raw = input.getText().toString().trim();
+
+                    try {
+
+                        long seconds = Long.parseLong(raw);
+
+                        if (seconds < 1 || seconds > 3600) {
+
+                            Toast.makeText(
+                                    this,
+                                    "Enter between 1 and 3600 seconds.",
+                                    Toast.LENGTH_LONG
+                            ).show();
+
+                            return;
+                        }
+
+                        long duration = seconds * 1000L;
+
+                        prefs.edit()
+                                .putLong(
+                                        TRADE_DURATION_MS,
+                                        duration
+                                )
+                                .apply();
+
+                        Toast.makeText(
+                                this,
+                                "Trade duration saved: " +
+                                        formatDuration(duration),
+                                Toast.LENGTH_LONG
+                        ).show();
+
+                    } catch (Exception e) {
+
+                        Toast.makeText(
+                                this,
+                                "Enter a valid number of seconds.",
+                                Toast.LENGTH_LONG
+                        ).show();
+                    }
+                })
+                .show();
+    }
+
+    private String formatDuration(long durationMs) {
+
+        long seconds = Math.max(1L, durationMs / 1000L);
+
+        if (seconds < 60L) {
+            return seconds +
+                    (seconds == 1L ? " second" : " seconds");
+        }
+
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+
+        if (remainingSeconds == 0L) {
+            return minutes +
+                    (minutes == 1L ? " minute" : " minutes");
+        }
+
+        return minutes + "m " + remainingSeconds + "s";
+    }
+
+    private void showSensitivitySettings() {
 
         String[] options = {
                 "Low sensitivity (10%)",
