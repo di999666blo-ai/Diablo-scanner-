@@ -40,6 +40,8 @@ public class ScreenCaptureService extends Service {
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "diablo_screen_capture";
 
+    private static final long ANALYSIS_INTERVAL_MS = 5000L;
+
     private MediaProjection projection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -70,7 +72,7 @@ public class ScreenCaptureService extends Service {
                     );
 
             channel.setDescription(
-                    "DIABLO live screen analysis"
+                    "DIABLO live chart screen analysis"
             );
 
             NotificationManager manager =
@@ -95,7 +97,7 @@ public class ScreenCaptureService extends Service {
         return builder
                 .setContentTitle("DIABLO SCANNER")
                 .setContentText(
-                        "Live screen capture and visual analysis running"
+                        "Live screen analysis is running"
                 )
                 .setSmallIcon(android.R.drawable.ic_menu_view)
                 .setOngoing(true)
@@ -342,7 +344,7 @@ public class ScreenCaptureService extends Service {
 
         } catch (Exception ignored) {
 
-            // Ignore a failed frame and keep capture running.
+            // Keep the capture service running after a failed frame.
 
         } finally {
 
@@ -367,15 +369,14 @@ public class ScreenCaptureService extends Service {
     }
 
     // ================================================
-    // LIVE VISUAL ANALYSIS
+    // DIABLO VISUAL CHART ANALYSER
     // ================================================
 
     private void analyseCapturedBitmap(Bitmap bitmap) {
 
         long now = System.currentTimeMillis();
 
-        // Analyse and save at most once every 10 seconds.
-        if (now - lastAnalysisTime < 10000L) {
+        if (now - lastAnalysisTime < ANALYSIS_INTERVAL_MS) {
             return;
         }
 
@@ -386,17 +387,53 @@ public class ScreenCaptureService extends Service {
             int width = bitmap.getWidth();
             int height = bitmap.getHeight();
 
+            if (width < 50 || height < 50) {
+                return;
+            }
+
+            /*
+             * Analyse the central chart area instead of the
+             * entire screen.
+             *
+             * These boundaries are approximate. Different
+             * brokers may place their charts differently.
+             */
+
+            int left = (int) (width * 0.05);
+            int right = (int) (width * 0.95);
+
+            int top = (int) (height * 0.15);
+            int bottom = (int) (height * 0.85);
+
+            left = Math.max(0, Math.min(left, width - 1));
+            right = Math.max(left + 1, Math.min(right, width));
+
+            top = Math.max(0, Math.min(top, height - 1));
+            bottom = Math.max(top + 1, Math.min(bottom, height));
+
+            int chartWidth = right - left;
+            int chartHeight = bottom - top;
+
             int step = Math.max(
                     1,
-                    Math.max(width, height) / 350
+                    Math.max(chartWidth, chartHeight) / 250
             );
 
             long green = 0;
-            long redPixels = 0;
+            long red = 0;
 
-            for (int y = 0; y < height; y += step) {
+            long upperGreen = 0;
+            long upperRed = 0;
 
-                for (int x = 0; x < width; x += step) {
+            long middleGreen = 0;
+            long middleRed = 0;
+
+            long lowerGreen = 0;
+            long lowerRed = 0;
+
+            for (int y = top; y < bottom; y += step) {
+
+                for (int x = left; x < right; x += step) {
 
                     int pixel = bitmap.getPixel(x, y);
 
@@ -404,29 +441,44 @@ public class ScreenCaptureService extends Service {
                     int g = Color.green(pixel);
                     int b = Color.blue(pixel);
 
-                    if (
+                    boolean isGreen =
                             g > 95 &&
                             g > r * 1.22 &&
-                            g > b * 1.08
-                    ) {
-                        green++;
-                    }
+                            g > b * 1.08;
 
-                    if (
+                    boolean isRed =
                             r > 105 &&
                             r > g * 1.22 &&
-                            r > b * 1.12
-                    ) {
-                        redPixels++;
+                            r > b * 1.12;
+
+                    if (isGreen) {
+
+                        green++;
+
+                        if (y < top + chartHeight / 3) {
+                            upperGreen++;
+                        } else if (y < top + 2 * chartHeight / 3) {
+                            middleGreen++;
+                        } else {
+                            lowerGreen++;
+                        }
+
+                    } else if (isRed) {
+
+                        red++;
+
+                        if (y < top + chartHeight / 3) {
+                            upperRed++;
+                        } else if (y < top + 2 * chartHeight / 3) {
+                            middleRed++;
+                        } else {
+                            lowerRed++;
+                        }
                     }
                 }
             }
 
-            double total = green + redPixels;
-
-            double difference = total == 0
-                    ? 0
-                    : Math.abs(green - redPixels) / total;
+            long total = green + red;
 
             SharedPreferences prefs =
                     getSharedPreferences(
@@ -434,43 +486,83 @@ public class ScreenCaptureService extends Service {
                             MODE_PRIVATE
                     );
 
-            int threshold = prefs.getInt(
-                    "threshold",
-                    15
-            );
+            int threshold = prefs.getInt("threshold", 15);
 
-            String signal;
+            String signal = "WAIT";
+            int score = 0;
 
-            if (
-                    total < 20 ||
-                    difference < threshold / 100.0
-            ) {
+            /*
+             * This is a visual colour heuristic, not a trained
+             * AI model. Its score is not a measured probability
+             * of winning a trade.
+             */
 
-                signal = "WAIT";
+            if (total >= 20) {
 
-            } else if (green > redPixels) {
+                double overallDifference =
+                        Math.abs(green - red) / (double) total;
 
-                signal = "UP BIAS";
+                double upperTotal = upperGreen + upperRed;
+                double middleTotal = middleGreen + middleRed;
+                double lowerTotal = lowerGreen + lowerRed;
 
-            } else {
+                double upperBalance =
+                        upperTotal == 0
+                                ? 0
+                                : (upperGreen - upperRed) / upperTotal;
 
-                signal = "DOWN BIAS";
-            }
+                double middleBalance =
+                        middleTotal == 0
+                                ? 0
+                                : (middleGreen - middleRed) / middleTotal;
 
-            int score;
+                double lowerBalance =
+                        lowerTotal == 0
+                                ? 0
+                                : (lowerGreen - lowerRed) / lowerTotal;
 
-            if (total < 20) {
+                /*
+                 * Compare the colour balance across vertical
+                 * zones. This is only a rough screen heuristic;
+                 * it does not identify candle bodies or wicks.
+                 */
 
-                score = 0;
+                double zoneDirection =
+                        (upperBalance + middleBalance + lowerBalance) / 3.0;
 
-            } else {
+                double combinedScore =
+                        (0.65 * (green - red) / total)
+                        + (0.35 * zoneDirection);
+
+                if (
+                        overallDifference >= threshold / 100.0
+                        && combinedScore > 0.12
+                ) {
+
+                    signal = "UP BIAS";
+
+                } else if (
+                        overallDifference >= threshold / 100.0
+                        && combinedScore < -0.12
+                ) {
+
+                    signal = "DOWN BIAS";
+
+                } else {
+
+                    signal = "WAIT";
+                }
 
                 score = (int) Math.round(
                         Math.min(
                                 95,
-                                50 + difference * 45
+                                50 + overallDifference * 45
                         )
                 );
+
+                if ("WAIT".equals(signal)) {
+                    score = Math.min(score, 50);
+                }
             }
 
             saveLiveResult(
@@ -478,7 +570,7 @@ public class ScreenCaptureService extends Service {
                     signal,
                     score,
                     green,
-                    redPixels
+                    red
             );
 
         } catch (Exception ignored) {
@@ -488,7 +580,7 @@ public class ScreenCaptureService extends Service {
     }
 
     // ================================================
-    // SAVE LIVE RESULT TO SHARED HISTORY
+    // SAVE RESULT TO DIABLO HISTORY
     // ================================================
 
     private void saveLiveResult(
@@ -521,16 +613,13 @@ public class ScreenCaptureService extends Service {
         item.put("red", redPixels);
         item.put("source", "LIVE_SCREEN");
 
-        // Newest result first.
         updated.put(item);
 
-        // Keep up to 49 older results.
         for (
                 int i = 0;
                 i < old.length() && i < 49;
                 i++
         ) {
-
             updated.put(old.get(i));
         }
 
@@ -540,7 +629,7 @@ public class ScreenCaptureService extends Service {
     }
 
     // ================================================
-    // STOP CAPTURE AND CLEAN UP
+    // STOP SCREEN CAPTURE
     // ================================================
 
     private void stopCapture() {
