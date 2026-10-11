@@ -180,6 +180,7 @@ public class MainActivity extends Activity {
         );
 
         TextView instructions = new TextView(this);
+
         instructions.setText(
                 "HOW TO USE\n\n" +
                 "1. Open a trading chart.\n" +
@@ -188,26 +189,28 @@ public class MainActivity extends Activity {
                 "4. Approve capture only if you agree.\n" +
                 "5. Use STOP SCREEN CAPTURE to stop it.\n\n" +
                 "For a saved screenshot, tap ANALYSE SAVED CHART.\n\n" +
-                "The floating bubble can display your latest saved " +
-                "result. It does not automatically analyse " +
-                "live chart frames yet."
+                "The floating bubble displays the latest saved " +
+                "result. Live chart analysis depends on the " +
+                "screen-capture service working correctly."
         );
+
         instructions.setTextColor(Color.LTGRAY);
         instructions.setTextSize(13);
         instructions.setPadding(8, 24, 8, 12);
         root.addView(instructions);
 
         TextView warning = new TextView(this);
+
         warning.setText(
                 "TRADING RISK WARNING\n\n" +
-                "Screenshot analysis currently measures red-like " +
-                "and green-like pixels. This is not reliable " +
-                "market prediction and does not guarantee profit.\n\n" +
-                "Live screen capture is a separate feature. " +
-                "It must be connected to chart analysis before " +
-                "it can generate live chart signals.\n\n" +
+                "Screenshot analysis compares red-like and " +
+                "green-like pixels. It cannot reliably predict " +
+                "market direction or guarantee profit.\n\n" +
+                "The visual score is not a probability of profit. " +
+                "Live capture must be tested on your device.\n\n" +
                 "DIABLO SCANNER does not place trades."
         );
+
         warning.setTextColor(Color.rgb(255, 190, 120));
         warning.setTextSize(12);
         warning.setGravity(Gravity.CENTER);
@@ -218,6 +221,7 @@ public class MainActivity extends Activity {
     private void addSectionTitle(String text) {
 
         TextView heading = new TextView(this);
+
         heading.setText(text);
         heading.setTextSize(13);
         heading.setTextColor(red);
@@ -270,11 +274,13 @@ public class MainActivity extends Activity {
                     );
 
             if (manager == null) {
+
                 Toast.makeText(
                         this,
                         "Screen capture is unavailable.",
                         Toast.LENGTH_LONG
                 ).show();
+
                 return;
             }
 
@@ -302,7 +308,9 @@ public class MainActivity extends Activity {
                     ScreenCaptureService.class
             );
 
-            intent.setAction("com.diablo.scanner.STOP_CAPTURE");
+            intent.setAction(
+                    ScreenCaptureService.ACTION_STOP_CAPTURE
+            );
 
             startService(intent);
 
@@ -352,7 +360,7 @@ public class MainActivity extends Activity {
 
             Toast.makeText(
                     this,
-                    "Screen capture service started.",
+                    "Screen capture service start requested.",
                     Toast.LENGTH_LONG
             ).show();
 
@@ -372,7 +380,8 @@ public class MainActivity extends Activity {
 
     private void startFloatingBubble() {
 
-        if (!Settings.canDrawOverlays(this)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
 
             try {
 
@@ -394,7 +403,7 @@ public class MainActivity extends Activity {
 
                 Toast.makeText(
                         this,
-                        "Open phone Settings and allow DIABLO SCANNER " +
+                        "Open Settings and allow DIABLO SCANNER " +
                         "to display over other apps.",
                         Toast.LENGTH_LONG
                 ).show();
@@ -410,7 +419,11 @@ public class MainActivity extends Activity {
                     FloatingBubbleService.class
             );
 
-            startService(serviceIntent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
 
             Toast.makeText(
                     this,
@@ -534,17 +547,39 @@ public class MainActivity extends Activity {
     }
 
     // =====================================================
-    // BASIC SCREENSHOT ANALYSIS
+    // IMPROVED SCREENSHOT COLOUR ANALYSIS
     // =====================================================
 
     private void analyseBitmap(Bitmap bitmap) {
 
+        if (bitmap == null || bitmap.isRecycled()) {
+
+            Toast.makeText(
+                    this,
+                    "Unable to analyse this image.",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
 
+        if (width < 2 || height < 2) {
+
+            Toast.makeText(
+                    this,
+                    "Image is too small to analyse.",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
         int step = Math.max(
                 1,
-                Math.max(width, height) / 350
+                Math.max(width, height) / 500
         );
 
         long green = 0;
@@ -563,29 +598,38 @@ public class MainActivity extends Activity {
 
                 checked++;
 
-                if (
-                        g > 95 &&
-                        g > r * 1.22 &&
-                        g > b * 1.08
-                ) {
-                    green++;
+                int brightness = Math.max(
+                        r,
+                        Math.max(g, b)
+                );
+
+                if (brightness < 70) {
+                    continue;
                 }
 
-                if (
-                        r > 105 &&
-                        r > g * 1.22 &&
-                        r > b * 1.12
-                ) {
+                boolean isGreen =
+                        g >= 90 &&
+                        g > r * 1.20 &&
+                        g > b * 1.08;
+
+                boolean isRed =
+                        r >= 90 &&
+                        r > g * 1.20 &&
+                        r > b * 1.08;
+
+                if (isGreen) {
+                    green++;
+                } else if (isRed) {
                     redPixels++;
                 }
             }
         }
 
-        double total = green + redPixels;
+        long total = green + redPixels;
 
         double difference = total == 0
-                ? 0
-                : Math.abs(green - redPixels) / total;
+                ? 0.0
+                : Math.abs(green - redPixels) / (double) total;
 
         double threshold =
                 prefs.getInt(THRESHOLD, 15) / 100.0;
@@ -593,41 +637,56 @@ public class MainActivity extends Activity {
         String signal;
         String detail;
         int colour;
+        int score;
 
-        if (total < 20 || difference < threshold) {
+        if (total < 20) {
+
+            signal = "WAIT";
+            colour = Color.YELLOW;
+            score = 0;
+
+            detail =
+                    "Too few clearly coloured pixels were found. " +
+                    "Choose a clearer chart screenshot.";
+
+        } else if (difference < threshold) {
 
             signal = "WAIT";
             colour = Color.YELLOW;
 
+            score = (int) Math.round(difference * 100);
+
             detail =
-                    "There is not enough clear red/green " +
-                    "dominance in this screenshot.";
+                    "Red and green pixels are too balanced " +
+                    "to show a clear visual bias.";
 
         } else if (green > redPixels) {
 
             signal = "UP BIAS";
             colour = Color.rgb(50, 220, 120);
 
+            score = (int) Math.round(
+                    Math.min(95, 50 + difference * 45)
+            );
+
             detail =
-                    "The image contains more green-like " +
-                    "pixels than red-like pixels.";
+                    "More green-dominant than red-dominant " +
+                    "pixels were detected. This is only a " +
+                    "visual colour comparison.";
 
         } else {
 
             signal = "DOWN BIAS";
             colour = red;
 
+            score = (int) Math.round(
+                    Math.min(95, 50 + difference * 45)
+            );
+
             detail =
-                    "The image contains more red-like " +
-                    "pixels than green-like pixels.";
-        }
-
-        int score = (int) Math.round(
-                Math.min(95, 50 + difference * 45)
-        );
-
-        if (total < 20) {
-            score = 0;
+                    "More red-dominant than green-dominant " +
+                    "pixels were detected. This is only a " +
+                    "visual colour comparison.";
         }
 
         signalText.setText(signal);
@@ -635,10 +694,11 @@ public class MainActivity extends Activity {
 
         statusText.setText(
                 detail +
-                "\nVisual balance: " + score +
-                "% heuristic score." +
+                "\nGreen pixels: " + green +
+                "\nRed pixels: " + redPixels +
                 "\nSampled pixels: " + checked +
-                "\nThis score is not a probability of profit."
+                "\nVisual balance score: " + score + "%" +
+                "\nThis is not a probability of profit."
         );
 
         saveHistory(signal, score, green, redPixels);
@@ -754,7 +814,7 @@ public class MainActivity extends Activity {
             statusText.setText(
                     "Latest saved visual result\n" +
                     "Time: " + time + "\n" +
-                    "Heuristic score: " + score + "%\n\n" +
+                    "Visual balance score: " + score + "%\n\n" +
                     "This is not a live market signal."
             );
 
@@ -805,7 +865,7 @@ public class MainActivity extends Activity {
                 .append(item.optString("signal", "WAIT"))
                 .append(" (")
                 .append(item.optInt("score", 0))
-                .append("% heuristic score)\n\n");
+                .append("% visual balance score)\n\n");
             }
 
             new AlertDialog.Builder(this)
