@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.provider.Settings;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
