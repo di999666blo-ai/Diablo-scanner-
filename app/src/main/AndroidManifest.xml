@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Floating bubble permission -->
+    <!-- Permission for the floating scanner bubble -->
     <uses-permission
         android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
@@ -9,11 +9,11 @@
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Required for screen-capture foreground services on Android 14+ -->
+    <!-- Screen capture service permission -->
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
-    <!-- Notification permission -->
+    <!-- Notifications -->
     <uses-permission
         android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -24,16 +24,14 @@
         android:hardwareAccelerated="true"
         android:supportsRtl="true">
 
-        <!-- Main application screen -->
+        <!-- Main app screen -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
-                <category
-                    android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
         </activity>
@@ -43,7 +41,7 @@
             android:name=".FloatingBubbleService"
             android:exported="false" />
 
-        <!-- Screen capture service -->
+        <!-- Live screen capture service -->
         <service
             android:name=".ScreenCaptureService"
             android:exported="false"
