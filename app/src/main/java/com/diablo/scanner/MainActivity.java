@@ -4,11 +4,14 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -30,6 +33,7 @@ import java.util.Locale;
 public class MainActivity extends Activity {
 
     private static final int PICK_CHART = 4101;
+    private static final int REQUEST_SCREEN_CAPTURE = 4102;
 
     private static final String PREFS = "diablo_scanner";
     private static final String HISTORY = "history";
@@ -71,6 +75,10 @@ public class MainActivity extends Activity {
         }
     }
 
+    // =====================================================
+    // MAIN DASHBOARD
+    // =====================================================
+
     private void buildDashboard() {
 
         ScrollView scroll = new ScrollView(this);
@@ -101,16 +109,14 @@ public class MainActivity extends Activity {
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText(
-            "D EDITION • CHART IMAGE SCANNER"
-        );
+        subtitle.setText("D EDITION • VISUAL CHART SCANNER");
         subtitle.setTextSize(12);
         subtitle.setTextColor(red);
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setPadding(0, 4, 0, 22);
         root.addView(subtitle);
 
-        addSectionTitle("LATEST VISUAL RESULT");
+        addSectionTitle("LATEST RESULT");
 
         signalText = new TextView(this);
         signalText.setText("WAIT");
@@ -123,8 +129,7 @@ public class MainActivity extends Activity {
 
         statusText = new TextView(this);
         statusText.setText(
-            "Choose a saved chart screenshot to begin.\n" +
-            "This is an experimental image-analysis tool."
+                "Choose a chart screenshot to begin."
         );
         statusText.setTextSize(14);
         statusText.setTextColor(white);
@@ -140,66 +145,69 @@ public class MainActivity extends Activity {
         root.addView(countText);
 
         addButton(
-            "ANALYSE SAVED CHART",
-            v -> chooseChart()
+                "ANALYSE SAVED CHART",
+                v -> chooseChart()
         );
 
         addButton(
-            "START FLOATING BUBBLE",
-            v -> startFloatingBubble()
+                "START LIVE SCREEN CAPTURE",
+                v -> requestScreenCapture()
         );
 
         addButton(
-            "SIGNAL HISTORY",
-            v -> showHistory()
+                "STOP SCREEN CAPTURE",
+                v -> stopScreenCapture()
         );
 
         addButton(
-            "CLEAR HISTORY",
-            v -> clearHistory()
+                "START FLOATING BUBBLE",
+                v -> startFloatingBubble()
         );
 
         addButton(
-            "SETTINGS / SENSITIVITY",
-            v -> showSettings()
+                "SIGNAL HISTORY",
+                v -> showHistory()
+        );
+
+        addButton(
+                "CLEAR HISTORY",
+                v -> clearHistory()
+        );
+
+        addButton(
+                "SETTINGS / SENSITIVITY",
+                v -> showSettings()
         );
 
         TextView instructions = new TextView(this);
-
         instructions.setText(
-            "HOW TO USE\n\n" +
-            "1. Take a screenshot of your trading chart.\n" +
-            "2. Open DIABLO SCANNER.\n" +
-            "3. Tap ANALYSE SAVED CHART.\n" +
-            "4. Select your screenshot.\n" +
-            "5. Review the experimental visual result.\n\n" +
-            "FLOATING BUBBLE\n\n" +
-            "1. Tap START FLOATING BUBBLE.\n" +
-            "2. Allow display-over-other-apps permission.\n" +
-            "3. Return to DIABLO SCANNER.\n" +
-            "4. Tap START FLOATING BUBBLE again.\n" +
-            "5. Tap the D bubble to open its compact panel."
+                "HOW TO USE\n\n" +
+                "1. Open a trading chart.\n" +
+                "2. Tap START LIVE SCREEN CAPTURE.\n" +
+                "3. Read Android's screen-capture warning.\n" +
+                "4. Approve capture only if you agree.\n" +
+                "5. Use STOP SCREEN CAPTURE to stop it.\n\n" +
+                "For a saved screenshot, tap ANALYSE SAVED CHART.\n\n" +
+                "The floating bubble can display your latest saved " +
+                "result. It does not automatically analyse " +
+                "live chart frames yet."
         );
-
         instructions.setTextColor(Color.LTGRAY);
         instructions.setTextSize(13);
         instructions.setPadding(8, 24, 8, 12);
         root.addView(instructions);
 
         TextView warning = new TextView(this);
-
         warning.setText(
-            "TRADING RISK WARNING\n\n" +
-            "This prototype counts certain red and green " +
-            "pixels in a selected image. It does not " +
-            "reliably predict market direction.\n\n" +
-            "The floating bubble currently displays the " +
-            "latest saved result. It does not scan a live " +
-            "chart automatically.\n\n" +
-            "Results may be wrong. No profits are guaranteed. " +
-            "This app does not place trades."
+                "TRADING RISK WARNING\n\n" +
+                "Screenshot analysis currently measures red-like " +
+                "and green-like pixels. This is not reliable " +
+                "market prediction and does not guarantee profit.\n\n" +
+                "Live screen capture is a separate feature. " +
+                "It must be connected to chart analysis before " +
+                "it can generate live chart signals.\n\n" +
+                "DIABLO SCANNER does not place trades."
         );
-
         warning.setTextColor(Color.rgb(255, 190, 120));
         warning.setTextSize(12);
         warning.setGravity(Gravity.CENTER);
@@ -210,7 +218,6 @@ public class MainActivity extends Activity {
     private void addSectionTitle(String text) {
 
         TextView heading = new TextView(this);
-
         heading.setText(text);
         heading.setTextSize(13);
         heading.setTextColor(red);
@@ -222,8 +229,8 @@ public class MainActivity extends Activity {
     }
 
     private void addButton(
-        String text,
-        View.OnClickListener listener
+            String text,
+            View.OnClickListener listener
     ) {
 
         Button button = new Button(this);
@@ -234,25 +241,134 @@ public class MainActivity extends Activity {
         button.setAllCaps(false);
 
         button.setBackgroundTintList(
-            android.content.res.ColorStateList.valueOf(
-                panelColor
-            )
+                ColorStateList.valueOf(panelColor)
         );
 
         LinearLayout.LayoutParams params =
-            new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            );
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
 
         params.setMargins(0, 6, 0, 6);
 
         root.addView(button, params);
-
         button.setOnClickListener(listener);
     }
 
-    // START THE FLOATING BUBBLE
+    // =====================================================
+    // LIVE SCREEN CAPTURE PERMISSION
+    // =====================================================
+
+    private void requestScreenCapture() {
+
+        try {
+
+            MediaProjectionManager manager =
+                    (MediaProjectionManager) getSystemService(
+                            MEDIA_PROJECTION_SERVICE
+                    );
+
+            if (manager == null) {
+                Toast.makeText(
+                        this,
+                        "Screen capture is unavailable.",
+                        Toast.LENGTH_LONG
+                ).show();
+                return;
+            }
+
+            startActivityForResult(
+                    manager.createScreenCaptureIntent(),
+                    REQUEST_SCREEN_CAPTURE
+            );
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "Could not request screen capture permission.",
+                    Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    private void stopScreenCapture() {
+
+        try {
+
+            Intent intent = new Intent(
+                    this,
+                    ScreenCaptureService.class
+            );
+
+            intent.setAction("com.diablo.scanner.STOP_CAPTURE");
+
+            startService(intent);
+
+            Toast.makeText(
+                    this,
+                    "Stop request sent.",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "Could not stop capture. Check the capture service.",
+                    Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    private void startScreenCaptureService(
+            int resultCode,
+            Intent resultData
+    ) {
+
+        Intent serviceIntent = new Intent(
+                this,
+                ScreenCaptureService.class
+        );
+
+        serviceIntent.putExtra(
+                ScreenCaptureService.EXTRA_RESULT_CODE,
+                resultCode
+        );
+
+        serviceIntent.putExtra(
+                ScreenCaptureService.EXTRA_RESULT_DATA,
+                resultData
+        );
+
+        try {
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+
+            Toast.makeText(
+                    this,
+                    "Screen capture service started.",
+                    Toast.LENGTH_LONG
+            ).show();
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "Could not start capture. Check service and manifest.",
+                    Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    // =====================================================
+    // FLOATING BUBBLE
+    // =====================================================
 
     private void startFloatingBubble() {
 
@@ -261,24 +377,26 @@ public class MainActivity extends Activity {
             try {
 
                 Intent intent = new Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName())
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName())
                 );
 
                 startActivity(intent);
 
                 Toast.makeText(
-                    this,
-                    "Allow DIABLO SCANNER to display over other apps. Then return and tap START FLOATING BUBBLE again.",
-                    Toast.LENGTH_LONG
+                        this,
+                        "Allow display over other apps, return here, " +
+                        "then tap START FLOATING BUBBLE again.",
+                        Toast.LENGTH_LONG
                 ).show();
 
             } catch (Exception e) {
 
                 Toast.makeText(
-                    this,
-                    "Could not open overlay permission settings. Find DIABLO SCANNER in your phone settings and allow display over other apps.",
-                    Toast.LENGTH_LONG
+                        this,
+                        "Open phone Settings and allow DIABLO SCANNER " +
+                        "to display over other apps.",
+                        Toast.LENGTH_LONG
                 ).show();
             }
 
@@ -288,77 +406,63 @@ public class MainActivity extends Activity {
         try {
 
             Intent serviceIntent = new Intent(
-                this,
-                FloatingBubbleService.class
+                    this,
+                    FloatingBubbleService.class
             );
 
             startService(serviceIntent);
 
             Toast.makeText(
-                this,
-                "DIABLO floating bubble started.",
-                Toast.LENGTH_SHORT
+                    this,
+                    "Floating bubble start requested.",
+                    Toast.LENGTH_SHORT
             ).show();
 
         } catch (Exception e) {
 
             Toast.makeText(
-                this,
-                "Could not start the bubble. Check the build and manifest.",
-                Toast.LENGTH_LONG
+                    this,
+                    "Could not start the floating bubble.",
+                    Toast.LENGTH_LONG
             ).show();
         }
     }
 
-    // SELECT A SAVED CHART IMAGE
-
-    private void chooseChart() {
-
-        Intent intent = new Intent(
-            Intent.ACTION_OPEN_DOCUMENT
-        );
-
-        intent.addCategory(
-            Intent.CATEGORY_OPENABLE
-        );
-
-        intent.setType("image/*");
-
-        try {
-
-            startActivityForResult(
-                intent,
-                PICK_CHART
-            );
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                this,
-                "Could not open image picker.",
-                Toast.LENGTH_LONG
-            ).show();
-        }
-    }
+    // =====================================================
+    // SCREEN-CAPTURE AND IMAGE-PICKER RESULTS
+    // =====================================================
 
     @Override
     protected void onActivityResult(
-        int requestCode,
-        int resultCode,
-        Intent data
+            int requestCode,
+            int resultCode,
+            Intent data
     ) {
 
-        super.onActivityResult(
-            requestCode,
-            resultCode,
-            data
-        );
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_SCREEN_CAPTURE) {
+
+            if (resultCode != RESULT_OK || data == null) {
+
+                Toast.makeText(
+                        this,
+                        "Screen capture permission was cancelled.",
+                        Toast.LENGTH_LONG
+                ).show();
+
+                return;
+            }
+
+            startScreenCaptureService(resultCode, data);
+            return;
+        }
 
         if (
-            requestCode != PICK_CHART ||
-            resultCode != RESULT_OK ||
-            data == null ||
-            data.getData() == null
+                requestCode != PICK_CHART ||
+                resultCode != RESULT_OK ||
+                data == null ||
+                data.getData() == null
         ) {
             return;
         }
@@ -366,8 +470,8 @@ public class MainActivity extends Activity {
         Uri uri = data.getData();
 
         try (
-            InputStream input =
-                getContentResolver().openInputStream(uri)
+                InputStream input =
+                        getContentResolver().openInputStream(uri)
         ) {
 
             if (input == null) {
@@ -375,11 +479,9 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            Bitmap bitmap =
-                BitmapFactory.decodeStream(input);
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
 
             if (bitmap == null) {
-
                 showImageError();
                 return;
             }
@@ -391,21 +493,49 @@ public class MainActivity extends Activity {
             }
 
         } catch (Exception e) {
-
             showImageError();
+        }
+    }
+
+    // =====================================================
+    // CHOOSE A SAVED CHART
+    // =====================================================
+
+    private void chooseChart() {
+
+        Intent intent = new Intent(
+                Intent.ACTION_OPEN_DOCUMENT
+        );
+
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+
+        try {
+
+            startActivityForResult(intent, PICK_CHART);
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "Could not open the image picker.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
     private void showImageError() {
 
         Toast.makeText(
-            this,
-            "Unable to read that image. Please choose another screenshot.",
-            Toast.LENGTH_LONG
+                this,
+                "Unable to read this image. Choose another screenshot.",
+                Toast.LENGTH_LONG
         ).show();
     }
 
-    // BASIC RED/GREEN IMAGE ANALYSIS
+    // =====================================================
+    // BASIC SCREENSHOT ANALYSIS
+    // =====================================================
 
     private void analyseBitmap(Bitmap bitmap) {
 
@@ -413,8 +543,8 @@ public class MainActivity extends Activity {
         int height = bitmap.getHeight();
 
         int step = Math.max(
-            1,
-            Math.max(width, height) / 350
+                1,
+                Math.max(width, height) / 350
         );
 
         long green = 0;
@@ -434,17 +564,17 @@ public class MainActivity extends Activity {
                 checked++;
 
                 if (
-                    g > 95 &&
-                    g > r * 1.22 &&
-                    g > b * 1.08
+                        g > 95 &&
+                        g > r * 1.22 &&
+                        g > b * 1.08
                 ) {
                     green++;
                 }
 
                 if (
-                    r > 105 &&
-                    r > g * 1.22 &&
-                    r > b * 1.12
+                        r > 105 &&
+                        r > g * 1.22 &&
+                        r > b * 1.12
                 ) {
                     redPixels++;
                 }
@@ -454,11 +584,11 @@ public class MainActivity extends Activity {
         double total = green + redPixels;
 
         double difference = total == 0
-            ? 0
-            : Math.abs(green - redPixels) / total;
+                ? 0
+                : Math.abs(green - redPixels) / total;
 
         double threshold =
-            prefs.getInt(THRESHOLD, 15) / 100.0;
+                prefs.getInt(THRESHOLD, 15) / 100.0;
 
         String signal;
         String detail;
@@ -470,8 +600,8 @@ public class MainActivity extends Activity {
             colour = Color.YELLOW;
 
             detail =
-                "There is not enough clear red/green " +
-                "dominance in this screenshot.";
+                    "There is not enough clear red/green " +
+                    "dominance in this screenshot.";
 
         } else if (green > redPixels) {
 
@@ -479,8 +609,8 @@ public class MainActivity extends Activity {
             colour = Color.rgb(50, 220, 120);
 
             detail =
-                "The image contains more green-like " +
-                "pixels than red-like pixels.";
+                    "The image contains more green-like " +
+                    "pixels than red-like pixels.";
 
         } else {
 
@@ -488,12 +618,12 @@ public class MainActivity extends Activity {
             colour = red;
 
             detail =
-                "The image contains more red-like " +
-                "pixels than green-like pixels.";
+                    "The image contains more red-like " +
+                    "pixels than green-like pixels.";
         }
 
         int score = (int) Math.round(
-            Math.min(95, 50 + difference * 45)
+                Math.min(95, 50 + difference * 45)
         );
 
         if (total < 20) {
@@ -504,36 +634,32 @@ public class MainActivity extends Activity {
         signalText.setTextColor(colour);
 
         statusText.setText(
-            detail +
-            "\nVisual balance: " + score +
-            "% heuristic score." +
-            "\nSampled pixels: " + checked +
-            "\nThis score is not a probability of profit."
+                detail +
+                "\nVisual balance: " + score +
+                "% heuristic score." +
+                "\nSampled pixels: " + checked +
+                "\nThis score is not a probability of profit."
         );
 
-        saveHistory(
-            signal,
-            score,
-            green,
-            redPixels
-        );
-
+        saveHistory(signal, score, green, redPixels);
         refreshCount();
     }
 
-    // SAVE THE LATEST RESULT AND HISTORY
+    // =====================================================
+    // SAVE HISTORY
+    // =====================================================
 
     private void saveHistory(
-        String signal,
-        int score,
-        long green,
-        long redPixels
+            String signal,
+            int score,
+            long green,
+            long redPixels
     ) {
 
         try {
 
             JSONArray old = new JSONArray(
-                prefs.getString(HISTORY, "[]")
+                    prefs.getString(HISTORY, "[]")
             );
 
             JSONArray updated = new JSONArray();
@@ -541,11 +667,11 @@ public class MainActivity extends Activity {
             JSONObject item = new JSONObject();
 
             item.put(
-                "time",
-                new SimpleDateFormat(
-                    "yyyy-MM-dd HH:mm",
-                    Locale.getDefault()
-                ).format(new Date())
+                    "time",
+                    new SimpleDateFormat(
+                            "yyyy-MM-dd HH:mm",
+                            Locale.getDefault()
+                    ).format(new Date())
             );
 
             item.put("signal", signal);
@@ -555,29 +681,27 @@ public class MainActivity extends Activity {
 
             updated.put(item);
 
-            for (
-                int i = 0;
-                i < old.length() && i < 49;
-                i++
-            ) {
+            for (int i = 0; i < old.length() && i < 49; i++) {
                 updated.put(old.get(i));
             }
 
             prefs.edit()
-                .putString(HISTORY, updated.toString())
-                .apply();
+                    .putString(HISTORY, updated.toString())
+                    .apply();
 
         } catch (Exception e) {
 
             Toast.makeText(
-                this,
-                "Could not save the result.",
-                Toast.LENGTH_SHORT
+                    this,
+                    "Could not save the result.",
+                    Toast.LENGTH_SHORT
             ).show();
         }
     }
 
-    // SHOW THE LATEST SAVED RESULT
+    // =====================================================
+    // LOAD LATEST RESULT
+    // =====================================================
 
     private void refreshLatestResult() {
 
@@ -588,7 +712,7 @@ public class MainActivity extends Activity {
         try {
 
             JSONArray history = new JSONArray(
-                prefs.getString(HISTORY, "[]")
+                    prefs.getString(HISTORY, "[]")
             );
 
             if (history.length() == 0) {
@@ -597,31 +721,25 @@ public class MainActivity extends Activity {
                 signalText.setTextColor(Color.YELLOW);
 
                 statusText.setText(
-                    "No saved chart results yet.\n" +
-                    "Choose a screenshot to begin."
+                        "No saved chart results yet.\n" +
+                        "Choose a screenshot to begin."
                 );
 
                 return;
             }
 
-            JSONObject latest =
-                history.getJSONObject(0);
+            JSONObject latest = history.getJSONObject(0);
 
-            String signal =
-                latest.optString("signal", "WAIT");
-
-            String time =
-                latest.optString("time", "Unknown time");
-
-            int score =
-                latest.optInt("score", 0);
+            String signal = latest.optString("signal", "WAIT");
+            String time = latest.optString("time", "Unknown time");
+            int score = latest.optInt("score", 0);
 
             signalText.setText(signal);
 
             if (signal.contains("UP")) {
 
                 signalText.setTextColor(
-                    Color.rgb(50, 220, 120)
+                        Color.rgb(50, 220, 120)
                 );
 
             } else if (signal.contains("DOWN")) {
@@ -634,10 +752,10 @@ public class MainActivity extends Activity {
             }
 
             statusText.setText(
-                "Latest saved visual result\n" +
-                "Time: " + time + "\n" +
-                "Heuristic score: " + score + "%\n\n" +
-                "This is not a live market signal."
+                    "Latest saved visual result\n" +
+                    "Time: " + time + "\n" +
+                    "Heuristic score: " + score + "%\n\n" +
+                    "This is not a live market signal."
             );
 
         } catch (Exception e) {
@@ -646,150 +764,148 @@ public class MainActivity extends Activity {
             signalText.setTextColor(Color.YELLOW);
 
             statusText.setText(
-                "Could not load the latest saved result."
+                    "Could not load the latest saved result."
             );
         }
     }
 
-    // DISPLAY SAVED HISTORY
+    // =====================================================
+    // SHOW HISTORY
+    // =====================================================
 
     private void showHistory() {
 
         try {
 
             JSONArray history = new JSONArray(
-                prefs.getString(HISTORY, "[]")
+                    prefs.getString(HISTORY, "[]")
             );
 
             if (history.length() == 0) {
 
                 new AlertDialog.Builder(this)
-                    .setTitle("Signal history")
-                    .setMessage(
-                        "No chart images analysed yet."
-                    )
-                    .setPositiveButton("OK", null)
-                    .show();
+                        .setTitle("Signal history")
+                        .setMessage("No chart images analysed yet.")
+                        .setPositiveButton("OK", null)
+                        .show();
 
                 return;
             }
 
             StringBuilder text = new StringBuilder();
 
-            for (
-                int i = 0;
-                i < history.length();
-                i++
-            ) {
+            for (int i = 0; i < history.length(); i++) {
 
-                JSONObject item =
-                    history.getJSONObject(i);
+                JSONObject item = history.getJSONObject(i);
 
                 text.append(
-                    item.optString("time", "Unknown time")
+                        item.optString("time", "Unknown time")
                 )
                 .append(" — ")
-                .append(
-                    item.optString("signal", "WAIT")
-                )
+                .append(item.optString("signal", "WAIT"))
                 .append(" (")
                 .append(item.optInt("score", 0))
                 .append("% heuristic score)\n\n");
             }
 
             new AlertDialog.Builder(this)
-                .setTitle("Recent visual results")
-                .setMessage(text.toString())
-                .setPositiveButton("CLOSE", null)
-                .show();
+                    .setTitle("Recent visual results")
+                    .setMessage(text.toString())
+                    .setPositiveButton("CLOSE", null)
+                    .show();
 
         } catch (Exception e) {
 
             Toast.makeText(
-                this,
-                "Could not load history.",
-                Toast.LENGTH_SHORT
+                    this,
+                    "Could not load history.",
+                    Toast.LENGTH_SHORT
             ).show();
         }
     }
 
+    // =====================================================
     // CLEAR HISTORY
+    // =====================================================
 
     private void clearHistory() {
 
         new AlertDialog.Builder(this)
-            .setTitle("Clear history?")
-            .setMessage(
-                "This removes saved results from this phone."
-            )
-            .setNegativeButton("CANCEL", null)
-            .setPositiveButton(
-                "CLEAR",
-                (dialog, which) -> {
+                .setTitle("Clear history?")
+                .setMessage(
+                        "This removes saved results from this phone."
+                )
+                .setNegativeButton("CANCEL", null)
+                .setPositiveButton(
+                        "CLEAR",
+                        (dialog, which) -> {
 
-                    prefs.edit()
-                        .remove(HISTORY)
-                        .apply();
+                            prefs.edit()
+                                    .remove(HISTORY)
+                                    .apply();
 
-                    refreshCount();
-                    refreshLatestResult();
+                            refreshCount();
+                            refreshLatestResult();
 
-                    Toast.makeText(
-                        this,
-                        "History cleared.",
-                        Toast.LENGTH_SHORT
-                    ).show();
-                }
-            )
-            .show();
+                            Toast.makeText(
+                                    this,
+                                    "History cleared.",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+                )
+                .show();
     }
 
-    // CHANGE SENSITIVITY
+    // =====================================================
+    // SENSITIVITY SETTINGS
+    // =====================================================
 
     private void showSettings() {
 
         String[] options = {
-            "Low sensitivity (10%)",
-            "Normal sensitivity (15%)",
-            "High sensitivity (25%)"
+                "Low sensitivity (10%)",
+                "Normal sensitivity (15%)",
+                "High sensitivity (25%)"
         };
 
-        int current =
-            prefs.getInt(THRESHOLD, 15);
+        int current = prefs.getInt(THRESHOLD, 15);
 
         int selected =
-            current == 10 ? 0 :
-            current == 25 ? 2 : 1;
+                current == 10 ? 0 :
+                current == 25 ? 2 : 1;
 
         new AlertDialog.Builder(this)
-            .setTitle("Visual sensitivity")
-            .setSingleChoiceItems(
-                options,
-                selected,
-                (dialog, which) -> {
+                .setTitle("Visual sensitivity")
+                .setSingleChoiceItems(
+                        options,
+                        selected,
+                        (dialog, which) -> {
 
-                    int value =
-                        which == 0 ? 10 :
-                        which == 2 ? 25 : 15;
+                            int value =
+                                    which == 0 ? 10 :
+                                    which == 2 ? 25 : 15;
 
-                    prefs.edit()
-                        .putInt(THRESHOLD, value)
-                        .apply();
+                            prefs.edit()
+                                    .putInt(THRESHOLD, value)
+                                    .apply();
 
-                    dialog.dismiss();
+                            dialog.dismiss();
 
-                    Toast.makeText(
-                        this,
-                        "Sensitivity saved.",
-                        Toast.LENGTH_SHORT
-                    ).show();
-                }
-            )
-            .setNegativeButton("CANCEL", null)
-            .show();
+                            Toast.makeText(
+                                    this,
+                                    "Sensitivity saved.",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+                )
+                .setNegativeButton("CANCEL", null)
+                .show();
     }
 
+    // =====================================================
     // COUNT SAVED RESULTS
+    // =====================================================
 
     private void refreshCount() {
 
@@ -800,18 +916,18 @@ public class MainActivity extends Activity {
         try {
 
             JSONArray history = new JSONArray(
-                prefs.getString(HISTORY, "[]")
+                    prefs.getString(HISTORY, "[]")
             );
 
             countText.setText(
-                "Saved results on this phone: " +
-                history.length()
+                    "Saved results on this phone: " +
+                    history.length()
             );
 
         } catch (Exception e) {
 
             countText.setText(
-                "Saved results on this phone: 0"
+                    "Saved results on this phone: 0"
             );
         }
     }
