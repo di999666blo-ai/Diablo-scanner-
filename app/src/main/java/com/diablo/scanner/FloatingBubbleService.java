@@ -381,7 +381,7 @@ public class FloatingBubbleService extends Service {
         updateStats();
     }
 
-    // READ THE LATEST SCANNER RESULT
+    // READ LATEST RESULT AND CHART MEMORY
 
     private void refreshLatestResult() {
         if (signalView == null || detailsView == null) {
@@ -447,11 +447,26 @@ public class FloatingBubbleService extends Service {
             tradeDirection = "WAIT";
         }
 
+        SharedPreferences memoryPrefs =
+                getSharedPreferences(PREFS, MODE_PRIVATE);
+
+        String patternMemory = memoryPrefs.getString(
+                "latest_pattern_memory",
+                "No saved chart comparison yet."
+        );
+
+        int patternCount = memoryPrefs.getInt(
+                "chart_pattern_count",
+                0
+        );
+
         detailsView.setText(
                 source +
                 "\nLast result: " + time +
                 "\nVisual heuristic score: " + score +
-                "\n\nThis is a visual heuristic, not AI or a guaranteed signal."
+                "\nSaved chart patterns: " + patternCount +
+                "\nMemory comparison: " + patternMemory +
+                "\n\nImportant: visual similarity is not a prediction. This scanner is not yet connected to an AI model."
         );
     }
 
