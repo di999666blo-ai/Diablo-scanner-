@@ -39,7 +39,6 @@ public class ScreenCaptureService extends Service {
 
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "diablo_screen_capture";
-
     private static final long ANALYSIS_INTERVAL_MS = 5000L;
 
     private MediaProjection projection;
@@ -61,15 +60,12 @@ public class ScreenCaptureService extends Service {
     }
 
     private void createNotificationChannel() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-            NotificationChannel channel =
-                    new NotificationChannel(
-                            CHANNEL_ID,
-                            "DIABLO Screen Capture",
-                            NotificationManager.IMPORTANCE_LOW
-                    );
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "DIABLO Screen Capture",
+                    NotificationManager.IMPORTANCE_LOW
+            );
 
             channel.setDescription(
                     "DIABLO live chart screen analysis"
@@ -85,7 +81,6 @@ public class ScreenCaptureService extends Service {
     }
 
     private Notification createNotification() {
-
         Notification.Builder builder;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -96,41 +91,28 @@ public class ScreenCaptureService extends Service {
 
         return builder
                 .setContentTitle("DIABLO SCANNER")
-                .setContentText(
-                        "Live screen analysis is running"
-                )
+                .setContentText("Live screen analysis is running")
                 .setSmallIcon(android.R.drawable.ic_menu_view)
                 .setOngoing(true)
                 .build();
     }
 
     private void startCaptureNotification() {
-
         Notification notification = createNotification();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-
             startForeground(
                     NOTIFICATION_ID,
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
             );
-
         } else {
-
-            startForeground(
-                    NOTIFICATION_ID,
-                    notification
-            );
+            startForeground(NOTIFICATION_ID, notification);
         }
     }
 
     @Override
-    public int onStartCommand(
-            Intent intent,
-            int flags,
-            int startId
-    ) {
+    public int onStartCommand(Intent intent, int flags, int startId) {
 
         if (intent == null) {
             stopSelf();
@@ -155,14 +137,11 @@ public class ScreenCaptureService extends Service {
         Intent resultData;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
             resultData = intent.getParcelableExtra(
                     EXTRA_RESULT_DATA,
                     Intent.class
             );
-
         } else {
-
             resultData = intent.getParcelableExtra(
                     EXTRA_RESULT_DATA
             );
@@ -174,7 +153,6 @@ public class ScreenCaptureService extends Service {
         }
 
         try {
-
             startCaptureNotification();
 
             MediaProjectionManager manager =
@@ -199,7 +177,6 @@ public class ScreenCaptureService extends Service {
             startCapture();
 
         } catch (Exception e) {
-
             stopCapture();
             stopSelf();
         }
@@ -225,13 +202,10 @@ public class ScreenCaptureService extends Service {
             return;
         }
 
-        workerThread =
-                new HandlerThread("DiabloCaptureWorker");
-
+        workerThread = new HandlerThread("DiabloCaptureWorker");
         workerThread.start();
 
-        workerHandler =
-                new Handler(workerThread.getLooper());
+        workerHandler = new Handler(workerThread.getLooper());
 
         imageReader = ImageReader.newInstance(
                 width,
@@ -242,7 +216,6 @@ public class ScreenCaptureService extends Service {
 
         projection.registerCallback(
                 new MediaProjection.Callback() {
-
                     @Override
                     public void onStop() {
                         stopCapture();
@@ -285,7 +258,6 @@ public class ScreenCaptureService extends Service {
         Bitmap croppedBitmap = null;
 
         try {
-
             image = reader.acquireLatestImage();
 
             if (image == null) {
@@ -299,7 +271,6 @@ public class ScreenCaptureService extends Service {
             }
 
             Image.Plane plane = planes[0];
-
             ByteBuffer buffer = plane.getBuffer();
 
             int pixelStride = plane.getPixelStride();
@@ -308,11 +279,9 @@ public class ScreenCaptureService extends Service {
             int imageWidth = image.getWidth();
             int imageHeight = image.getHeight();
 
-            if (
-                    pixelStride <= 0 ||
+            if (pixelStride <= 0 ||
                     imageWidth <= 0 ||
-                    imageHeight <= 0
-            ) {
+                    imageHeight <= 0) {
                 return;
             }
 
@@ -343,33 +312,27 @@ public class ScreenCaptureService extends Service {
             analyseCapturedBitmap(croppedBitmap);
 
         } catch (Exception ignored) {
-
-            // Keep the capture service running after a failed frame.
-
+            // A failed frame must not stop screen capture.
         } finally {
 
             if (image != null) {
                 image.close();
             }
 
-            if (
-                    croppedBitmap != null &&
-                    !croppedBitmap.isRecycled()
-            ) {
+            if (croppedBitmap != null &&
+                    !croppedBitmap.isRecycled()) {
                 croppedBitmap.recycle();
             }
 
-            if (
-                    fullBitmap != null &&
-                    !fullBitmap.isRecycled()
-            ) {
+            if (fullBitmap != null &&
+                    !fullBitmap.isRecycled()) {
                 fullBitmap.recycle();
             }
         }
     }
 
     // ================================================
-    // DIABLO VISUAL CHART ANALYSER
+    // DIABLO VISUAL CHART ANALYSER AND CHART MEMORY
     // ================================================
 
     private void analyseCapturedBitmap(Bitmap bitmap) {
@@ -383,7 +346,6 @@ public class ScreenCaptureService extends Service {
         lastAnalysisTime = now;
 
         try {
-
             int width = bitmap.getWidth();
             int height = bitmap.getHeight();
 
@@ -391,14 +353,7 @@ public class ScreenCaptureService extends Service {
                 return;
             }
 
-            /*
-             * Analyse the central chart area instead of the
-             * entire screen.
-             *
-             * These boundaries are approximate. Different
-             * brokers may place their charts differently.
-             */
-
+            // Approximate central chart area.
             int left = (int) (width * 0.05);
             int right = (int) (width * 0.95);
 
@@ -432,7 +387,6 @@ public class ScreenCaptureService extends Service {
             long lowerRed = 0;
 
             for (int y = top; y < bottom; y += step) {
-
                 for (int x = left; x < right; x += step) {
 
                     int pixel = bitmap.getPixel(x, y);
@@ -452,7 +406,6 @@ public class ScreenCaptureService extends Service {
                             r > b * 1.12;
 
                     if (isGreen) {
-
                         green++;
 
                         if (y < top + chartHeight / 3) {
@@ -464,7 +417,6 @@ public class ScreenCaptureService extends Service {
                         }
 
                     } else if (isRed) {
-
                         red++;
 
                         if (y < top + chartHeight / 3) {
@@ -480,11 +432,10 @@ public class ScreenCaptureService extends Service {
 
             long total = green + red;
 
-            SharedPreferences prefs =
-                    getSharedPreferences(
-                            "diablo_scanner",
-                            MODE_PRIVATE
-                    );
+            SharedPreferences prefs = getSharedPreferences(
+                    "diablo_scanner",
+                    MODE_PRIVATE
+            );
 
             int threshold = prefs.getInt("threshold", 15);
 
@@ -493,8 +444,7 @@ public class ScreenCaptureService extends Service {
 
             /*
              * This is a visual colour heuristic, not a trained
-             * AI model. Its score is not a measured probability
-             * of winning a trade.
+             * AI model. The score is not a measured win probability.
              */
 
             if (total >= 20) {
@@ -521,35 +471,26 @@ public class ScreenCaptureService extends Service {
                                 ? 0
                                 : (lowerGreen - lowerRed) / lowerTotal;
 
-                /*
-                 * Compare the colour balance across vertical
-                 * zones. This is only a rough screen heuristic;
-                 * it does not identify candle bodies or wicks.
-                 */
-
                 double zoneDirection =
-                        (upperBalance + middleBalance + lowerBalance) / 3.0;
+                        (upperBalance +
+                         middleBalance +
+                         lowerBalance) / 3.0;
 
                 double combinedScore =
                         (0.65 * (green - red) / total)
                         + (0.35 * zoneDirection);
 
-                if (
-                        overallDifference >= threshold / 100.0
-                        && combinedScore > 0.12
-                ) {
+                if (overallDifference >= threshold / 100.0
+                        && combinedScore > 0.12) {
 
                     signal = "UP BIAS";
 
-                } else if (
-                        overallDifference >= threshold / 100.0
-                        && combinedScore < -0.12
-                ) {
+                } else if (overallDifference >= threshold / 100.0
+                        && combinedScore < -0.12) {
 
                     signal = "DOWN BIAS";
 
                 } else {
-
                     signal = "WAIT";
                 }
 
@@ -565,6 +506,21 @@ public class ScreenCaptureService extends Service {
                 }
             }
 
+            /*
+             * NEW: Save this chart's visual fingerprint and
+             * compare it with previously saved chart patterns.
+             *
+             * Similarity is not a prediction of trade success.
+             */
+            String patternMemory =
+                    ChartMemory.rememberAndCompare(
+                            this,
+                            bitmap,
+                            signal,
+                            score
+                    );
+
+            // Save the normal scan result and its history.
             saveLiveResult(
                     prefs,
                     signal,
@@ -573,8 +529,19 @@ public class ScreenCaptureService extends Service {
                     red
             );
 
-        } catch (Exception ignored) {
+            // Store the latest pattern-comparison message.
+            prefs.edit()
+                    .putString(
+                            "latest_pattern_memory",
+                            patternMemory
+                    )
+                    .putInt(
+                            "chart_pattern_count",
+                            ChartMemory.getPatternCount(this)
+                    )
+                    .apply();
 
+        } catch (Exception ignored) {
             // A failed analysis must not stop screen capture.
         }
     }
@@ -615,11 +582,7 @@ public class ScreenCaptureService extends Service {
 
         updated.put(item);
 
-        for (
-                int i = 0;
-                i < old.length() && i < 49;
-                i++
-        ) {
+        for (int i = 0; i < old.length() && i < 49; i++) {
             updated.put(old.get(i));
         }
 
@@ -642,18 +605,12 @@ public class ScreenCaptureService extends Service {
         captureStarted = false;
 
         if (virtualDisplay != null) {
-
             virtualDisplay.release();
             virtualDisplay = null;
         }
 
         if (imageReader != null) {
-
-            imageReader.setOnImageAvailableListener(
-                    null,
-                    null
-            );
-
+            imageReader.setOnImageAvailableListener(null, null);
             imageReader.close();
             imageReader = null;
         }
@@ -662,7 +619,6 @@ public class ScreenCaptureService extends Service {
         projection = null;
 
         if (oldProjection != null) {
-
             try {
                 oldProjection.stop();
             } catch (Exception ignored) {
@@ -670,7 +626,6 @@ public class ScreenCaptureService extends Service {
         }
 
         if (workerThread != null) {
-
             workerThread.quitSafely();
             workerThread = null;
             workerHandler = null;
@@ -681,11 +636,8 @@ public class ScreenCaptureService extends Service {
 
     @Override
     public void onDestroy() {
-
         stopCapture();
-
         stopForeground(true);
-
         super.onDestroy();
     }
 
