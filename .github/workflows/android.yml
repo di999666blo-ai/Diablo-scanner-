@@ -1,58 +1,106 @@
 name: DIABLO SCANNER BUILD
 
 on:
-workflow_dispatch:
-push:
-branches:
-- main
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
-contents: read
+  contents: read
 
 jobs:
-build:
-name: Build Android APK
-runs-on: ubuntu-latest
-timeout-minutes: 90
+  build:
+    name: Build Diablo Scanner with Vision AI
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
 
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout Diablo Scanner
+        uses: actions/checkout@v4
 
-  - name: Set up Java 17
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: '17'
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-  - name: Set up Gradle
-    uses: gradle/actions/setup-gradle@v4
-    with:
-      gradle-version: '8.7'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
-  - name: Set up Android SDK
-    uses: android-actions/setup-android@v3
-    with:
-      packages: platform-tools
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
-  - name: Install Android SDK and native build tools
-    run: |
-      sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
-      echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Install Android build tools
+        run: |
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018" \
+            "cmake;3.22.1"
 
-  - name: Verify native build tools
-    run: |
-      test -d "$ANDROID_NDK_HOME"
-      cmake --version
-      echo "Android NDK ready for vision AI integration."
+      - name: Download llama.cpp vision engine
+        run: |
+          git clone --depth 1 \
+            https://github.com/ggml-org/llama.cpp.git \
+            llama.cpp
 
-  - name: Build APK
-    run: gradle --no-daemon assembleDebug
+      - name: Build vision engine for Android
+        run: |
+          set -e
 
-  - name: Upload APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: diablo-scanner-apk
-      path: app/build/outputs/apk/debug/app-debug.apk
-      if-no-files-found: error
-      retention-days: 7
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          mkdir -p app/src/main/assets/arm64-v8a
+          mkdir -p app/src/main/assets/armeabi-v7a
+
+          for ABI in arm64-v8a armeabi-v7a; do
+            echo "Building vision engine for $ABI"
+
+            cmake -S llama.cpp -B "llama.cpp/build-$ABI" \
+              -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI="$ABI" \
+              -DANDROID_PLATFORM=android-26 \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DGGML_NATIVE=OFF \
+              -DGGML_OPENMP=OFF \
+              -DGGML_LLAMAFILE=OFF \
+              -DGGML_CUDA=OFF \
+              -DLLAMA_OPENSSL=OFF \
+              -DLLAMA_BUILD_TESTS=OFF \
+              -DLLAMA_BUILD_EXAMPLES=OFF \
+              -DLLAMA_BUILD_SERVER=OFF \
+              -DLLAMA_BUILD_APP=OFF \
+              -DLLAMA_BUILD_TOOLS=ON \
+              -DLLAMA_BUILD_UI=OFF
+
+            cmake --build "llama.cpp/build-$ABI" \
+              --target llama-mtmd-cli \
+              --config Release \
+              -j2
+
+            BIN="llama.cpp/build-$ABI/bin/llama-mtmd-cli"
+
+            if [ ! -f "$BIN" ]; then
+              echo "Vision engine binary missing for $ABI"
+              exit 1
+            fi
+
+            cp "$BIN" "app/src/main/assets/$ABI/llama-mtmd-cli"
+            chmod 755 "app/src/main/assets/$ABI/llama-mtmd-cli"
+          done
+
+      - name: Build Android APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: diablo-scanner-vision-ai-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
