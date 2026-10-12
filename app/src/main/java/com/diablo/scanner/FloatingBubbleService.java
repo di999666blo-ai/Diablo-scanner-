@@ -28,7 +28,10 @@ import java.util.Locale;
 public class FloatingBubbleService extends Service {
 
     private static final String PREFS = "diablo_scanner";
-    private static final String AI_PREFS = "diablo_scanner_ai";
+
+    // AI results are saved in the same preferences as live scan results.
+    private static final String AI_PREFS = "diablo_scanner";
+
     private static final String TRADE_PREFS = "diablo_trade_records";
     private static final String TRADE_HISTORY = "trades";
 
@@ -361,7 +364,7 @@ public class FloatingBubbleService extends Service {
         updateStats();
     }
 
-    // READ LATEST RESULT, PRIORITISING A FRESH AI RESULT
+    // READ LATEST RESULT
 
     private void refreshLatestResult() {
         if (signalView == null || detailsView == null) {
@@ -379,10 +382,10 @@ public class FloatingBubbleService extends Service {
         SharedPreferences prefs =
                 getSharedPreferences(PREFS, MODE_PRIVATE);
 
+        // FIX: AI result fields are saved in diablo_scanner.
         SharedPreferences aiPrefs =
                 getSharedPreferences(AI_PREFS, MODE_PRIVATE);
 
-        // Prefer a recent AI result over basic colour analysis.
         String aiSignal = aiPrefs.getString(
                 "latest_ai_signal",
                 ""
@@ -409,7 +412,7 @@ public class FloatingBubbleService extends Service {
             usingAI = true;
         }
 
-        // Fall back to the saved history if there is no fresh AI result.
+        // Otherwise use the most recent non-AI history entry.
         if (!usingAI) {
             try {
                 JSONArray history = new JSONArray(
@@ -424,8 +427,6 @@ public class FloatingBubbleService extends Service {
                             "SAVED_SCREENSHOT"
                     );
 
-                    // Ignore old AI history here. Freshness is checked
-                    // against the dedicated AI timestamp above.
                     if ("LIVE_AI".equals(sourceValue)) {
                         continue;
                     }
@@ -448,7 +449,6 @@ public class FloatingBubbleService extends Service {
         }
 
         signal = normaliseSignal(signal);
-
         signalView.setText(signal);
 
         if ("UP".equals(signal)) {
@@ -555,7 +555,6 @@ public class FloatingBubbleService extends Service {
 
             long age = System.currentTimeMillis() - parsed.getTime();
 
-            // Allow a small clock difference, but don't show very old AI.
             return age >= -60000L && age <= AI_FRESHNESS_MS;
 
         } catch (Exception error) {
@@ -581,7 +580,7 @@ public class FloatingBubbleService extends Service {
         return "WAIT";
     }
 
-    // START THE TRADE TIMER
+    // TRADE TIMER
 
     private void startTrade() {
         if (tradeActive || awaitingResult) {
