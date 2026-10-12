@@ -28,8 +28,12 @@ import java.util.Locale;
 public class FloatingBubbleService extends Service {
 
     private static final String PREFS = "diablo_scanner";
+    private static final String AI_PREFS = "diablo_scanner_ai";
     private static final String TRADE_PREFS = "diablo_trade_records";
     private static final String TRADE_HISTORY = "trades";
+
+    private static final long DEFAULT_TRADE_DURATION_MS = 60000L;
+    private static final long AI_FRESHNESS_MS = 180000L;
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams bubbleParams;
@@ -48,7 +52,7 @@ public class FloatingBubbleService extends Service {
     private boolean awaitingResult = false;
 
     private long tradeStartMs = 0L;
-    private long tradeDurationMs = 30000L;
+    private long tradeDurationMs = DEFAULT_TRADE_DURATION_MS;
 
     private String tradeDirection = "WAIT";
 
@@ -81,11 +85,9 @@ public class FloatingBubbleService extends Service {
 
     private GradientDrawable makeBackground(int color) {
         GradientDrawable shape = new GradientDrawable();
-
         shape.setColor(color);
         shape.setCornerRadius(24);
         shape.setStroke(2, Color.rgb(255, 35, 65));
-
         return shape;
     }
 
@@ -95,26 +97,18 @@ public class FloatingBubbleService extends Service {
             int color
     ) {
         TextView view = new TextView(this);
-
         view.setText(text);
         view.setTextSize(size);
         view.setTextColor(color);
         view.setGravity(Gravity.CENTER);
-
-        view.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
+        view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         view.setPadding(10, 9, 10, 9);
-
         return view;
     }
 
     private int getOverlayType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            return WindowManager.LayoutParams
-                    .TYPE_APPLICATION_OVERLAY;
+            return WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         }
 
         return WindowManager.LayoutParams.TYPE_PHONE;
@@ -136,11 +130,7 @@ public class FloatingBubbleService extends Service {
     // MOVABLE D BUBBLE
 
     private void showBubble() {
-        TextView icon = makeText(
-                "D",
-                25,
-                Color.WHITE
-        );
+        TextView icon = makeText("D", 25, Color.WHITE);
 
         icon.setBackground(
                 makeBackground(Color.rgb(10, 10, 16))
@@ -153,32 +143,29 @@ public class FloatingBubbleService extends Service {
         bubbleParams.x = 12;
         bubbleParams.y = 180;
 
-        windowManager.addView(bubble, bubbleParams);
+        try {
+            windowManager.addView(bubble, bubbleParams);
+        } catch (Exception error) {
+            bubble = null;
+            stopSelf();
+            return;
+        }
 
         icon.setOnTouchListener(new View.OnTouchListener() {
-
             float downX;
             float downY;
-
             int startX;
             int startY;
-
             boolean moved;
 
             @Override
-            public boolean onTouch(
-                    View view,
-                    MotionEvent event
-            ) {
+            public boolean onTouch(View view, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_DOWN) {
                     downX = event.getRawX();
                     downY = event.getRawY();
-
                     startX = bubbleParams.x;
                     startY = bubbleParams.y;
-
                     moved = false;
-
                     return true;
                 }
 
@@ -211,7 +198,6 @@ public class FloatingBubbleService extends Service {
                     if (!moved) {
                         expandPanel();
                     }
-
                     return true;
                 }
 
@@ -226,15 +212,9 @@ public class FloatingBubbleService extends Service {
             int backgroundColor,
             View.OnClickListener listener
     ) {
-        TextView button = makeText(
-                label,
-                13,
-                Color.WHITE
-        );
+        TextView button = makeText(label, 13, Color.WHITE);
 
-        button.setBackground(
-                makeBackground(backgroundColor)
-        );
+        button.setBackground(makeBackground(backgroundColor));
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(
@@ -246,7 +226,6 @@ public class FloatingBubbleService extends Service {
         params.bottomMargin = 2;
 
         layout.addView(button, params);
-
         button.setOnClickListener(listener);
     }
 
@@ -262,14 +241,16 @@ public class FloatingBubbleService extends Service {
         int oldX = bubbleParams.x;
         int oldY = bubbleParams.y;
 
-        windowManager.removeView(bubble);
+        try {
+            windowManager.removeView(bubble);
+        } catch (Exception ignored) {
+        }
+
         bubble = null;
 
         LinearLayout layout = new LinearLayout(this);
-
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(12, 10, 12, 10);
-
         layout.setBackground(
                 makeBackground(Color.rgb(12, 12, 18))
         );
@@ -282,20 +263,14 @@ public class FloatingBubbleService extends Service {
                 )
         );
 
-        signalView = makeText(
-                "WAIT",
-                27,
-                Color.YELLOW
-        );
-
+        signalView = makeText("WAIT", 27, Color.YELLOW);
         layout.addView(signalView);
 
         detailsView = makeText(
-                "Loading latest result...",
+                "Waiting for a chart analysis...",
                 12,
                 Color.LTGRAY
         );
-
         layout.addView(detailsView);
 
         tradeStatusView = makeText(
@@ -303,15 +278,9 @@ public class FloatingBubbleService extends Service {
                 13,
                 Color.WHITE
         );
-
         layout.addView(tradeStatusView);
 
-        statsView = makeText(
-                "",
-                12,
-                Color.LTGRAY
-        );
-
+        statsView = makeText("", 12, Color.LTGRAY);
         layout.addView(statsView);
 
         addButton(
@@ -374,14 +343,25 @@ public class FloatingBubbleService extends Service {
         panelParams.x = oldX;
         panelParams.y = oldY;
 
-        windowManager.addView(panel, panelParams);
+        try {
+            windowManager.addView(panel, panelParams);
+        } catch (Exception error) {
+            panel = null;
+            expanded = false;
+            signalView = null;
+            detailsView = null;
+            tradeStatusView = null;
+            statsView = null;
+            showBubble();
+            return;
+        }
 
         refreshLatestResult();
         updateTradeStatus();
         updateStats();
     }
 
-    // READ LATEST RESULT AND CHART MEMORY
+    // READ LATEST RESULT, PRIORITISING A FRESH AI RESULT
 
     private void refreshLatestResult() {
         if (signalView == null || detailsView == null) {
@@ -391,83 +371,214 @@ public class FloatingBubbleService extends Service {
         String signal = "WAIT";
         String time = "No saved result yet";
         String source = "No analysis recorded";
-
+        String explanation = "";
         int score = 0;
 
-        try {
-            SharedPreferences prefs =
-                    getSharedPreferences(PREFS, MODE_PRIVATE);
+        boolean usingAI = false;
 
-            JSONArray history = new JSONArray(
-                    prefs.getString("history", "[]")
-            );
+        SharedPreferences prefs =
+                getSharedPreferences(PREFS, MODE_PRIVATE);
 
-            if (history.length() > 0) {
-                JSONObject latest = history.getJSONObject(0);
+        SharedPreferences aiPrefs =
+                getSharedPreferences(AI_PREFS, MODE_PRIVATE);
 
-                signal = latest.optString("signal", "WAIT");
-                time = latest.optString("time", "Unknown time");
-                score = latest.optInt("score", 0);
+        // Prefer a recent AI result over basic colour analysis.
+        String aiSignal = aiPrefs.getString(
+                "latest_ai_signal",
+                ""
+        );
 
-                String sourceValue = latest.optString(
-                        "source",
-                        "SAVED_SCREENSHOT"
+        String aiTime = aiPrefs.getString(
+                "latest_ai_time",
+                ""
+        );
+
+        String aiDetails = aiPrefs.getString(
+                "latest_ai_details",
+                ""
+        );
+
+        int aiScore = aiPrefs.getInt("latest_ai_score", 0);
+
+        if (isFreshAIResult(aiSignal, aiTime)) {
+            signal = normaliseSignal(aiSignal);
+            time = aiTime;
+            source = "Source: Local AI chart analysis";
+            explanation = aiDetails;
+            score = Math.max(0, Math.min(100, aiScore));
+            usingAI = true;
+        }
+
+        // Fall back to the saved history if there is no fresh AI result.
+        if (!usingAI) {
+            try {
+                JSONArray history = new JSONArray(
+                        prefs.getString("history", "[]")
                 );
 
-                if ("LIVE_SCREEN".equals(sourceValue)) {
-                    source = "Source: Live screen capture";
-                } else {
-                    source = "Source: Saved screenshot";
+                for (int i = 0; i < history.length(); i++) {
+                    JSONObject item = history.getJSONObject(i);
+
+                    String sourceValue = item.optString(
+                            "source",
+                            "SAVED_SCREENSHOT"
+                    );
+
+                    // Ignore old AI history here. Freshness is checked
+                    // against the dedicated AI timestamp above.
+                    if ("LIVE_AI".equals(sourceValue)) {
+                        continue;
+                    }
+
+                    signal = item.optString("signal", "WAIT");
+                    time = item.optString("time", "Unknown time");
+                    score = item.optInt("score", 0);
+
+                    if ("LIVE_SCREEN".equals(sourceValue)) {
+                        source = "Source: Live screen colour analysis";
+                    } else {
+                        source = "Source: Saved screenshot analysis";
+                    }
+
+                    break;
                 }
+            } catch (Exception ignored) {
+                source = "Could not read saved history";
             }
-        } catch (Exception ignored) {
-            source = "Could not read saved history";
         }
+
+        signal = normaliseSignal(signal);
 
         signalView.setText(signal);
 
-        if (signal.toUpperCase(Locale.US).contains("UP")) {
-            signalView.setTextColor(
-                    Color.rgb(50, 230, 120)
-            );
-
+        if ("UP".equals(signal)) {
+            signalView.setTextColor(Color.rgb(50, 230, 120));
             tradeDirection = "UP";
-
-        } else if (
-                signal.toUpperCase(Locale.US).contains("DOWN")
-        ) {
-            signalView.setTextColor(
-                    Color.rgb(255, 45, 65)
-            );
-
+        } else if ("DOWN".equals(signal)) {
+            signalView.setTextColor(Color.rgb(255, 45, 65));
             tradeDirection = "DOWN";
-
         } else {
             signalView.setTextColor(Color.YELLOW);
             tradeDirection = "WAIT";
         }
 
-        SharedPreferences memoryPrefs =
-                getSharedPreferences(PREFS, MODE_PRIVATE);
-
-        String patternMemory = memoryPrefs.getString(
+        String patternMemory = prefs.getString(
                 "latest_pattern_memory",
                 "No saved chart comparison yet."
         );
 
-        int patternCount = memoryPrefs.getInt(
+        int patternCount = prefs.getInt(
                 "chart_pattern_count",
                 0
         );
 
-        detailsView.setText(
-                source +
-                "\nLast result: " + time +
-                "\nVisual heuristic score: " + score +
-                "\nSaved chart patterns: " + patternCount +
-                "\nMemory comparison: " + patternMemory +
-                "\n\nImportant: visual similarity is not a prediction. This scanner is not yet connected to an AI model."
+        StringBuilder message = new StringBuilder();
+
+        message.append(source);
+        message.append("\nLast result: ").append(time);
+
+        if (usingAI) {
+            message.append("\nAI confidence estimate: ")
+                    .append(score)
+                    .append("%");
+
+            message.append("\n\nAI explanation:\n");
+
+            if (explanation == null || explanation.trim().isEmpty()) {
+                message.append("No explanation was returned.");
+            } else {
+                message.append(explanation.trim());
+            }
+
+            message.append(
+                    "\n\nAI confidence is subjective, not a verified win probability."
+            );
+        } else {
+            message.append("\nVisual heuristic score: ")
+                    .append(score);
+
+            message.append("\nSaved chart patterns: ")
+                    .append(patternCount);
+
+            message.append("\nMemory comparison: ")
+                    .append(patternMemory);
+
+            message.append(
+                    "\n\nBasic visual analysis is not an AI prediction."
+            );
+
+            if (aiSignal == null || aiSignal.trim().isEmpty()) {
+                message.append(
+                        "\nAI result unavailable. Select both model files and check the engine."
+                );
+            } else {
+                message.append(
+                        "\nThe last AI result is old or not yet available. Waiting for a fresh result."
+                );
+            }
+        }
+
+        message.append(
+                "\n\nNo signal guarantees a winning trade. DIABLO does not place trades."
         );
+
+        detailsView.setText(message.toString());
+    }
+
+    private boolean isFreshAIResult(String signal, String time) {
+        if (signal == null || signal.trim().isEmpty()
+                || time == null || time.trim().isEmpty()) {
+            return false;
+        }
+
+        String normal = normaliseSignal(signal);
+
+        if (!"UP".equals(normal)
+                && !"DOWN".equals(normal)
+                && !"WAIT".equals(normal)) {
+            return false;
+        }
+
+        try {
+            SimpleDateFormat format = new SimpleDateFormat(
+                    "yyyy-MM-dd HH:mm:ss",
+                    Locale.getDefault()
+            );
+
+            format.setLenient(false);
+
+            Date parsed = format.parse(time);
+
+            if (parsed == null) {
+                return false;
+            }
+
+            long age = System.currentTimeMillis() - parsed.getTime();
+
+            // Allow a small clock difference, but don't show very old AI.
+            return age >= -60000L && age <= AI_FRESHNESS_MS;
+
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
+    private String normaliseSignal(String signal) {
+        if (signal == null) {
+            return "WAIT";
+        }
+
+        String upper = signal.trim().toUpperCase(Locale.ROOT);
+
+        if (upper.contains("UP")) {
+            return "UP";
+        }
+
+        if (upper.contains("DOWN")) {
+            return "DOWN";
+        }
+
+        return "WAIT";
     }
 
     // START THE TRADE TIMER
@@ -479,7 +590,6 @@ public class FloatingBubbleService extends Service {
                         "Finish the current trade record first."
                 );
             }
-
             return;
         }
 
@@ -488,15 +598,14 @@ public class FloatingBubbleService extends Service {
 
         tradeDurationMs = prefs.getLong(
                 "trade_duration_ms",
-                30000L
+                DEFAULT_TRADE_DURATION_MS
         );
 
         if (tradeDurationMs < 1000L) {
-            tradeDurationMs = 30000L;
+            tradeDurationMs = DEFAULT_TRADE_DURATION_MS;
         }
 
         tradeStartMs = System.currentTimeMillis();
-
         tradeActive = true;
         awaitingResult = false;
 
@@ -526,16 +635,14 @@ public class FloatingBubbleService extends Service {
                 tradeStatusView.setText(
                         "Duration finished. Mark the actual result: WIN, LOSS or UNKNOWN."
                 );
-
             } else {
                 tradeStatusView.setText(
                         "TRADE TIMER RUNNING" +
                         "\nDirection at entry: " + tradeDirection +
                         "\nTime left: " + formatDuration(remaining) +
-                        "\nScanner refreshes while the panel is open."
+                        "\nThe timer does not execute trades."
                 );
             }
-
         } else if (awaitingResult) {
             tradeStatusView.setText(
                     "Trade duration finished. Tap MARK WIN, MARK LOSS or MARK UNKNOWN."
@@ -566,7 +673,7 @@ public class FloatingBubbleService extends Service {
         );
     }
 
-    // SAVE THE USER-CONFIRMED TRADE RESULT
+    // SAVE USER-CONFIRMED TRADE RESULT
 
     private void saveTradeResult(String result) {
         if (!tradeActive && !awaitingResult) {
@@ -575,7 +682,6 @@ public class FloatingBubbleService extends Service {
                         "Tap I TOOK TRADE first to start a trade record."
                 );
             }
-
             return;
         }
 
@@ -598,7 +704,6 @@ public class FloatingBubbleService extends Service {
             );
 
             JSONArray updated = new JSONArray();
-
             JSONObject item = new JSONObject();
 
             item.put("result", result);
@@ -679,7 +784,6 @@ public class FloatingBubbleService extends Service {
                     unknown++;
                 }
             }
-
         } catch (Exception ignored) {
         }
 
@@ -703,7 +807,7 @@ public class FloatingBubbleService extends Service {
         );
     }
 
-    // MINIMISE THE PANEL
+    // MINIMISE PANEL
 
     private void collapsePanel() {
         if (panel != null) {
@@ -721,7 +825,6 @@ public class FloatingBubbleService extends Service {
         statsView = null;
 
         expanded = false;
-
         showBubble();
     }
 
@@ -736,7 +839,6 @@ public class FloatingBubbleService extends Service {
                 windowManager.removeView(bubble);
             } catch (Exception ignored) {
             }
-
             bubble = null;
         }
 
@@ -745,7 +847,6 @@ public class FloatingBubbleService extends Service {
                 windowManager.removeView(panel);
             } catch (Exception ignored) {
             }
-
             panel = null;
         }
 
