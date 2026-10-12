@@ -25,6 +25,9 @@ import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -52,6 +55,16 @@ public class ScreenCaptureService extends Service {
     private boolean stopping = false;
 
     private long lastAnalysisTime = 0L;
+
+    /*
+     * AI runs separately from screen capture.
+     * This prevents a slow model from freezing the live capture.
+     */
+    private final ExecutorService aiExecutor =
+            Executors.newSingleThreadExecutor();
+
+    private final AtomicBoolean aiRunning =
+            new AtomicBoolean(false);
 
     @Override
     public void onCreate() {
@@ -332,7 +345,7 @@ public class ScreenCaptureService extends Service {
     }
 
     // ================================================
-    // DIABLO VISUAL CHART ANALYSER AND CHART MEMORY
+    // LIVE CHART ANALYSIS
     // ================================================
 
     private void analyseCapturedBitmap(Bitmap bitmap) {
@@ -443,8 +456,8 @@ public class ScreenCaptureService extends Service {
             int score = 0;
 
             /*
-             * This is a visual colour heuristic, not a trained
-             * AI model. The score is not a measured win probability.
+             * Existing colour-based heuristic.
+             * Its score is not a measured win probability.
              */
 
             if (total >= 20) {
@@ -506,12 +519,7 @@ public class ScreenCaptureService extends Service {
                 }
             }
 
-            /*
-             * NEW: Save this chart's visual fingerprint and
-             * compare it with previously saved chart patterns.
-             *
-             * Similarity is not a prediction of trade success.
-             */
+            // Preserve the existing chart memory feature.
             String patternMemory =
                     ChartMemory.rememberAndCompare(
                             this,
@@ -520,7 +528,7 @@ public class ScreenCaptureService extends Service {
                             score
                     );
 
-            // Save the normal scan result and its history.
+            // Save the existing live scanner result.
             saveLiveResult(
                     prefs,
                     signal,
@@ -529,7 +537,6 @@ public class ScreenCaptureService extends Service {
                     red
             );
 
-            // Store the latest pattern-comparison message.
             prefs.edit()
                     .putString(
                             "latest_pattern_memory",
@@ -541,13 +548,217 @@ public class ScreenCaptureService extends Service {
                     )
                     .apply();
 
+            /*
+             * NEW AI CONNECTION:
+             * Send a safe copy of the captured chart to the AI
+             * on a background thread. The live capture continues.
+             */
+            startAIAnalysis(bitmap);
+
         } catch (Exception ignored) {
             // A failed analysis must not stop screen capture.
         }
     }
 
     // ================================================
-    // SAVE RESULT TO DIABLO HISTORY
+    // CONNECT LOCAL VISION AI TO LIVE SCREEN CAPTURE
+    // ================================================
+
+    private void startAIAnalysis(Bitmap capturedChart) {
+
+        // Do not run AI until both model files have been selected.
+        if (!LocalVisionAI.modelsReady(this)) {
+            return;
+        }
+
+        // Never start multiple expensive AI jobs simultaneously.
+        if (!aiRunning.compareAndSet(false, true)) {
+            return;
+        }
+
+        final Bitmap aiBitmap;
+
+        try {
+            aiBitmap = capturedChart.copy(
+                    Bitmap.Config.ARGB_8888,
+                    false
+            );
+
+            if (aiBitmap == null) {
+                aiRunning.set(false);
+                return;
+            }
+
+        } catch (Exception error) {
+            aiRunning.set(false);
+            return;
+        }
+
+        try {
+            aiExecutor.execute(() -> {
+
+                try {
+                    LocalVisionAI.Result result =
+                            LocalVisionAI.analyze(
+                                    getApplicationContext(),
+                                    aiBitmap
+                            );
+
+                    if (result != null) {
+                        saveAIResult(result);
+                    }
+
+                } catch (Exception ignored) {
+                    // AI failure must not stop live screen capture.
+                } finally {
+
+                    if (!aiBitmap.isRecycled()) {
+                        aiBitmap.recycle();
+                    }
+
+                    aiRunning.set(false);
+                }
+            });
+
+        } catch (Exception error) {
+
+            if (!aiBitmap.isRecycled()) {
+                aiBitmap.recycle();
+            }
+
+            aiRunning.set(false);
+        }
+    }
+
+    // ================================================
+    // SAVE AI RESULT TO HISTORY
+    // ================================================
+
+    private void saveAIResult(LocalVisionAI.Result result) {
+
+        if (result == null) {
+            return;
+        }
+
+        String aiSignal = result.signal == null
+                ? "WAIT"
+                : result.signal.trim().toUpperCase(Locale.ROOT);
+
+        if (!"UP".equals(aiSignal)
+                && !"DOWN".equals(aiSignal)) {
+            aiSignal = "WAIT";
+        }
+
+        String displaySignal;
+
+        if ("UP".equals(aiSignal)) {
+            displaySignal = "UP BIAS";
+        } else if ("DOWN".equals(aiSignal)) {
+            displaySignal = "DOWN BIAS";
+        } else {
+            displaySignal = "WAIT";
+        }
+
+        String details = result.details == null
+                ? "No AI explanation returned."
+                : result.details.trim();
+
+        int score = extractConfidence(details);
+
+        SharedPreferences prefs = getSharedPreferences(
+                "diablo_scanner",
+                MODE_PRIVATE
+        );
+
+        try {
+            JSONArray old = new JSONArray(
+                    prefs.getString("history", "[]")
+            );
+
+            JSONArray updated = new JSONArray();
+
+            JSONObject item = new JSONObject();
+
+            item.put(
+                    "time",
+                    new SimpleDateFormat(
+                            "yyyy-MM-dd HH:mm:ss",
+                            Locale.getDefault()
+                    ).format(new Date())
+            );
+
+            item.put("signal", displaySignal);
+            item.put("score", score);
+            item.put("green", 0);
+            item.put("red", 0);
+            item.put("source", "LIVE_AI");
+
+            updated.put(item);
+
+            for (int i = 0; i < old.length() && i < 49; i++) {
+                updated.put(old.get(i));
+            }
+
+            prefs.edit()
+                    .putString("history", updated.toString())
+                    .putString("latest_ai_details", details)
+                    .putString("latest_ai_signal", displaySignal)
+                    .putInt("latest_ai_score", score)
+                    .putString("latest_ai_time", item.getString("time"))
+                    .apply();
+
+        } catch (Exception ignored) {
+            // A history error must not stop the scanner.
+        }
+    }
+
+    private int extractConfidence(String details) {
+
+        if (details == null) {
+            return 0;
+        }
+
+        String[] lines = details.toUpperCase(Locale.ROOT)
+                .split("\\n");
+
+        for (String line : lines) {
+
+            String cleaned = line.trim();
+
+            if (cleaned.startsWith("CONFIDENCE:")) {
+
+                String value = cleaned.substring(
+                        "CONFIDENCE:".length()
+                ).trim();
+
+                StringBuilder digits = new StringBuilder();
+
+                for (int i = 0; i < value.length(); i++) {
+                    char c = value.charAt(i);
+
+                    if (Character.isDigit(c)) {
+                        digits.append(c);
+                    } else if (digits.length() > 0) {
+                        break;
+                    }
+                }
+
+                try {
+                    int parsed = Integer.parseInt(digits.toString());
+
+                    return Math.max(0, Math.min(100, parsed));
+
+                } catch (Exception ignored) {
+                    return 0;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    // ================================================
+    // SAVE NORMAL LIVE SCAN RESULT
     // ================================================
 
     private void saveLiveResult(
@@ -637,6 +848,10 @@ public class ScreenCaptureService extends Service {
     @Override
     public void onDestroy() {
         stopCapture();
+
+        // Stop any remaining AI work when the service is destroyed.
+        aiExecutor.shutdownNow();
+
         stopForeground(true);
         super.onDestroy();
     }
