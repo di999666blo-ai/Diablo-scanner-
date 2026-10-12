@@ -58,9 +58,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+
         getWindow().setStatusBarColor(background);
         getWindow().setNavigationBarColor(Color.BLACK);
+
         buildDashboard();
         refreshCount();
         refreshLatestResult();
@@ -69,6 +72,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+
         if (prefs != null) {
             refreshCount();
             refreshLatestResult();
@@ -84,6 +88,7 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(20, 24, 20, 24);
         root.setBackgroundColor(background);
+
         scroll.addView(root);
         setContentView(scroll);
 
@@ -147,6 +152,7 @@ public class MainActivity extends Activity {
         addButton("SET UP AI MODEL FILES", v -> showAIModelSetup());
 
         TextView instructions = new TextView(this);
+
         instructions.setText(
                 "HOW TO USE\n\n" +
                 "1. Open your trading chart.\n" +
@@ -157,6 +163,7 @@ public class MainActivity extends Activity {
                 "6. Use STOP SCREEN CAPTURE when finished.\n\n" +
                 "You can also analyse a saved chart screenshot."
         );
+
         instructions.setTextColor(Color.LTGRAY);
         instructions.setTextSize(13);
         instructions.setPadding(8, 24, 8, 12);
@@ -168,17 +175,20 @@ public class MainActivity extends Activity {
         aiStatus.setPadding(8, 8, 8, 12);
         aiStatus.setTag("ai_model_status");
         root.addView(aiStatus);
+
         refreshAIModelStatus();
 
         TextView warning = new TextView(this);
+
         warning.setText(
                 "TRADING RISK WARNING\n\n" +
-                "The current scanner compares red-like and green-like pixels. " +
-                "The AI model files must be selected and a working inference " +
-                "engine connected before this app can perform AI chart analysis.\n\n" +
-                "Visual scores are not probabilities of profit. No signal " +
-                "guarantees a winning trade. DIABLO SCANNER does not place trades."
+                "DIABLO SCANNER includes basic visual chart analysis and " +
+                "source code for a local vision AI engine. Actual AI operation " +
+                "must be verified on the phone.\n\n" +
+                "AI confidence is not a verified probability of winning. " +
+                "No signal guarantees profit. The app does not place trades."
         );
+
         warning.setTextColor(Color.rgb(255, 190, 120));
         warning.setTextSize(12);
         warning.setGravity(Gravity.CENTER);
@@ -188,28 +198,39 @@ public class MainActivity extends Activity {
 
     private void addSectionTitle(String text) {
         TextView heading = new TextView(this);
+
         heading.setText(text);
         heading.setTextSize(13);
         heading.setTextColor(red);
         heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER);
         heading.setPadding(0, 12, 0, 4);
+
         root.addView(heading);
     }
 
-    private void addButton(String text, View.OnClickListener listener) {
+    private void addButton(
+            String text,
+            View.OnClickListener listener
+    ) {
         Button button = new Button(this);
+
         button.setText(text);
         button.setTextColor(white);
         button.setTextSize(14);
         button.setAllCaps(false);
-        button.setBackgroundTintList(ColorStateList.valueOf(panelColor));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+        button.setBackgroundTintList(
+                ColorStateList.valueOf(panelColor)
         );
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+
         params.setMargins(0, 6, 0, 6);
+
         root.addView(button, params);
         button.setOnClickListener(listener);
     }
@@ -226,17 +247,37 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("DIABLO AI MODEL SETUP")
                 .setItems(options, (dialog, which) -> {
+
                     if (which == 0) {
                         AIModelSetup.chooseTextModel(this);
+
                     } else if (which == 1) {
                         AIModelSetup.chooseImageModel(this);
+
                     } else {
-                        refreshAIModelStatus();
+                        boolean ready =
+                                AIModelSetup.areBothModelsSelected(this);
+
+                        String message;
+
+                        if (ready) {
+                            message =
+                                    "Both model files are copied into app storage.\n\n" +
+                                    "The source includes a connection to the local " +
+                                    "vision AI engine, but successful model inference " +
+                                    "has not yet been verified on this phone.\n\n" +
+                                    "The next step is to finish the source code, " +
+                                    "build the app, and test the engine.";
+                        } else {
+                            message =
+                                    "One or both model files are missing.\n\n" +
+                                    "Select the SmolVLM text model and its matching " +
+                                    "image projector using the two setup options.";
+                        }
+
                         new AlertDialog.Builder(this)
-                                .setTitle("Model file status")
-                                .setMessage(AIModelSetup.areBothModelsSelected(this)
-                                        ? "Both model files have been copied into app storage. The AI inference engine is not connected yet."
-                                        : "One or both model files are missing. Select both GGUF files.")
+                                .setTitle("AI model status")
+                                .setMessage(message)
                                 .setPositiveButton("OK", null)
                                 .show();
                     }
@@ -246,16 +287,30 @@ public class MainActivity extends Activity {
     }
 
     private void refreshAIModelStatus() {
-        if (root == null) return;
+        if (root == null) {
+            return;
+        }
 
         View view = root.findViewWithTag("ai_model_status");
-        if (!(view instanceof TextView)) return;
+
+        if (!(view instanceof TextView)) {
+            return;
+        }
 
         TextView label = (TextView) view;
 
-        label.setText(AIModelSetup.areBothModelsSelected(this)
-                ? "AI MODEL FILES: BOTH COPIED. Model inference connection is still required."
-                : "AI MODEL FILES: NOT SET UP. Tap SET UP AI MODEL FILES to select both GGUF files.");
+        if (AIModelSetup.areBothModelsSelected(this)) {
+            label.setText(
+                    "AI MODEL FILES: READY IN STORAGE\n" +
+                    "Local AI connection added to source; " +
+                    "actual model operation still needs device testing."
+            );
+        } else {
+            label.setText(
+                    "AI MODEL FILES: NOT SET UP\n" +
+                    "Tap SET UP AI MODEL FILES to select both GGUF files."
+            );
+        }
     }
 
     // LIVE SCREEN CAPTURE
@@ -263,10 +318,15 @@ public class MainActivity extends Activity {
     private void requestScreenCapture() {
         try {
             MediaProjectionManager manager =
-                    (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+                    (MediaProjectionManager)
+                            getSystemService(MEDIA_PROJECTION_SERVICE);
 
             if (manager == null) {
-                Toast.makeText(this, "Screen capture is unavailable.", Toast.LENGTH_LONG).show();
+                Toast.makeText(
+                        this,
+                        "Screen capture is unavailable.",
+                        Toast.LENGTH_LONG
+                ).show();
                 return;
             }
 
@@ -274,26 +334,62 @@ public class MainActivity extends Activity {
                     manager.createScreenCaptureIntent(),
                     REQUEST_SCREEN_CAPTURE
             );
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not request screen capture permission.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Could not request screen capture permission.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
     private void stopScreenCapture() {
         try {
-            Intent intent = new Intent(this, ScreenCaptureService.class);
-            intent.setAction(ScreenCaptureService.ACTION_STOP_CAPTURE);
+            Intent intent = new Intent(
+                    this,
+                    ScreenCaptureService.class
+            );
+
+            intent.setAction(
+                    ScreenCaptureService.ACTION_STOP_CAPTURE
+            );
+
             startService(intent);
-            Toast.makeText(this, "Stop request sent.", Toast.LENGTH_SHORT).show();
+
+            Toast.makeText(
+                    this,
+                    "Stop request sent.",
+                    Toast.LENGTH_SHORT
+            ).show();
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not stop capture. Check the capture service.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Could not stop capture. Check the capture service.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
-    private void startScreenCaptureService(int resultCode, Intent resultData) {
-        Intent serviceIntent = new Intent(this, ScreenCaptureService.class);
-        serviceIntent.putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, resultCode);
-        serviceIntent.putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, resultData);
+    private void startScreenCaptureService(
+            int resultCode,
+            Intent resultData
+    ) {
+        Intent serviceIntent = new Intent(
+                this,
+                ScreenCaptureService.class
+        );
+
+        serviceIntent.putExtra(
+                ScreenCaptureService.EXTRA_RESULT_CODE,
+                resultCode
+        );
+
+        serviceIntent.putExtra(
+                ScreenCaptureService.EXTRA_RESULT_DATA,
+                resultData
+        );
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -301,9 +397,19 @@ public class MainActivity extends Activity {
             } else {
                 startService(serviceIntent);
             }
-            Toast.makeText(this, "Screen capture start requested.", Toast.LENGTH_LONG).show();
+
+            Toast.makeText(
+                    this,
+                    "Screen capture start requested.",
+                    Toast.LENGTH_LONG
+            ).show();
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not start capture. Check the service and manifest.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Could not start capture. Check the service and manifest.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
@@ -312,70 +418,113 @@ public class MainActivity extends Activity {
     private void startFloatingBubble() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && !Settings.canDrawOverlays(this)) {
+
             try {
                 Intent intent = new Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName())
                 );
+
                 startActivity(intent);
+
                 Toast.makeText(
                         this,
-                        "Allow display over other apps, return here, then tap START FLOATING BUBBLE again.",
+                        "Allow display over other apps, return here, " +
+                        "then tap START FLOATING BUBBLE again.",
                         Toast.LENGTH_LONG
                 ).show();
+
             } catch (Exception e) {
-                Toast.makeText(this, "Allow DIABLO SCANNER to display over other apps.", Toast.LENGTH_LONG).show();
+                Toast.makeText(
+                        this,
+                        "Allow DIABLO SCANNER to display over other apps.",
+                        Toast.LENGTH_LONG
+                ).show();
             }
+
             return;
         }
 
         try {
-            Intent serviceIntent = new Intent(this, FloatingBubbleService.class);
+            Intent serviceIntent = new Intent(
+                    this,
+                    FloatingBubbleService.class
+            );
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent);
             } else {
                 startService(serviceIntent);
             }
-            Toast.makeText(this, "Floating bubble start requested.", Toast.LENGTH_SHORT).show();
+
+            Toast.makeText(
+                    this,
+                    "Floating bubble start requested.",
+                    Toast.LENGTH_SHORT
+            ).show();
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not start the floating bubble.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Could not start the floating bubble.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
     // RESULT HANDLING
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data
+    ) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (AIModelSetup.handleResult(this, requestCode, resultCode, data)) {
+        if (AIModelSetup.handleResult(
+                this,
+                requestCode,
+                resultCode,
+                data
+        )) {
             refreshAIModelStatus();
             return;
         }
 
         if (requestCode == REQUEST_SCREEN_CAPTURE) {
             if (resultCode != RESULT_OK || data == null) {
-                Toast.makeText(this, "Screen capture permission was cancelled.", Toast.LENGTH_LONG).show();
+                Toast.makeText(
+                        this,
+                        "Screen capture permission was cancelled.",
+                        Toast.LENGTH_LONG
+                ).show();
                 return;
             }
+
             startScreenCaptureService(resultCode, data);
             return;
         }
 
-        if (requestCode != PICK_CHART || resultCode != RESULT_OK
-                || data == null || data.getData() == null) {
+        if (requestCode != PICK_CHART
+                || resultCode != RESULT_OK
+                || data == null
+                || data.getData() == null) {
             return;
         }
 
         Uri uri = data.getData();
 
-        try (InputStream input = getContentResolver().openInputStream(uri)) {
+        try (InputStream input =
+                     getContentResolver().openInputStream(uri)) {
+
             if (input == null) {
                 showImageError();
                 return;
             }
 
             Bitmap bitmap = BitmapFactory.decodeStream(input);
+
             if (bitmap == null) {
                 showImageError();
                 return;
@@ -386,6 +535,7 @@ public class MainActivity extends Activity {
             } finally {
                 bitmap.recycle();
             }
+
         } catch (Exception e) {
             showImageError();
         }
@@ -393,25 +543,39 @@ public class MainActivity extends Activity {
 
     private void chooseChart() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("image/*");
 
         try {
             startActivityForResult(intent, PICK_CHART);
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not open the image picker.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Could not open the image picker.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
     private void showImageError() {
-        Toast.makeText(this, "Unable to read this image. Choose another screenshot.", Toast.LENGTH_LONG).show();
+        Toast.makeText(
+                this,
+                "Unable to read this image. Choose another screenshot.",
+                Toast.LENGTH_LONG
+        ).show();
     }
 
-    // EXISTING BASIC VISUAL ANALYSIS — NOT AI INFERENCE
+    // BASIC VISUAL ANALYSIS — NOT AI INFERENCE
 
     private void analyseBitmap(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
-            Toast.makeText(this, "Unable to analyse this image.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Unable to analyse this image.",
+                    Toast.LENGTH_LONG
+            ).show();
             return;
         }
 
@@ -419,11 +583,19 @@ public class MainActivity extends Activity {
         int height = bitmap.getHeight();
 
         if (width < 2 || height < 2) {
-            Toast.makeText(this, "Image is too small to analyse.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    this,
+                    "Image is too small to analyse.",
+                    Toast.LENGTH_LONG
+            ).show();
             return;
         }
 
-        int step = Math.max(1, Math.max(width, height) / 500);
+        int step = Math.max(
+                1,
+                Math.max(width, height) / 500
+        );
+
         long green = 0;
         long redPixels = 0;
         long checked = 0;
@@ -431,16 +603,31 @@ public class MainActivity extends Activity {
         for (int y = 0; y < height; y += step) {
             for (int x = 0; x < width; x += step) {
                 int pixel = bitmap.getPixel(x, y);
+
                 int r = Color.red(pixel);
                 int g = Color.green(pixel);
                 int b = Color.blue(pixel);
+
                 checked++;
 
-                int brightness = Math.max(r, Math.max(g, b));
-                if (brightness < 70) continue;
+                int brightness = Math.max(
+                        r,
+                        Math.max(g, b)
+                );
 
-                boolean isGreen = g >= 90 && g > r * 1.20 && g > b * 1.08;
-                boolean isRed = r >= 90 && r > g * 1.20 && r > b * 1.08;
+                if (brightness < 70) {
+                    continue;
+                }
+
+                boolean isGreen =
+                        g >= 90
+                        && g > r * 1.20
+                        && g > b * 1.08;
+
+                boolean isRed =
+                        r >= 90
+                        && r > g * 1.20
+                        && r > b * 1.08;
 
                 if (isGreen) {
                     green++;
@@ -451,9 +638,13 @@ public class MainActivity extends Activity {
         }
 
         long total = green + redPixels;
-        double difference = total == 0 ? 0.0
+
+        double difference = total == 0
+                ? 0.0
                 : Math.abs(green - redPixels) / (double) total;
-        double threshold = prefs.getInt(THRESHOLD, 15) / 100.0;
+
+        double threshold =
+                prefs.getInt(THRESHOLD, 15) / 100.0;
 
         String signal;
         String detail;
@@ -464,26 +655,48 @@ public class MainActivity extends Activity {
             signal = "WAIT";
             colour = Color.YELLOW;
             score = 0;
-            detail = "Too few clearly coloured pixels were found. Choose a clearer chart screenshot.";
+
+            detail =
+                    "Too few clearly coloured pixels were found. " +
+                    "Choose a clearer chart screenshot.";
+
         } else if (difference < threshold) {
             signal = "WAIT";
             colour = Color.YELLOW;
             score = (int) Math.round(difference * 100);
-            detail = "Red and green pixels are too balanced to show a clear visual bias.";
+
+            detail =
+                    "Red and green pixels are too balanced to show " +
+                    "a clear visual bias.";
+
         } else if (green > redPixels) {
             signal = "UP BIAS";
             colour = Color.rgb(50, 220, 120);
-            score = (int) Math.round(Math.min(95, 50 + difference * 45));
-            detail = "More green-dominant than red-dominant pixels were detected. This is only a visual colour comparison.";
+
+            score = (int) Math.round(
+                    Math.min(95, 50 + difference * 45)
+            );
+
+            detail =
+                    "More green-dominant than red-dominant pixels " +
+                    "were detected. This is only a visual colour comparison.";
+
         } else {
             signal = "DOWN BIAS";
             colour = red;
-            score = (int) Math.round(Math.min(95, 50 + difference * 45));
-            detail = "More red-dominant than green-dominant pixels were detected. This is only a visual colour comparison.";
+
+            score = (int) Math.round(
+                    Math.min(95, 50 + difference * 45)
+            );
+
+            detail =
+                    "More red-dominant than green-dominant pixels " +
+                    "were detected. This is only a visual colour comparison.";
         }
 
         signalText.setText(signal);
         signalText.setTextColor(colour);
+
         statusText.setText(
                 detail +
                 "\nGreen pixels: " + green +
@@ -499,47 +712,82 @@ public class MainActivity extends Activity {
 
     // SAVE HISTORY
 
-    private void saveHistory(String signal, int score, long green, long redPixels) {
+    private void saveHistory(
+            String signal,
+            int score,
+            long green,
+            long redPixels
+    ) {
         try {
-            JSONArray old = new JSONArray(prefs.getString(HISTORY, "[]"));
+            JSONArray old = new JSONArray(
+                    prefs.getString(HISTORY, "[]")
+            );
+
             JSONArray updated = new JSONArray();
             JSONObject item = new JSONObject();
 
-            item.put("time", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()));
+            item.put(
+                    "time",
+                    new SimpleDateFormat(
+                            "yyyy-MM-dd HH:mm",
+                            Locale.getDefault()
+                    ).format(new Date())
+            );
+
             item.put("signal", signal);
             item.put("score", score);
             item.put("green", green);
             item.put("red", redPixels);
 
             updated.put(item);
+
             for (int i = 0; i < old.length() && i < 49; i++) {
                 updated.put(old.get(i));
             }
 
-            prefs.edit().putString(HISTORY, updated.toString()).apply();
+            prefs.edit()
+                    .putString(HISTORY, updated.toString())
+                    .apply();
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not save the result.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                    this,
+                    "Could not save the result.",
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
     private void refreshLatestResult() {
-        if (signalText == null || statusText == null) return;
+        if (signalText == null || statusText == null) {
+            return;
+        }
 
         try {
-            JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
+            JSONArray history = new JSONArray(
+                    prefs.getString(HISTORY, "[]")
+            );
+
             if (history.length() == 0) {
                 signalText.setText("WAIT");
                 signalText.setTextColor(Color.YELLOW);
-                statusText.setText("No saved chart results yet.\nChoose a screenshot to begin.");
+
+                statusText.setText(
+                        "No saved chart results yet.\n" +
+                        "Choose a screenshot to begin."
+                );
+
                 return;
             }
 
             JSONObject latest = history.getJSONObject(0);
+
             String signal = latest.optString("signal", "WAIT");
             String time = latest.optString("time", "Unknown time");
             int score = latest.optInt("score", 0);
 
             signalText.setText(signal);
+
             if (signal.contains("UP")) {
                 signalText.setTextColor(Color.rgb(50, 220, 120));
             } else if (signal.contains("DOWN")) {
@@ -553,28 +801,38 @@ public class MainActivity extends Activity {
                     "\nVisual balance score: " + score +
                     "%\n\nThis is not a live market signal."
             );
+
         } catch (Exception e) {
             signalText.setText("WAIT");
             signalText.setTextColor(Color.YELLOW);
-            statusText.setText("Could not load the latest saved result.");
+
+            statusText.setText(
+                    "Could not load the latest saved result."
+            );
         }
     }
 
     private void showHistory() {
         try {
-            JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
+            JSONArray history = new JSONArray(
+                    prefs.getString(HISTORY, "[]")
+            );
+
             if (history.length() == 0) {
                 new AlertDialog.Builder(this)
                         .setTitle("Signal history")
                         .setMessage("No chart images analysed yet.")
                         .setPositiveButton("OK", null)
                         .show();
+
                 return;
             }
 
             StringBuilder text = new StringBuilder();
+
             for (int i = 0; i < history.length(); i++) {
                 JSONObject item = history.getJSONObject(i);
+
                 text.append(item.optString("time", "Unknown time"))
                         .append(" — ")
                         .append(item.optString("signal", "WAIT"))
@@ -588,21 +846,34 @@ public class MainActivity extends Activity {
                     .setMessage(text.toString())
                     .setPositiveButton("CLOSE", null)
                     .show();
+
         } catch (Exception e) {
-            Toast.makeText(this, "Could not load history.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                    this,
+                    "Could not load history.",
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
     private void clearHistory() {
         new AlertDialog.Builder(this)
                 .setTitle("Clear history?")
-                .setMessage("This removes saved results from this phone.")
+                .setMessage(
+                        "This removes saved results from this phone."
+                )
                 .setNegativeButton("CANCEL", null)
                 .setPositiveButton("CLEAR", (dialog, which) -> {
                     prefs.edit().remove(HISTORY).apply();
+
                     refreshCount();
                     refreshLatestResult();
-                    Toast.makeText(this, "History cleared.", Toast.LENGTH_SHORT).show();
+
+                    Toast.makeText(
+                            this,
+                            "History cleared.",
+                            Toast.LENGTH_SHORT
+                    ).show();
                 })
                 .show();
     }
@@ -610,7 +881,10 @@ public class MainActivity extends Activity {
     // SETTINGS
 
     private void showSettings() {
-        String[] options = {"Set trade duration", "Set visual sensitivity"};
+        String[] options = {
+                "Set trade duration",
+                "Set visual sensitivity"
+        };
 
         new AlertDialog.Builder(this)
                 .setTitle("DIABLO SETTINGS")
@@ -635,64 +909,109 @@ public class MainActivity extends Activity {
                 "Custom duration (seconds)"
         };
 
-        long current = prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS);
+        long current = prefs.getLong(
+                TRADE_DURATION_MS,
+                DEFAULT_TRADE_DURATION_MS
+        );
+
         int selected = current == 5000L ? 0
                 : current == 15000L ? 1
                 : current == 30000L ? 2
                 : current == 60000L ? 3
-                : current == 300000L ? 4 : -1;
+                : current == 300000L ? 4
+                : -1;
 
         new AlertDialog.Builder(this)
                 .setTitle("Trade duration")
-                .setMessage("Current: " + formatDuration(current) +
-                        "\nChoose your preferred tracking duration.")
-                .setSingleChoiceItems(options, selected, (dialog, which) -> {
-                    if (which == 5) {
-                        dialog.dismiss();
-                        showCustomTradeDuration();
-                        return;
-                    }
+                .setMessage(
+                        "Current: " + formatDuration(current) +
+                        "\nChoose your preferred tracking duration."
+                )
+                .setSingleChoiceItems(
+                        options,
+                        selected,
+                        (dialog, which) -> {
 
-                    long duration = which == 0 ? 5000L
-                            : which == 1 ? 15000L
-                            : which == 2 ? 30000L
-                            : which == 3 ? 60000L : 300000L;
+                            if (which == 5) {
+                                dialog.dismiss();
+                                showCustomTradeDuration();
+                                return;
+                            }
 
-                    prefs.edit().putLong(TRADE_DURATION_MS, duration).apply();
-                    dialog.dismiss();
-                    Toast.makeText(this, "Trade duration saved: " +
-                            formatDuration(duration), Toast.LENGTH_LONG).show();
-                })
+                            long duration = which == 0 ? 5000L
+                                    : which == 1 ? 15000L
+                                    : which == 2 ? 30000L
+                                    : which == 3 ? 60000L
+                                    : 300000L;
+
+                            prefs.edit()
+                                    .putLong(TRADE_DURATION_MS, duration)
+                                    .apply();
+
+                            dialog.dismiss();
+
+                            Toast.makeText(
+                                    this,
+                                    "Trade duration saved: " +
+                                    formatDuration(duration),
+                                    Toast.LENGTH_LONG
+                            ).show();
+                        }
+                )
                 .setNegativeButton("CANCEL", null)
                 .show();
     }
 
     private void showCustomTradeDuration() {
         EditText input = new EditText(this);
+
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setSingleLine(true);
         input.setHint("Enter seconds (1 to 3600)");
 
         new AlertDialog.Builder(this)
                 .setTitle("Custom trade duration")
-                .setMessage("Enter the duration in seconds, from 1 to 3600.")
+                .setMessage(
+                        "Enter the duration in seconds, from 1 to 3600."
+                )
                 .setView(input)
                 .setNegativeButton("CANCEL", null)
                 .setPositiveButton("SAVE", (dialog, which) -> {
+
                     String raw = input.getText().toString().trim();
+
                     try {
                         long seconds = Long.parseLong(raw);
+
                         if (seconds < 1 || seconds > 3600) {
-                            Toast.makeText(this, "Enter between 1 and 3600 seconds.", Toast.LENGTH_LONG).show();
+                            Toast.makeText(
+                                    this,
+                                    "Enter between 1 and 3600 seconds.",
+                                    Toast.LENGTH_LONG
+                            ).show();
+
                             return;
                         }
 
                         long duration = seconds * 1000L;
-                        prefs.edit().putLong(TRADE_DURATION_MS, duration).apply();
-                        Toast.makeText(this, "Trade duration saved: " +
-                                formatDuration(duration), Toast.LENGTH_LONG).show();
+
+                        prefs.edit()
+                                .putLong(TRADE_DURATION_MS, duration)
+                                .apply();
+
+                        Toast.makeText(
+                                this,
+                                "Trade duration saved: " +
+                                formatDuration(duration),
+                                Toast.LENGTH_LONG
+                        ).show();
+
                     } catch (Exception e) {
-                        Toast.makeText(this, "Enter a valid number of seconds.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(
+                                this,
+                                "Enter a valid number of seconds.",
+                                Toast.LENGTH_LONG
+                        ).show();
                     }
                 })
                 .show();
@@ -700,15 +1019,20 @@ public class MainActivity extends Activity {
 
     private String formatDuration(long durationMs) {
         long seconds = Math.max(1L, durationMs / 1000L);
+
         if (seconds < 60L) {
-            return seconds + (seconds == 1L ? " second" : " seconds");
+            return seconds +
+                    (seconds == 1L ? " second" : " seconds");
         }
 
         long minutes = seconds / 60L;
         long remainingSeconds = seconds % 60L;
+
         if (remainingSeconds == 0L) {
-            return minutes + (minutes == 1L ? " minute" : " minutes");
+            return minutes +
+                    (minutes == 1L ? " minute" : " minutes");
         }
+
         return minutes + "m " + remainingSeconds + "s";
     }
 
@@ -720,28 +1044,57 @@ public class MainActivity extends Activity {
         };
 
         int current = prefs.getInt(THRESHOLD, 15);
-        int selected = current == 10 ? 0 : current == 25 ? 2 : 1;
+
+        int selected = current == 10 ? 0
+                : current == 25 ? 2
+                : 1;
 
         new AlertDialog.Builder(this)
                 .setTitle("Visual sensitivity")
-                .setSingleChoiceItems(options, selected, (dialog, which) -> {
-                    int value = which == 0 ? 10 : which == 2 ? 25 : 15;
-                    prefs.edit().putInt(THRESHOLD, value).apply();
-                    dialog.dismiss();
-                    Toast.makeText(this, "Sensitivity saved.", Toast.LENGTH_SHORT).show();
-                })
+                .setSingleChoiceItems(
+                        options,
+                        selected,
+                        (dialog, which) -> {
+
+                            int value = which == 0 ? 10
+                                    : which == 2 ? 25
+                                    : 15;
+
+                            prefs.edit()
+                                    .putInt(THRESHOLD, value)
+                                    .apply();
+
+                            dialog.dismiss();
+
+                            Toast.makeText(
+                                    this,
+                                    "Sensitivity saved.",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+                )
                 .setNegativeButton("CANCEL", null)
                 .show();
     }
 
     private void refreshCount() {
-        if (countText == null) return;
+        if (countText == null) {
+            return;
+        }
 
         try {
-            JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
-            countText.setText("Saved results on this phone: " + history.length());
+            JSONArray history = new JSONArray(
+                    prefs.getString(HISTORY, "[]")
+            );
+
+            countText.setText(
+                    "Saved results on this phone: " + history.length()
+            );
+
         } catch (Exception e) {
-            countText.setText("Saved results on this phone: 0");
+            countText.setText(
+                    "Saved results on this phone: 0"
+            );
         }
     }
 }
