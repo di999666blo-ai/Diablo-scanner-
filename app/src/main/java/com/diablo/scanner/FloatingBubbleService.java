@@ -1,6 +1,9 @@
 package com.diablo.scanner;
 
 import android.app.Service;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -28,10 +31,7 @@ import java.util.Locale;
 public class FloatingBubbleService extends Service {
 
     private static final String PREFS = "diablo_scanner";
-
-    // AI results are saved in the same preferences as live scan results.
     private static final String AI_PREFS = "diablo_scanner";
-
     private static final String TRADE_PREFS = "diablo_trade_records";
     private static final String TRADE_HISTORY = "trades";
 
@@ -78,12 +78,66 @@ public class FloatingBubbleService extends Service {
     public void onCreate() {
         super.onCreate();
 
+        // Promote the service immediately to help Android keep the
+        // floating bubble alive when the user switches apps.
+        createForegroundNotification();
+
         windowManager = (WindowManager)
                 getSystemService(WINDOW_SERVICE);
 
         showBubble();
 
         handler.postDelayed(refreshRunnable, 1000L);
+    }
+
+    private void createForegroundNotification() {
+        final String channelId = "diablo_bubble_service";
+        final int notificationId = 4105;
+
+        NotificationManager manager =
+                (NotificationManager)
+                        getSystemService(NOTIFICATION_SERVICE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel =
+                    new NotificationChannel(
+                            channelId,
+                            "DIABLO Floating Scanner",
+                            NotificationManager.IMPORTANCE_LOW
+                    );
+
+            channel.setDescription(
+                    "Keeps the DIABLO floating scanner service running."
+            );
+
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+
+        Notification.Builder builder;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder = new Notification.Builder(this, channelId);
+        } else {
+            builder = new Notification.Builder(this);
+        }
+
+        builder.setSmallIcon(android.R.drawable.ic_menu_view)
+                .setContentTitle("DIABLO SCANNER")
+                .setContentText("Floating scanner service is running.")
+                .setOngoing(true);
+
+        startForeground(notificationId, builder.build());
+    }
+
+    @Override
+    public int onStartCommand(
+            Intent intent,
+            int flags,
+            int startId
+    ) {
+        return START_STICKY;
     }
 
     private GradientDrawable makeBackground(int color) {
@@ -382,7 +436,6 @@ public class FloatingBubbleService extends Service {
         SharedPreferences prefs =
                 getSharedPreferences(PREFS, MODE_PRIVATE);
 
-        // FIX: AI result fields are saved in diablo_scanner.
         SharedPreferences aiPrefs =
                 getSharedPreferences(AI_PREFS, MODE_PRIVATE);
 
@@ -412,7 +465,6 @@ public class FloatingBubbleService extends Service {
             usingAI = true;
         }
 
-        // Otherwise use the most recent non-AI history entry.
         if (!usingAI) {
             try {
                 JSONArray history = new JSONArray(
