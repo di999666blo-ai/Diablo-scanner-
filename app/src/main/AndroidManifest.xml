@@ -18,11 +18,13 @@
         android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:allowBackup="false"
-        android:label="DIABLO SCANNER"
-        android:theme="@android:style/Theme.Material.NoActionBar"
-        android:hardwareAccelerated="true"
-        android:supportsRtl="true">
+    android:allowBackup="false"
+    android:label="DIABLO SCANNER"
+    android:icon="@drawable/ic_diablo_launcher"
+    android:roundIcon="@drawable/ic_diablo_launcher"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:hardwareAccelerated="true"
+    android:supportsRtl="true">
 
         <!-- Main app screen -->
         <activity
