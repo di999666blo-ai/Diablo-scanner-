@@ -356,14 +356,6 @@ lastAnalysisTime = now;
 
     private void analyseCapturedBitmap(Bitmap bitmap) {
 
-        long now = System.currentTimeMillis();
-
-        if (now - lastAnalysisTime < ANALYSIS_INTERVAL_MS) {
-            return;
-        }
-
-        lastAnalysisTime = now;
-
         try {
             int width = bitmap.getWidth();
             int height = bitmap.getHeight();
