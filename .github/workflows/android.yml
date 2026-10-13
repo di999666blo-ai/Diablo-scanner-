@@ -37,13 +37,14 @@ jobs:
 
       - name: Install Android build tools
         run: |
+          set -e
           sdkmanager \
             "platforms;android-35" \
             "build-tools;35.0.0" \
             "ndk;27.2.12479018" \
             "cmake;3.22.1"
 
-      - name: Download matching AI models
+      - name: Download AI models
         run: |
           set -e
 
@@ -62,23 +63,23 @@ jobs:
 
           ls -lh app/src/main/assets/models/
 
-      - name: Download llama.cpp vision engine
+      - name: Download llama.cpp
         run: |
           git clone --depth 1 \
             https://github.com/ggml-org/llama.cpp.git \
             llama.cpp
 
-      - name: Build vision engine for Android
+      - name: Build and package Android AI engine
         run: |
           set -e
 
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
 
-          mkdir -p app/src/main/assets/arm64-v8a
-          mkdir -p app/src/main/assets/armeabi-v7a
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          mkdir -p app/src/main/jniLibs/armeabi-v7a
 
           for ABI in arm64-v8a armeabi-v7a; do
-            echo "Building vision engine for $ABI"
+            echo "Building llama.cpp for $ABI"
 
             cmake -S llama.cpp -B "llama.cpp/build-$ABI" \
               -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
@@ -105,18 +106,52 @@ jobs:
 
             BIN="llama.cpp/build-$ABI/bin/llama-mtmd-cli"
 
-            if [ ! -f "$BIN" ]; then
-              echo "Vision engine binary missing for $ABI"
+            if [ ! -s "$BIN" ]; then
+              echo "ERROR: AI engine missing for $ABI"
               exit 1
             fi
 
-            cp "$BIN" "app/src/main/assets/$ABI/llama-mtmd-cli"
-            chmod 755 "app/src/main/assets/$ABI/llama-mtmd-cli"
+            cp "$BIN" \
+              "app/src/main/jniLibs/$ABI/libdiablo_llama.so"
+
+            chmod 755 \
+              "app/src/main/jniLibs/$ABI/libdiablo_llama.so"
+
+            ls -lh \
+              "app/src/main/jniLibs/$ABI/libdiablo_llama.so"
           done
+
+      - name: Verify bundled AI files
+        run: |
+          set -e
+
+          test -s app/src/main/assets/models/diablo-text-model.gguf
+          test -s app/src/main/assets/models/diablo-image-projector.gguf
+          test -s app/src/main/jniLibs/arm64-v8a/libdiablo_llama.so
+          test -s app/src/main/jniLibs/armeabi-v7a/libdiablo_llama.so
+
+          echo "AI models and both engine binaries exist."
 
       - name: Build Android APK
         run: |
+          set -e
           gradle --no-daemon assembleDebug
+
+      - name: Verify APK contains AI models
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+
+          unzip -l "$APK" > apk-contents.txt
+
+          grep -q "assets/models/diablo-text-model.gguf" apk-contents.txt
+          grep -q "assets/models/diablo-image-projector.gguf" apk-contents.txt
+          grep -q "libdiablo_llama.so" apk-contents.txt
+
+          ls -lh "$APK"
+          echo "APK contains the expected AI model and engine files."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
