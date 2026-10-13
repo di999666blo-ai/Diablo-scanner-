@@ -17,16 +17,31 @@ public final class LocalVisionAI {
     private static final String PREFS = "diablo_scanner_ai";
     private static final String MODEL_KEY = "text_model_path";
     private static final String PROJECTOR_KEY = "image_model_path";
+
     private static final String ENGINE = "llama-mtmd-cli";
+
+    private static final String MODEL_ASSET =
+            "models/diablo-text-model.gguf";
+
+    private static final String PROJECTOR_ASSET =
+            "models/diablo-image-projector.gguf";
+
+    private static final String MODEL_FILE =
+            "diablo-text-model.gguf";
+
+    private static final String PROJECTOR_FILE =
+            "diablo-image-projector.gguf";
 
     private static final int MAX_OUTPUT_BYTES = 100000;
     private static final int MAX_IMAGE_DIMENSION = 640;
+
     private static final long ANALYSIS_TIMEOUT_SECONDS = 90L;
 
     private LocalVisionAI() {
     }
 
     public static final class Result {
+
         public final String signal;
         public final String details;
 
@@ -36,34 +51,164 @@ public final class LocalVisionAI {
         }
     }
 
+    /*
+     * Checks whether both packaged models are available.
+     * This does not copy hundreds of megabytes on the UI thread.
+     */
     public static boolean modelsReady(Context context) {
+
         if (context == null) {
             return false;
         }
 
-        SharedPreferences prefs =
-                context.getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                );
+        SharedPreferences prefs = context.getSharedPreferences(
+                PREFS,
+                Context.MODE_PRIVATE
+        );
 
-        String model = prefs.getString(MODEL_KEY, "");
-        String projector = prefs.getString(PROJECTOR_KEY, "");
+        String modelPath = prefs.getString(MODEL_KEY, "");
+        String projectorPath = prefs.getString(PROJECTOR_KEY, "");
 
-        return exists(model) && exists(projector);
+        if (exists(modelPath) && exists(projectorPath)) {
+            return true;
+        }
+
+        try (InputStream model =
+                     context.getAssets().open(MODEL_ASSET);
+             InputStream projector =
+                     context.getAssets().open(PROJECTOR_ASSET)) {
+
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static boolean exists(String path) {
-        return path != null
-                && !path.trim().isEmpty()
-                && new File(path).isFile()
-                && new File(path).canRead();
+
+        if (path == null || path.trim().isEmpty()) {
+            return false;
+        }
+
+        File file = new File(path);
+
+        return file.isFile() && file.canRead();
+    }
+
+    /*
+     * Copies a packaged model into private app storage.
+     * Runs during analysis, not during screen capture setup.
+     */
+    private static File copyAssetIfNeeded(
+            Context context,
+            String assetName,
+            String destinationName
+    ) throws Exception {
+
+        File destination = new File(
+                context.getFilesDir(),
+                destinationName
+        );
+
+        if (destination.isFile() && destination.canRead()
+                && destination.length() > 1000000L) {
+            return destination;
+        }
+
+        if (destination.exists() && !destination.delete()) {
+            throw new Exception(
+                    "Cannot replace model file: " + destinationName
+            );
+        }
+
+        try (InputStream input =
+                     context.getAssets().open(assetName);
+             FileOutputStream output =
+                     new FileOutputStream(destination)) {
+
+            byte[] buffer = new byte[65536];
+            int count;
+
+            while ((count = input.read(buffer)) != -1) {
+                output.write(buffer, 0, count);
+            }
+
+            output.flush();
+            output.getFD().sync();
+        }
+
+        if (!destination.isFile()
+                || !destination.canRead()
+                || destination.length() < 1000000L) {
+
+            throw new Exception(
+                    "Packaged model is missing or incomplete: "
+                            + destinationName
+            );
+        }
+
+        return destination;
+    }
+
+    /*
+     * Ensures the packaged models are copied and registered.
+     */
+    private static File[] prepareModels(Context context)
+            throws Exception {
+
+        SharedPreferences prefs = context.getSharedPreferences(
+                PREFS,
+                Context.MODE_PRIVATE
+        );
+
+        String savedModel = prefs.getString(MODEL_KEY, "");
+        String savedProjector = prefs.getString(PROJECTOR_KEY, "");
+
+        File model;
+        File projector;
+
+        if (exists(savedModel) && exists(savedProjector)) {
+
+            model = new File(savedModel);
+            projector = new File(savedProjector);
+
+        } else {
+
+            model = copyAssetIfNeeded(
+                    context,
+                    MODEL_ASSET,
+                    MODEL_FILE
+            );
+
+            projector = copyAssetIfNeeded(
+                    context,
+                    PROJECTOR_ASSET,
+                    PROJECTOR_FILE
+            );
+
+            prefs.edit()
+                    .putString(
+                            MODEL_KEY,
+                            model.getAbsolutePath()
+                    )
+                    .putString(
+                            PROJECTOR_KEY,
+                            projector.getAbsolutePath()
+                    )
+                    .apply();
+        }
+
+        return new File[]{model, projector};
     }
 
     private static String findEngineAsset() {
+
         for (String abi : Build.SUPPORTED_ABIS) {
+
             if ("arm64-v8a".equals(abi)
                     || "armeabi-v7a".equals(abi)) {
+
                 return abi + "/" + ENGINE;
             }
         }
@@ -76,14 +221,17 @@ public final class LocalVisionAI {
             String asset
     ) throws Exception {
 
-        File destination =
-                new File(context.getFilesDir(), ENGINE);
+        File destination = new File(
+                context.getFilesDir(),
+                ENGINE
+        );
 
         if (destination.isFile()
-                && destination.length() > 100000) {
+                && destination.length() > 100000L) {
 
             if (!destination.canExecute()
                     && !destination.setExecutable(true, true)) {
+
                 throw new Exception(
                         "Cannot enable AI engine execution."
                 );
@@ -114,7 +262,8 @@ public final class LocalVisionAI {
         }
 
         if (!destination.isFile()
-                || destination.length() < 100000) {
+                || destination.length() < 100000L) {
+
             throw new Exception(
                     "The packaged AI engine is missing or incomplete."
             );
@@ -148,16 +297,10 @@ public final class LocalVisionAI {
         if (chart.isRecycled()
                 || chart.getWidth() < 2
                 || chart.getHeight() < 2) {
+
             return new Result(
                     "WAIT",
                     "The chart image is invalid or too small."
-            );
-        }
-
-        if (!modelsReady(context)) {
-            return new Result(
-                    "WAIT",
-                    "Select both the SmolVLM text model and its matching image projector."
             );
         }
 
@@ -165,38 +308,25 @@ public final class LocalVisionAI {
         Process process = null;
 
         try {
-            SharedPreferences prefs =
-                    context.getSharedPreferences(
-                            PREFS,
-                            Context.MODE_PRIVATE
-                    );
 
-            String modelPath =
-                    prefs.getString(MODEL_KEY, "");
+            File[] models = prepareModels(context);
 
-            String projectorPath =
-                    prefs.getString(PROJECTOR_KEY, "");
+            File model = models[0];
+            File projector = models[1];
 
-            if (!exists(modelPath) || !exists(projectorPath)) {
-                return new Result(
-                        "WAIT",
-                        "One or both model files cannot be read."
-                );
-            }
+            String engineAsset = findEngineAsset();
 
-            File model = new File(modelPath);
-            File projector = new File(projectorPath);
-
-            String asset = findEngineAsset();
-
-            if (asset == null) {
+            if (engineAsset == null) {
                 return new Result(
                         "WAIT",
                         "This Android processor architecture is unsupported."
                 );
             }
 
-            File engine = prepareEngine(context, asset);
+            File engine = prepareEngine(
+                    context,
+                    engineAsset
+            );
 
             imageFile = new File(
                     context.getCacheDir(),
@@ -245,25 +375,23 @@ public final class LocalVisionAI {
                 output.flush();
 
             } finally {
+
                 if (resized != chart && !resized.isRecycled()) {
                     resized.recycle();
                 }
             }
 
             String prompt =
-                    "You are an experimental visual chart assistant. " +
-                    "Examine the supplied trading chart image. Consider " +
-                    "recent visible candle bodies and wicks, short-term " +
-                    "momentum, visible support and resistance, and whether " +
-                    "the chart is clear enough to assess. Do not invent " +
-                    "prices, indicators, or unseen information. " +
-                    "Respond using exactly these fields, each on a new line: " +
+                    "You are an experimental visual trading-chart assistant. " +
+                    "Analyze only the visible chart. Consider recent candle " +
+                    "bodies and wicks, short-term momentum, visible support " +
+                    "and resistance, and chart clarity. Do not invent prices " +
+                    "or indicators. Return these fields on separate lines: " +
                     "DIRECTION: UP or DOWN or WAIT; " +
-                    "CONFIDENCE: an integer from 0 to 100; " +
+                    "CONFIDENCE: integer from 0 to 100; " +
                     "REASON: one short sentence. " +
-                    "Choose WAIT when the image is unclear or the evidence " +
-                    "is contradictory. Confidence is a subjective model " +
-                    "estimate, not a measured probability of winning. " +
+                    "Choose WAIT if evidence is unclear or contradictory. " +
+                    "Confidence is not a verified probability of winning. " +
                     "Never promise profit.";
 
             ProcessBuilder builder = new ProcessBuilder(
@@ -275,7 +403,7 @@ public final class LocalVisionAI {
                     "-p", prompt,
                     "-n", "120",
                     "-c", "2048",
-                    "-t", "4",
+                    "-t", "2",
                     "--temp", "0.1"
             );
 
@@ -289,6 +417,7 @@ public final class LocalVisionAI {
                     new ByteArrayOutputStream();
 
             Thread reader = new Thread(() -> {
+
                 try (InputStream input =
                              running.getInputStream()) {
 
@@ -296,11 +425,14 @@ public final class LocalVisionAI {
                     int count;
 
                     while ((count = input.read(buffer)) != -1) {
+
                         synchronized (captured) {
+
                             int remaining =
                                     MAX_OUTPUT_BYTES - captured.size();
 
                             if (remaining > 0) {
+
                                 captured.write(
                                         buffer,
                                         0,
@@ -311,8 +443,9 @@ public final class LocalVisionAI {
                     }
 
                 } catch (Exception ignored) {
-                    // Preserve any output already captured.
+                    // Preserve output already received.
                 }
+
             }, "DiabloAIOutputReader");
 
             reader.setDaemon(true);
@@ -324,11 +457,12 @@ public final class LocalVisionAI {
             );
 
             if (!finished) {
+
                 process.destroyForcibly();
 
                 return new Result(
                         "WAIT",
-                        "AI analysis timed out. The phone may not have enough processing power or memory for this model."
+                        "AI analysis timed out. The phone may not have enough memory or processing power."
                 );
             }
 
@@ -341,6 +475,7 @@ public final class LocalVisionAI {
             }
 
             if (process.exitValue() != 0) {
+
                 String diagnostic = output;
 
                 if (diagnostic.length() > 700) {
@@ -353,10 +488,17 @@ public final class LocalVisionAI {
                         "WAIT",
                         "AI engine failed with exit code "
                                 + process.exitValue()
-                                + ". Check that the model, projector, and engine are compatible."
+                                + ". Check model and engine compatibility."
                                 + (diagnostic.isEmpty()
                                 ? ""
                                 : "\nEngine output:\n" + diagnostic)
+                );
+            }
+
+            if (output.isEmpty()) {
+                return new Result(
+                        "WAIT",
+                        "The AI engine returned no readable answer."
                 );
             }
 
@@ -368,30 +510,25 @@ public final class LocalVisionAI {
                 );
             }
 
-            if (output.trim().isEmpty()) {
-                return new Result(
-                        "WAIT",
-                        "The AI engine returned no readable answer."
-                );
-            }
-
             if ("WAIT".equals(signal)) {
                 output =
-                        "The model did not provide a clear UP or DOWN direction. " +
-                        "WAIT is used for safety.\n\n" + output;
+                        "No clear UP or DOWN direction was found. WAIT is used for safety.\n\n"
+                                + output;
             }
 
             return new Result(signal, output);
 
         } catch (Exception error) {
+
             return new Result(
                     "WAIT",
-                    "Local AI could not complete the analysis: "
+                    "Local AI error: "
                             + error.getClass().getSimpleName()
-                            + ". Check model files, engine packaging, and available memory."
+                            + ". Check packaged models, engine compatibility, and available storage."
             );
 
         } finally {
+
             if (process != null && process.isAlive()) {
                 process.destroyForcibly();
             }
@@ -403,6 +540,7 @@ public final class LocalVisionAI {
     }
 
     private static String parseDirection(String output) {
+
         if (output == null || output.trim().isEmpty()) {
             return "WAIT";
         }
@@ -410,6 +548,7 @@ public final class LocalVisionAI {
         String upper = output.toUpperCase(Locale.ROOT);
 
         for (String line : upper.split("\\r?\\n")) {
+
             String cleaned = line.trim();
 
             if (!cleaned.startsWith("DIRECTION:")) {
