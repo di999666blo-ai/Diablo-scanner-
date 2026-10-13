@@ -276,6 +276,12 @@ public class ScreenCaptureService extends Service {
             if (image == null) {
                 return;
             }
+            // Prevent repeated full-screen bitmap allocation.
+long now = System.currentTimeMillis();
+if (now - lastAnalysisTime < ANALYSIS_INTERVAL_MS) {
+    return;
+}
+lastAnalysisTime = now;
 
             Image.Plane[] planes = image.getPlanes();
 
