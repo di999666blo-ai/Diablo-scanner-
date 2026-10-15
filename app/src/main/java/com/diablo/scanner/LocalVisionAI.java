@@ -69,18 +69,24 @@ public final class LocalVisionAI {
         String modelPath = prefs.getString(MODEL_KEY, "");
         String projectorPath = prefs.getString(PROJECTOR_KEY, "");
 
-        if (exists(modelPath) && exists(projectorPath)) {
-            return true;
+        boolean customModelsReady = exists(modelPath) && exists(projectorPath);
+        if (!customModelsReady) {
+            try (InputStream model = context.getAssets().open(MODEL_ASSET);
+                 InputStream projector = context.getAssets().open(PROJECTOR_ASSET)) {
+                // Both bundled model assets are present.
+            } catch (Exception missingModels) {
+                return false;
+            }
         }
 
-        try (InputStream model =
-                     context.getAssets().open(MODEL_ASSET);
-             InputStream projector =
-                     context.getAssets().open(PROJECTOR_ASSET)) {
+        String engineAsset = findEngineAsset();
+        if (engineAsset == null) {
+            return false;
+        }
 
+        try (InputStream engine = context.getAssets().open(engineAsset)) {
             return true;
-
-        } catch (Exception e) {
+        } catch (Exception missingEngine) {
             return false;
         }
     }
