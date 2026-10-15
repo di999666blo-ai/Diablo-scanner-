@@ -255,19 +255,16 @@ public class MainActivity extends Activity {
                         AIModelSetup.chooseImageModel(this);
 
                     } else {
-                        boolean ready =
-                                AIModelSetup.areBothModelsSelected(this);
+                        boolean ready = LocalVisionAI.modelsReady(this);
 
                         String message;
 
                         if (ready) {
                             message =
-                                    "Both model files are copied into app storage.\n\n" +
-                                    "The source includes a connection to the local " +
-                                    "vision AI engine, but successful model inference " +
-                                    "has not yet been verified on this phone.\n\n" +
-                                    "The next step is to finish the source code, " +
-                                    "build the app, and test the engine.";
+                                    "The model files and engine assets appear available.\n\n" +
+                                    "This check confirms the required files can be found; " +
+                                    "it does not prove that inference works on this phone.\n\n" +
+                                    "A real chart test is still required.";
                         } else {
                             message =
                                     "One or both model files are missing.\n\n" +
@@ -299,16 +296,15 @@ public class MainActivity extends Activity {
 
         TextView label = (TextView) view;
 
-        if (AIModelSetup.areBothModelsSelected(this)) {
+        if (LocalVisionAI.modelsReady(this)) {
             label.setText(
-                    "AI MODEL FILES: READY IN STORAGE\n" +
-                    "Local AI connection added to source; " +
-                    "actual model operation still needs device testing."
+                    "AI FILES + ENGINE: FOUND\n" +
+                    "Model inference still needs a real on-device test."
             );
         } else {
             label.setText(
-                    "AI MODEL FILES: NOT SET UP\n" +
-                    "Tap SET UP AI MODEL FILES to select both GGUF files."
+                    "AI FILES OR ENGINE: MISSING\n" +
+                    "Select matching text-model and image-projector GGUF files, then rebuild if the engine is missing."
             );
         }
     }
