@@ -267,9 +267,9 @@ public class MainActivity extends Activity {
                                     "A real chart test is still required.";
                         } else {
                             message =
-                                    "One or both model files are missing.\n\n" +
-                                    "Select the SmolVLM text model and its matching " +
-                                    "image projector using the two setup options.";
+                                    "The required AI files or the packaged engine are missing.\n\n" +
+                                    "Select the matching SmolVLM text model and image projector. " +
+                                    "If the engine is missing, the app must be rebuilt with the fixed GitHub Actions workflow." ;
                         }
 
                         new AlertDialog.Builder(this)
@@ -304,7 +304,7 @@ public class MainActivity extends Activity {
         } else {
             label.setText(
                     "AI FILES OR ENGINE: MISSING\n" +
-                    "Select matching text-model and image-projector GGUF files, then rebuild if the engine is missing."
+                    "Select the matching text model and image projector. If the engine is missing, rebuild the APK."
             );
         }
     }
