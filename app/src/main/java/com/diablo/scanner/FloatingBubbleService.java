@@ -253,6 +253,7 @@ public class FloatingBubbleService extends Service {
 
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     if (!moved) {
+                        requestOneScan();
                         expandPanel();
                     }
                     return true;
@@ -370,6 +371,13 @@ public class FloatingBubbleService extends Service {
 
         addButton(
                 layout,
+                "SCAN ONE SIGNAL",
+                Color.rgb(115, 25, 35),
+                v -> requestOneScan()
+        );
+
+        addButton(
+                layout,
                 "REFRESH NOW",
                 Color.rgb(35, 35, 45),
                 v -> refreshLatestResult()
@@ -416,6 +424,32 @@ public class FloatingBubbleService extends Service {
         refreshLatestResult();
         updateTradeStatus();
         updateStats();
+    }
+
+    // One tap requests one chart analysis. Screen capture must first be started
+    // from the main app so Android's screen-capture permission is active.
+    private void requestOneScan() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        prefs.edit()
+                .putLong("latest_bubble_signal_until", 0L)
+                .putString("bubble_scan_status", "SCANNING")
+                .apply();
+
+        if (signalView != null) {
+            signalView.setText("WAIT");
+            signalView.setTextColor(Color.YELLOW);
+        }
+        if (detailsView != null) {
+            detailsView.setText("One scan requested. Waiting for the chart result...");
+        }
+
+        try {
+            Intent intent = new Intent(ScreenCaptureService.ACTION_SCAN_ONCE);
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
+        } catch (Exception ignored) {
+            prefs.edit().putString("bubble_scan_status", "NOT_READY").apply();
+        }
     }
 
     // READ LATEST RESULT
@@ -498,6 +532,19 @@ public class FloatingBubbleService extends Service {
             } catch (Exception ignored) {
                 source = "Could not read saved history";
             }
+        }
+
+        // Keep the bubble on WAIT except for a short display window after
+        // the one result produced by the latest tap.
+        if (prefs.getLong("latest_bubble_signal_until", 0L)
+                <= System.currentTimeMillis()) {
+            signalView.setText("WAIT");
+            signalView.setTextColor(Color.YELLOW);
+            tradeDirection = "WAIT";
+            detailsView.setText(
+                    "READY\nTap D or SCAN ONE SIGNAL to analyse the current chart.\nOne tap = one result. Results are saved in app history."
+            );
+            return;
         }
 
         signal = normaliseSignal(signal);
