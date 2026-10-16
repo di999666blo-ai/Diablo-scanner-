@@ -886,9 +886,12 @@ lastAnalysisTime = now;
     public void onDestroy() {
         stopCapture();
 
-        // Stop any remaining AI work when the service is destroyed.
+        // Do not interrupt an AI inference already running. The old
+        // shutdownNow() interrupted Process.waitFor(), which surfaced in the
+        // bubble as "Local AI error: InterruptedException". Let the single
+        // requested scan finish; no new tasks can be submitted after shutdown.
         try { unregisterReceiver(scanReceiver); } catch (Exception ignored) { }
-        aiExecutor.shutdownNow();
+        aiExecutor.shutdown();
 
         stopForeground(true);
         super.onDestroy();
