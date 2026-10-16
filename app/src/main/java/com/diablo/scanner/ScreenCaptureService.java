@@ -5,6 +5,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
@@ -39,6 +42,8 @@ public class ScreenCaptureService extends Service {
 
     public static final String ACTION_STOP_CAPTURE =
             "com.diablo.scanner.STOP_CAPTURE";
+    public static final String ACTION_SCAN_ONCE =
+            "com.diablo.scanner.SCAN_ONCE";
 
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "diablo_screen_capture";
@@ -65,11 +70,31 @@ public class ScreenCaptureService extends Service {
 
     private final AtomicBoolean aiRunning =
             new AtomicBoolean(false);
+    // A chart is analysed only after an explicit bubble tap.
+    private final AtomicBoolean scanRequested = new AtomicBoolean(false);
+
+    private final BroadcastReceiver scanReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent != null && ACTION_SCAN_ONCE.equals(intent.getAction())) {
+                if (captureStarted) {
+                    scanRequested.set(true);
+                    getSharedPreferences("diablo_scanner", MODE_PRIVATE)
+                            .edit().putString("bubble_scan_status", "SCANNING").apply();
+                } else {
+                    getSharedPreferences("diablo_scanner", MODE_PRIVATE)
+                            .edit().putString("bubble_scan_status", "NOT_READY").apply();
+                }
+            }
+        }
+    };
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        IntentFilter filter = new IntentFilter(ACTION_SCAN_ONCE);
+        registerReceiver(scanReceiver, filter);
     }
 
     private void createNotificationChannel() {
@@ -356,6 +381,11 @@ lastAnalysisTime = now;
 
     private void analyseCapturedBitmap(Bitmap bitmap) {
 
+        // Consume exactly one request. Later frames are ignored until another tap.
+        if (!scanRequested.compareAndSet(true, false)) {
+            return;
+        }
+
         try {
             int width = bitmap.getWidth();
             int height = bitmap.getHeight();
@@ -526,14 +556,16 @@ lastAnalysisTime = now;
                             score
                     );
 
-            // Save the existing live scanner result.
-            saveLiveResult(
-                    prefs,
-                    signal,
-                    score,
-                    green,
-                    red
-            );
+            // Only store one result per tap. Prefer the AI result when the
+            // model is ready; otherwise store this one basic visual result.
+            boolean aiReady = LocalVisionAI.modelsReady(this);
+            if (!aiReady) {
+                saveLiveResult(prefs, signal, score, green, red);
+                prefs.edit()
+                        .putLong("latest_bubble_signal_until", System.currentTimeMillis() + 12000L)
+                        .putString("bubble_scan_status", "DONE")
+                        .apply();
+            }
 
             prefs.edit()
                     .putString(
@@ -589,6 +621,8 @@ lastAnalysisTime = now;
 
         } catch (Exception error) {
             aiRunning.set(false);
+            getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
+                    .putString("bubble_scan_status", "FAILED").apply();
             return;
         }
 
@@ -604,6 +638,9 @@ lastAnalysisTime = now;
 
                     if (result != null) {
                         saveAIResult(result);
+                    } else {
+                        getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
+                                .putString("bubble_scan_status", "FAILED").apply();
                     }
 
                 } catch (Exception ignored) {
@@ -703,6 +740,8 @@ lastAnalysisTime = now;
                     .putString("latest_ai_signal", displaySignal)
                     .putInt("latest_ai_score", score)
                     .putString("latest_ai_time", item.getString("time"))
+                    .putLong("latest_bubble_signal_until", System.currentTimeMillis() + 12000L)
+                    .putString("bubble_scan_status", "DONE")
                     .apply();
 
         } catch (Exception ignored) {
@@ -848,6 +887,7 @@ lastAnalysisTime = now;
         stopCapture();
 
         // Stop any remaining AI work when the service is destroyed.
+        try { unregisterReceiver(scanReceiver); } catch (Exception ignored) { }
         aiExecutor.shutdownNow();
 
         stopForeground(true);
