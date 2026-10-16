@@ -33,9 +33,9 @@ public final class LocalVisionAI {
             "diablo-image-projector.gguf";
 
     private static final int MAX_OUTPUT_BYTES = 100000;
-    private static final int MAX_IMAGE_DIMENSION = 640;
+    private static final int MAX_IMAGE_DIMENSION = 480;
 
-    private static final long ANALYSIS_TIMEOUT_SECONDS = 90L;
+    private static final long ANALYSIS_TIMEOUT_SECONDS = 45L;
 
     private LocalVisionAI() {
     }
@@ -388,17 +388,24 @@ public final class LocalVisionAI {
             }
 
             String prompt =
-                    "You are an experimental visual trading-chart assistant. " +
-                    "Analyze only the visible chart. Consider recent candle " +
-                    "bodies and wicks, short-term momentum, visible support " +
-                    "and resistance, and chart clarity. Do not invent prices " +
-                    "or indicators. Return these fields on separate lines: " +
-                    "DIRECTION: UP or DOWN or WAIT; " +
-                    "CONFIDENCE: integer from 0 to 100; " +
+                    "You are Diablo Scanner, an experimental visual assistant " +
+                    "for a possible 1-minute chart trade. Inspect the supplied " +
+                    "live chart image only. First locate the most recent candles " +
+                    "and any clearly visible user-drawn horizontal price line. " +
+                    "Judge the latest candle bodies and wicks, the last few " +
+                    "candles' direction, momentum, rejection at the line, and " +
+                    "nearby support/resistance. If the line or candles cannot " +
+                    "be seen clearly, say WAIT. Do not guess hidden prices, " +
+                    "indicators, expiry results, or future movement. " +
+                    "Choose UP only when recent price action gives clearer " +
+                    "short-term upward evidence; choose DOWN only when clearer " +
+                    "short-term downward evidence exists. If evidence is mixed, " +
+                    "say WAIT. Return exactly three short lines: " +
+                    "DIRECTION: UP or DOWN or WAIT " +
+                    "CONFIDENCE: integer 0 to 100 " +
                     "REASON: one short sentence. " +
-                    "Choose WAIT if evidence is unclear or contradictory. " +
-                    "Confidence is not a verified probability of winning. " +
-                    "Never promise profit.";
+                    "Confidence is not a verified win probability. Never " +
+                    "promise profit and never claim certainty.";
 
             ProcessBuilder builder = new ProcessBuilder(
                     engine.getAbsolutePath(),
@@ -407,9 +414,9 @@ public final class LocalVisionAI {
                     "--no-mmproj-offload",
                     "--image", imageFile.getAbsolutePath(),
                     "-p", prompt,
-                    "-n", "120",
-                    "-c", "2048",
-                    "-t", "2",
+                    "-n", "60",
+                    "-c", "1024",
+                    "-t", "3",
                     "--temp", "0.1"
             );
 
