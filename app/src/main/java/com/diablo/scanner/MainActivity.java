@@ -563,147 +563,83 @@ public class MainActivity extends Activity {
         ).show();
     }
 
-    // BASIC VISUAL ANALYSIS — NOT AI INFERENCE
+    // SAVED CHART ANALYSIS — USE THE SAME LOCAL VISION AI AS LIVE SCANNING
 
     private void analyseBitmap(Bitmap bitmap) {
-        if (bitmap == null || bitmap.isRecycled()) {
-            Toast.makeText(
-                    this,
-                    "Unable to analyse this image.",
-                    Toast.LENGTH_LONG
-            ).show();
+        if (bitmap == null || bitmap.isRecycled()
+                || bitmap.getWidth() < 2 || bitmap.getHeight() < 2) {
+            showImageError();
             return;
         }
 
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        if (width < 2 || height < 2) {
-            Toast.makeText(
-                    this,
-                    "Image is too small to analyse.",
-                    Toast.LENGTH_LONG
-            ).show();
+        // Make a private copy before returning from the picker callback.
+        final Bitmap chartCopy;
+        try {
+            chartCopy = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+        } catch (Exception error) {
+            showImageError();
             return;
         }
 
-        int step = Math.max(
-                1,
-                Math.max(width, height) / 500
-        );
+        signalText.setText("ANALYSING...");
+        signalText.setTextColor(Color.YELLOW);
+        statusText.setText("Running local vision AI on your saved chart. This may take a while on this phone.");
+        Toast.makeText(this, "Saved chart sent to local AI analysis.", Toast.LENGTH_SHORT).show();
 
-        long green = 0;
-        long redPixels = 0;
-        long checked = 0;
+        new Thread(() -> {
+            LocalVisionAI.Result result = LocalVisionAI.analyze(
+                    getApplicationContext(),
+                    chartCopy
+            );
 
-        for (int y = 0; y < height; y += step) {
-            for (int x = 0; x < width; x += step) {
-                int pixel = bitmap.getPixel(x, y);
+            if (!chartCopy.isRecycled()) {
+                chartCopy.recycle();
+            }
 
-                int r = Color.red(pixel);
-                int g = Color.green(pixel);
-                int b = Color.blue(pixel);
-
-                checked++;
-
-                int brightness = Math.max(
-                        r,
-                        Math.max(g, b)
-                );
-
-                if (brightness < 70) {
-                    continue;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    return;
                 }
 
-                boolean isGreen =
-                        g >= 90
-                        && g > r * 1.20
-                        && g > b * 1.08;
+                String signal = result == null ? "WAIT" : result.signal;
+                String details = result == null
+                        ? "The AI returned no result. Please try another chart."
+                        : result.details;
+                int confidence = extractConfidence(details);
 
-                boolean isRed =
-                        r >= 90
-                        && r > g * 1.20
-                        && r > b * 1.08;
-
-                if (isGreen) {
-                    green++;
-                } else if (isRed) {
-                    redPixels++;
+                signalText.setText(signal);
+                if ("UP".equalsIgnoreCase(signal) || signal.toUpperCase(Locale.ROOT).contains("UP")) {
+                    signalText.setTextColor(Color.rgb(50, 220, 120));
+                } else if (signal.toUpperCase(Locale.ROOT).contains("DOWN")) {
+                    signalText.setTextColor(red);
+                } else {
+                    signalText.setTextColor(Color.YELLOW);
                 }
+
+                statusText.setText("SAVED CHART AI RESULT\n" + details
+                        + "\n\nConfidence is not a verified win probability.");
+                saveHistory(signal, confidence, 0, 0);
+                refreshCount();
+            });
+        }, "DiabloSavedChartAI").start();
+    }
+
+    private int extractConfidence(String details) {
+        if (details == null) {
+            return 0;
+        }
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?i)CONFIDENCE\\s*:\\s*(\\d{1,3})")
+                .matcher(details);
+
+        if (matcher.find()) {
+            try {
+                return Math.max(0, Math.min(100, Integer.parseInt(matcher.group(1))));
+            } catch (Exception ignored) {
             }
         }
-
-        long total = green + redPixels;
-
-        double difference = total == 0
-                ? 0.0
-                : Math.abs(green - redPixels) / (double) total;
-
-        double threshold =
-                prefs.getInt(THRESHOLD, 15) / 100.0;
-
-        String signal;
-        String detail;
-        int colour;
-        int score;
-
-        if (total < 20) {
-            signal = "WAIT";
-            colour = Color.YELLOW;
-            score = 0;
-
-            detail =
-                    "Too few clearly coloured pixels were found. " +
-                    "Choose a clearer chart screenshot.";
-
-        } else if (difference < threshold) {
-            signal = "WAIT";
-            colour = Color.YELLOW;
-            score = (int) Math.round(difference * 100);
-
-            detail =
-                    "Red and green pixels are too balanced to show " +
-                    "a clear visual bias.";
-
-        } else if (green > redPixels) {
-            signal = "UP BIAS";
-            colour = Color.rgb(50, 220, 120);
-
-            score = (int) Math.round(
-                    Math.min(95, 50 + difference * 45)
-            );
-
-            detail =
-                    "More green-dominant than red-dominant pixels " +
-                    "were detected. This is only a visual colour comparison.";
-
-        } else {
-            signal = "DOWN BIAS";
-            colour = red;
-
-            score = (int) Math.round(
-                    Math.min(95, 50 + difference * 45)
-            );
-
-            detail =
-                    "More red-dominant than green-dominant pixels " +
-                    "were detected. This is only a visual colour comparison.";
-        }
-
-        signalText.setText(signal);
-        signalText.setTextColor(colour);
-
-        statusText.setText(
-                detail +
-                "\nGreen pixels: " + green +
-                "\nRed pixels: " + redPixels +
-                "\nSampled pixels: " + checked +
-                "\nVisual balance score: " + score + "%" +
-                "\nThis is not a probability of profit."
-        );
-
-        saveHistory(signal, score, green, redPixels);
-        refreshCount();
+        return 0;
     }
 
     // SAVE HISTORY
