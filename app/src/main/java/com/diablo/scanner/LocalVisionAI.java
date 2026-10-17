@@ -208,6 +208,19 @@ public final class LocalVisionAI {
         return new File[]{model, projector};
     }
 
+    private static String formatTargetDuration(long durationMs) {
+        long seconds = Math.max(1L, durationMs / 1000L);
+        if (seconds < 60L) {
+            return seconds + (seconds == 1L ? " second" : " seconds");
+        }
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+        if (remainingSeconds == 0L) {
+            return minutes + (minutes == 1L ? " minute" : " minutes");
+        }
+        return minutes + " minutes " + remainingSeconds + " seconds";
+    }
+
     private static String findEngineAsset() {
 
         for (String abi : Build.SUPPORTED_ABIS) {
@@ -387,9 +400,15 @@ public final class LocalVisionAI {
                 }
             }
 
+            long targetDurationMs = context.getSharedPreferences(
+                    "diablo_scanner",
+                    Context.MODE_PRIVATE
+            ).getLong("trade_duration_ms", 60000L);
+            String targetDuration = formatTargetDuration(targetDurationMs);
+
             String prompt =
                     "You are Diablo Scanner, an experimental visual assistant " +
-                    "for a possible 1-minute chart trade. Inspect the supplied " +
+                    "for a possible chart trade with target duration " + targetDuration + ". Inspect the supplied " +
                     "live chart image only. First locate the most recent candles " +
                     "and any clearly visible user-drawn horizontal price line. " +
                     "Judge the latest candle bodies and wicks, the last few " +
