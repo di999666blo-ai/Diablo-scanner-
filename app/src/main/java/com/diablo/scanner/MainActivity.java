@@ -837,7 +837,13 @@ public class MainActivity extends Activity {
                 "15 seconds",
                 "30 seconds",
                 "1 minute",
+                "2 minutes",
+                "3 minutes",
                 "5 minutes",
+                "10 minutes",
+                "15 minutes",
+                "30 minutes",
+                "60 minutes",
                 "Custom duration (seconds)"
         };
 
@@ -850,7 +856,13 @@ public class MainActivity extends Activity {
                 : current == 15000L ? 1
                 : current == 30000L ? 2
                 : current == 60000L ? 3
-                : current == 300000L ? 4
+                : current == 120000L ? 4
+                : current == 180000L ? 5
+                : current == 300000L ? 6
+                : current == 600000L ? 7
+                : current == 900000L ? 8
+                : current == 1800000L ? 9
+                : current == 3600000L ? 10
                 : -1;
 
         new AlertDialog.Builder(this)
@@ -864,17 +876,18 @@ public class MainActivity extends Activity {
                         selected,
                         (dialog, which) -> {
 
-                            if (which == 5) {
+                            if (which == 11) {
                                 dialog.dismiss();
                                 showCustomTradeDuration();
                                 return;
                             }
 
-                            long duration = which == 0 ? 5000L
-                                    : which == 1 ? 15000L
-                                    : which == 2 ? 30000L
-                                    : which == 3 ? 60000L
-                                    : 300000L;
+                            long[] durations = {
+                                    5000L, 15000L, 30000L, 60000L,
+                                    120000L, 180000L, 300000L, 600000L,
+                                    900000L, 1800000L, 3600000L
+                            };
+                            long duration = durations[which];
 
                             prefs.edit()
                                     .putLong(TRADE_DURATION_MS, duration)
