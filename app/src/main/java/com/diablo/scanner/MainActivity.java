@@ -567,142 +567,151 @@ public class MainActivity extends Activity {
         ).show();
     }
 
-    // BASIC VISUAL ANALYSIS — NOT AI INFERENCE
+    // SAVED CHART ANALYSIS — LOCAL VISION AI FIRST
 
-        // Prefer the bundled SmolVLM vision model for saved charts.
-        // Run inference off the UI thread so the dashboard remains responsive.
-        if (LocalVisionAI.modelsReady(this)) {
-            final Bitmap aiBitmap;
+    private void analyseBitmap(Bitmap bitmap) {
+        if (bitmap == null || bitmap.isRecycled()) {
+            Toast.makeText(this, "Unable to analyse this image.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+
+        if (width < 2 || height < 2) {
+            Toast.makeText(this, "Image is too small to analyse.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (!LocalVisionAI.modelsReady(this)) {
+            analyseBitmapHeuristicFallback(bitmap);
+            return;
+        }
+
+        final Bitmap aiBitmap;
+        try {
+            aiBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+        } catch (Exception copyError) {
+            analyseBitmapHeuristicFallback(bitmap);
+            return;
+        }
+
+        if (aiBitmap == null) {
+            analyseBitmapHeuristicFallback(bitmap);
+            return;
+        }
+
+        signalText.setText("ANALYSING…");
+        signalText.setTextColor(Color.CYAN);
+        statusText.setText("SmolVLM is analysing this saved chart. Please wait.");
+
+        Thread aiThread = new Thread(() -> {
+            LocalVisionAI.Result aiResult;
             try {
-                aiBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-            } catch (Exception copyError) {
-                Toast.makeText(
-                        this,
-                        "Could not prepare the chart for AI analysis. Using visual fallback.",
-                        Toast.LENGTH_LONG
-                ).show();
-                return analyseBitmapHeuristicFallback(bitmap);
-            }
-
-            if (aiBitmap == null) {
-                Toast.makeText(
-                        this,
-                        "Could not prepare the chart for AI analysis.",
-                        Toast.LENGTH_LONG
-                ).show();
-                return;
-            }
-
-            signalText.setText("ANALYSING…");
-            signalText.setTextColor(Color.CYAN);
-            statusText.setText(
-                    "SmolVLM is analysing this saved chart. Please wait."
-            );
-
-            Thread aiThread = new Thread(() -> {
-                LocalVisionAI.Result aiResult = LocalVisionAI.analyze(
-                        getApplicationContext(),
-                        aiBitmap
+                aiResult = LocalVisionAI.analyze(getApplicationContext(), aiBitmap);
+            } catch (Exception error) {
+                aiResult = new LocalVisionAI.Result(
+                        "WAIT",
+                        "Saved-chart AI analysis failed: " +
+                        error.getClass().getSimpleName()
                 );
-
+            } finally {
                 if (!aiBitmap.isRecycled()) {
                     aiBitmap.recycle();
                 }
+            }
 
-                runOnUiThread(() -> {
-                    if (aiResult == null) {
-                        signalText.setText("WAIT");
-                        signalText.setTextColor(Color.YELLOW);
-                        statusText.setText("AI returned no result. Please try another chart.");
-                        return;
+            final LocalVisionAI.Result finalResult = aiResult;
+            runOnUiThread(() -> {
+                if (finalResult == null) {
+                    signalText.setText("WAIT");
+                    signalText.setTextColor(Color.YELLOW);
+                    statusText.setText("AI returned no result. Please try another chart.");
+                    return;
+                }
+
+                String direction = finalResult.signal == null
+                        ? "WAIT"
+                        : finalResult.signal.trim().toUpperCase(java.util.Locale.ROOT);
+
+                String displaySignal;
+                int displayColour;
+
+                if ("UP".equals(direction)) {
+                    displaySignal = "UP BIAS";
+                    displayColour = Color.rgb(50, 220, 120);
+                } else if ("DOWN".equals(direction)) {
+                    displaySignal = "DOWN BIAS";
+                    displayColour = red;
+                } else {
+                    displaySignal = "WAIT";
+                    displayColour = Color.YELLOW;
+                }
+
+                String details = finalResult.details == null
+                        ? "No explanation returned."
+                        : finalResult.details;
+
+                int confidence = 0;
+                for (String line : details.split("\\r?\\n")) {
+                    String cleaned = line.trim().toUpperCase(java.util.Locale.ROOT);
+                    if (!cleaned.startsWith("CONFIDENCE:")) {
+                        continue;
                     }
 
-                    String direction = aiResult.signal == null
-                            ? "WAIT"
-                            : aiResult.signal.trim().toUpperCase(java.util.Locale.ROOT);
-
-                    String displaySignal;
-                    int displayColour;
-
-                    if ("UP".equals(direction)) {
-                        displaySignal = "UP BIAS";
-                        displayColour = Color.rgb(50, 220, 120);
-                    } else if ("DOWN".equals(direction)) {
-                        displaySignal = "DOWN BIAS";
-                        displayColour = red;
-                    } else {
-                        displaySignal = "WAIT";
-                        displayColour = Color.YELLOW;
-                    }
-
-                    int confidence = 0;
-                    String details = aiResult.details == null
-                            ? "No explanation returned."
-                            : aiResult.details;
-
-                    for (String line : details.split("\\r?\\n")) {
-                        String cleaned = line.trim().toUpperCase(java.util.Locale.ROOT);
-                        if (cleaned.startsWith("CONFIDENCE:")) {
-                            String value = cleaned.substring("CONFIDENCE:".length()).trim();
-                            StringBuilder digits = new StringBuilder();
-                            for (int i = 0; i < value.length(); i++) {
-                                char c = value.charAt(i);
-                                if (Character.isDigit(c)) {
-                                    digits.append(c);
-                                } else if (digits.length() > 0) {
-                                    break;
-                                }
-                            }
-                            try {
-                                confidence = Math.max(0, Math.min(100,
-                                        Integer.parseInt(digits.toString())));
-                            } catch (Exception ignored) {
-                                confidence = 0;
-                            }
+                    String value = cleaned.substring("CONFIDENCE:".length()).trim();
+                    StringBuilder digits = new StringBuilder();
+                    for (int i = 0; i < value.length(); i++) {
+                        char c = value.charAt(i);
+                        if (Character.isDigit(c)) {
+                            digits.append(c);
+                        } else if (digits.length() > 0) {
                             break;
                         }
                     }
 
-                    signalText.setText(displaySignal);
-                    signalText.setTextColor(displayColour);
-                    statusText.setText(
-                            "SAVED CHART • LOCAL VISION AI\n" +
-                            details +
-                            "\n\nExperimental confidence: " + confidence + "%" +
-                            "\nConfidence is not a verified win probability."
-                    );
+                    try {
+                        confidence = Math.max(0, Math.min(100,
+                                Integer.parseInt(digits.toString())));
+                    } catch (Exception ignored) {
+                        confidence = 0;
+                    }
+                    break;
+                }
 
-                    saveHistory(displaySignal, confidence, 0, 0);
-                    refreshCount();
-                });
-            }, "DiabloSavedChartAI");
+                signalText.setText(displaySignal);
+                signalText.setTextColor(displayColour);
+                statusText.setText(
+                        "SAVED CHART • LOCAL VISION AI\n" +
+                        details +
+                        "\n\nExperimental confidence: " + confidence + "%" +
+                        "\nConfidence is not a verified win probability."
+                );
 
-            aiThread.start();
-            return;
-        }
+                saveHistory(displaySignal, confidence, 0, 0);
+                refreshCount();
+            });
+        }, "DiabloSavedChartAI");
 
-        return analyseBitmapHeuristicFallback(bitmap);
+        aiThread.start();
     }
 
     // Colour-count fallback used only when the local vision model is unavailable.
     private void analyseBitmapHeuristicFallback(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
-            Toast.makeText(
-                    this,
-                    "Unable to analyse this image.",
-                    Toast.LENGTH_LONG
-            ).show();
+            Toast.makeText(this, "Unable to analyse this image.", Toast.LENGTH_LONG).show();
             return;
         }
 
-        int step = Math.max(
-                1,
-                Math.max(width, height) / 500
-        );        int step = Math.max(
-                1,
-                Math.max(width, height) / 500
-        );
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
 
+        if (width < 2 || height < 2) {
+            Toast.makeText(this, "Image is too small to analyse.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        int step = Math.max(1, Math.max(width, height) / 500);
         long green = 0;
         long redPixels = 0;
         long checked = 0;
@@ -710,31 +719,18 @@ public class MainActivity extends Activity {
         for (int y = 0; y < height; y += step) {
             for (int x = 0; x < width; x += step) {
                 int pixel = bitmap.getPixel(x, y);
-
                 int r = Color.red(pixel);
                 int g = Color.green(pixel);
                 int b = Color.blue(pixel);
-
                 checked++;
 
-                int brightness = Math.max(
-                        r,
-                        Math.max(g, b)
-                );
-
+                int brightness = Math.max(r, Math.max(g, b));
                 if (brightness < 70) {
                     continue;
                 }
 
-                boolean isGreen =
-                        g >= 90
-                        && g > r * 1.20
-                        && g > b * 1.08;
-
-                boolean isRed =
-                        r >= 90
-                        && r > g * 1.20
-                        && r > b * 1.08;
+                boolean isGreen = g >= 90 && g > r * 1.20 && g > b * 1.08;
+                boolean isRed = r >= 90 && r > g * 1.20 && r > b * 1.08;
 
                 if (isGreen) {
                     green++;
@@ -745,13 +741,8 @@ public class MainActivity extends Activity {
         }
 
         long total = green + redPixels;
-
-        double difference = total == 0
-                ? 0.0
-                : Math.abs(green - redPixels) / (double) total;
-
-        double threshold =
-                prefs.getInt(THRESHOLD, 15) / 100.0;
+        double difference = total == 0 ? 0.0 : Math.abs(green - redPixels) / (double) total;
+        double threshold = prefs.getInt(THRESHOLD, 15) / 100.0;
 
         String signal;
         String detail;
@@ -762,48 +753,26 @@ public class MainActivity extends Activity {
             signal = "WAIT";
             colour = Color.YELLOW;
             score = 0;
-
-            detail =
-                    "Too few clearly coloured pixels were found. " +
-                    "Choose a clearer chart screenshot.";
-
+            detail = "Too few clearly coloured pixels were found. Choose a clearer chart screenshot.";
         } else if (difference < threshold) {
             signal = "WAIT";
             colour = Color.YELLOW;
             score = (int) Math.round(difference * 100);
-
-            detail =
-                    "Red and green pixels are too balanced to show " +
-                    "a clear visual bias.";
-
+            detail = "Red and green pixels are too balanced to show a clear visual bias.";
         } else if (green > redPixels) {
             signal = "UP BIAS";
             colour = Color.rgb(50, 220, 120);
-
-            score = (int) Math.round(
-                    Math.min(95, 50 + difference * 45)
-            );
-
-            detail =
-                    "More green-dominant than red-dominant pixels " +
-                    "were detected. This is only a visual colour comparison.";
-
+            score = (int) Math.round(Math.min(95, 50 + difference * 45));
+            detail = "More green-dominant than red-dominant pixels were detected. This is only a visual colour comparison.";
         } else {
             signal = "DOWN BIAS";
             colour = red;
-
-            score = (int) Math.round(
-                    Math.min(95, 50 + difference * 45)
-            );
-
-            detail =
-                    "More red-dominant than green-dominant pixels " +
-                    "were detected. This is only a visual colour comparison.";
+            score = (int) Math.round(Math.min(95, 50 + difference * 45));
+            detail = "More red-dominant than green-dominant pixels were detected. This is only a visual colour comparison.";
         }
 
         signalText.setText(signal);
         signalText.setTextColor(colour);
-
         statusText.setText(
                 detail +
                 "\nGreen pixels: " + green +
