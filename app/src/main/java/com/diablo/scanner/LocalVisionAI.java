@@ -405,9 +405,9 @@ public final class LocalVisionAI {
             if ("SCALPING".equalsIgnoreCase(mode)) {
                 modeInstructions =
                         "The selected mode is SCALPING SETUP. After DIRECTION, " +
-                        "CONFIDENCE, and REASON, return ENTRY, TAKE_PROFIT, and " +
-                        "STOP_LOSS. Use price values only if they are clearly readable " +
-                        "on the screenshot; otherwise write N/A. Never invent prices. " +
+                        "CONFIDENCE, and REASON, also return ACTION: BUY, SELL, or WAIT; " +
+                        "ENTRY, TAKE_PROFIT, and STOP_LOSS. Use price values only if they are clearly " +
+                        "readable on the screenshot; otherwise write N/A. Never invent prices. " +
                         "Do not treat a visual guess as a guaranteed entry.";
             } else {
                 modeInstructions =
