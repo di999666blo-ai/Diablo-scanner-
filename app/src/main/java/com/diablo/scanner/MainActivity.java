@@ -865,7 +865,8 @@ public class MainActivity extends Activity {
                 "Set trade duration",
                 "Set chart timeframe",
                 "Select trading mode",
-                "Set visual sensitivity"
+                "Set visual sensitivity",
+                "Choose candle timing (forming/close)"
         };
 
         new AlertDialog.Builder(this)
@@ -877,8 +878,10 @@ public class MainActivity extends Activity {
                         showChartTimeframeSettings();
                     } else if (which == 2) {
                         showTradingModeSettings();
-                    } else {
+                    } else if (which == 3) {
                         showSensitivitySettings();
+                    } else {
+                        showSignalTimingSettings();
                     }
                 })
                 .setNegativeButton("CLOSE", null)
@@ -915,13 +918,31 @@ public class MainActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Trading mode")
-                .setMessage("Mode 1 gives a directional chart read. Mode 2 asks the AI for a visible-chart scalping setup. Entry/TP/SL are shown only when the chart makes them readable.")
+                .setMessage("Mode 1 gives a directional chart read. Mode 2 analyses the visible chart for a scalping bias. Entry/TP/SL are not invented when prices cannot be read.")
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     prefs.edit().putString("trading_mode", values[which]).apply();
                     dialog.dismiss();
                     refreshControlSummary();
                     Toast.makeText(this, "Trading mode saved: " + labels[which],
                             Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private void showSignalTimingSettings() {
+        String[] labels = {"Analyse the forming candle", "Wait until candle close"};
+        String[] values = {"FORMING", "CLOSE"};
+        String current = prefs.getString("signal_timing", "CLOSE");
+        int selected = "FORMING".equalsIgnoreCase(current) ? 0 : 1;
+        new AlertDialog.Builder(this)
+                .setTitle("Mode 1 candle timing")
+                .setMessage("A screenshot cannot independently verify whether a broker candle has closed.")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    prefs.edit().putString("signal_timing", values[which]).apply();
+                    dialog.dismiss();
+                    refreshControlSummary();
+                    Toast.makeText(this, "Candle timing saved: " + labels[which], Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton("CANCEL", null)
                 .show();
