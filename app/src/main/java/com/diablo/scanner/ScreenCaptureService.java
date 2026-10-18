@@ -40,6 +40,9 @@ public class ScreenCaptureService extends Service {
     public static final String ACTION_STOP_CAPTURE =
             "com.diablo.scanner.STOP_CAPTURE";
 
+    public static final String ACTION_ANALYZE_ONCE =
+            "com.diablo.scanner.ANALYZE_ONCE";
+
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "diablo_screen_capture";
     private static final long ANALYSIS_INTERVAL_MS = 5000L;
@@ -51,10 +54,11 @@ public class ScreenCaptureService extends Service {
     private HandlerThread workerThread;
     private Handler workerHandler;
 
-    private boolean captureStarted = false;
+    private volatile boolean captureStarted = false;
     private boolean stopping = false;
 
-    private long lastAnalysisTime = 0L;
+    // The scanner analyses only after the user explicitly taps the D bubble.
+    private volatile boolean analysisRequested = false;
 
     /*
      * AI runs separately from screen capture.
@@ -135,6 +139,18 @@ public class ScreenCaptureService extends Service {
         if (ACTION_STOP_CAPTURE.equals(intent.getAction())) {
             stopCapture();
             stopSelf();
+            return START_NOT_STICKY;
+        }
+
+        if (ACTION_ANALYZE_ONCE.equals(intent.getAction())) {
+            if (captureStarted) {
+                analysisRequested = true;
+                getSharedPreferences("diablo_scanner", MODE_PRIVATE)
+                        .edit()
+                        .putString("scan_status", "SCANNING")
+                        .putString("scan_message", "Capturing the current chart for one analysis...")
+                        .apply();
+            }
             return START_NOT_STICKY;
         }
 
@@ -262,6 +278,12 @@ public class ScreenCaptureService extends Service {
 
         captureStarted = true;
         stopping = false;
+        getSharedPreferences("diablo_scanner", MODE_PRIVATE)
+                .edit()
+                .putBoolean("screen_capture_active", true)
+                .putString("scan_status", "WAIT")
+                .putString("scan_message", "Ready. Tap the D bubble to analyse one chart.")
+                .apply();
     }
 
     private void processCapturedFrame(ImageReader reader) {
@@ -276,12 +298,11 @@ public class ScreenCaptureService extends Service {
             if (image == null) {
                 return;
             }
-            // Prevent repeated full-screen bitmap allocation.
-long now = System.currentTimeMillis();
-if (now - lastAnalysisTime < ANALYSIS_INTERVAL_MS) {
-    return;
-}
-lastAnalysisTime = now;
+            // Do not analyse continuously. A tap requests exactly one frame.
+            if (!analysisRequested) {
+                return;
+            }
+            analysisRequested = false;
 
             Image.Plane[] planes = image.getPlanes();
 
@@ -364,6 +385,14 @@ lastAnalysisTime = now;
                 return;
             }
 
+            // Prefer the bundled SmolVLM vision model for the actual chart reading.
+            // The colour-only method below is used only when the model pair is unavailable.
+            if (LocalVisionAI.modelsReady(this)) {
+                startAIAnalysis(bitmap);
+                return;
+            }
+
+            // Fallback only when the bundled/selected vision model is unavailable.
             // Approximate central chart area.
             int left = (int) (width * 0.05);
             int right = (int) (width * 0.95);
@@ -703,6 +732,8 @@ lastAnalysisTime = now;
                     .putString("latest_ai_signal", displaySignal)
                     .putInt("latest_ai_score", score)
                     .putString("latest_ai_time", item.getString("time"))
+                    .putString("scan_status", "READY")
+                    .putString("scan_message", displaySignal + " • " + details)
                     .apply();
 
         } catch (Exception ignored) {
@@ -797,6 +828,8 @@ lastAnalysisTime = now;
 
         prefs.edit()
                 .putString("history", updated.toString())
+                .putString("scan_status", "READY")
+                .putString("scan_message", signal + " • Visual fallback used; not AI.")
                 .apply();
     }
 
@@ -812,6 +845,13 @@ lastAnalysisTime = now;
 
         stopping = true;
         captureStarted = false;
+        analysisRequested = false;
+        getSharedPreferences("diablo_scanner", MODE_PRIVATE)
+                .edit()
+                .putBoolean("screen_capture_active", false)
+                .putString("scan_status", "WAIT")
+                .putString("scan_message", "Screen capture stopped. Start it again to scan.")
+                .apply();
 
         if (virtualDisplay != null) {
             virtualDisplay.release();
