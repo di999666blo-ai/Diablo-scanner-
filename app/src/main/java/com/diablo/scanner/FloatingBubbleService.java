@@ -578,12 +578,12 @@ public class FloatingBubbleService extends Service {
         signal = normaliseSignal(signal);
         signalView.setText(signal);
 
-        if ("UP".equals(signal)) {
+        if ("UP".equals(signal) || "BUY".equals(signal)) {
             signalView.setTextColor(Color.rgb(50, 230, 120));
-            tradeDirection = "UP";
-        } else if ("DOWN".equals(signal)) {
+            tradeDirection = signal;
+        } else if ("DOWN".equals(signal) || "SELL".equals(signal)) {
             signalView.setTextColor(Color.rgb(255, 45, 65));
-            tradeDirection = "DOWN";
+            tradeDirection = signal;
         } else {
             signalView.setTextColor(Color.YELLOW);
             tradeDirection = "WAIT";
@@ -662,6 +662,8 @@ public class FloatingBubbleService extends Service {
 
         if (!"UP".equals(normal)
                 && !"DOWN".equals(normal)
+                && !"BUY".equals(normal)
+                && !"SELL".equals(normal)
                 && !"WAIT".equals(normal)) {
             return false;
         }
@@ -695,6 +697,14 @@ public class FloatingBubbleService extends Service {
         }
 
         String upper = signal.trim().toUpperCase(Locale.ROOT);
+
+        if (upper.contains("BUY")) {
+            return "BUY";
+        }
+
+        if (upper.contains("SELL")) {
+            return "SELL";
+        }
 
         if (upper.contains("UP")) {
             return "UP";
