@@ -262,12 +262,8 @@ public class MainActivity extends Activity {
 
                         if (ready) {
                             message =
-                                    "Both model files are copied into app storage.\n\n" +
-                                    "The source includes a connection to the local " +
-                                    "vision AI engine, but successful model inference " +
-                                    "has not yet been verified on this phone.\n\n" +
-                                    "The next step is to finish the source code, " +
-                                    "build the app, and test the engine.";
+                                    "Both model files are available to the app, either bundled in this APK or selected from storage.\n\n" +
+                                    "The local vision engine still needs a successful build and on-phone inference test.";
                         } else {
                             message =
                                     "One or both model files are missing.\n\n" +
@@ -301,9 +297,9 @@ public class MainActivity extends Activity {
 
         if (AIModelSetup.areBothModelsSelected(this)) {
             label.setText(
-                    "AI MODEL FILES: READY IN STORAGE\n" +
-                    "Local AI connection added to source; " +
-                    "actual model operation still needs device testing."
+                    "AI MODEL FILES: AVAILABLE\n" +
+                    "SmolVLM brain + image projector are bundled or selected. " +
+                    "The first analysis prepares them in app storage; actual inference still needs phone testing."
             );
         } else {
             label.setText(
