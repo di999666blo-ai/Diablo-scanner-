@@ -569,7 +569,123 @@ public class MainActivity extends Activity {
 
     // BASIC VISUAL ANALYSIS — NOT AI INFERENCE
 
-    private void analyseBitmap(Bitmap bitmap) {
+        // Prefer the bundled SmolVLM vision model for saved charts.
+        // Run inference off the UI thread so the dashboard remains responsive.
+        if (LocalVisionAI.modelsReady(this)) {
+            final Bitmap aiBitmap;
+            try {
+                aiBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+            } catch (Exception copyError) {
+                Toast.makeText(
+                        this,
+                        "Could not prepare the chart for AI analysis. Using visual fallback.",
+                        Toast.LENGTH_LONG
+                ).show();
+                return analyseBitmapHeuristicFallback(bitmap);
+            }
+
+            if (aiBitmap == null) {
+                Toast.makeText(
+                        this,
+                        "Could not prepare the chart for AI analysis.",
+                        Toast.LENGTH_LONG
+                ).show();
+                return;
+            }
+
+            signalText.setText("ANALYSING…");
+            signalText.setTextColor(Color.CYAN);
+            statusText.setText(
+                    "SmolVLM is analysing this saved chart. Please wait."
+            );
+
+            Thread aiThread = new Thread(() -> {
+                LocalVisionAI.Result aiResult = LocalVisionAI.analyze(
+                        getApplicationContext(),
+                        aiBitmap
+                );
+
+                if (!aiBitmap.isRecycled()) {
+                    aiBitmap.recycle();
+                }
+
+                runOnUiThread(() -> {
+                    if (aiResult == null) {
+                        signalText.setText("WAIT");
+                        signalText.setTextColor(Color.YELLOW);
+                        statusText.setText("AI returned no result. Please try another chart.");
+                        return;
+                    }
+
+                    String direction = aiResult.signal == null
+                            ? "WAIT"
+                            : aiResult.signal.trim().toUpperCase(java.util.Locale.ROOT);
+
+                    String displaySignal;
+                    int displayColour;
+
+                    if ("UP".equals(direction)) {
+                        displaySignal = "UP BIAS";
+                        displayColour = Color.rgb(50, 220, 120);
+                    } else if ("DOWN".equals(direction)) {
+                        displaySignal = "DOWN BIAS";
+                        displayColour = red;
+                    } else {
+                        displaySignal = "WAIT";
+                        displayColour = Color.YELLOW;
+                    }
+
+                    int confidence = 0;
+                    String details = aiResult.details == null
+                            ? "No explanation returned."
+                            : aiResult.details;
+
+                    for (String line : details.split("\\r?\\n")) {
+                        String cleaned = line.trim().toUpperCase(java.util.Locale.ROOT);
+                        if (cleaned.startsWith("CONFIDENCE:")) {
+                            String value = cleaned.substring("CONFIDENCE:".length()).trim();
+                            StringBuilder digits = new StringBuilder();
+                            for (int i = 0; i < value.length(); i++) {
+                                char c = value.charAt(i);
+                                if (Character.isDigit(c)) {
+                                    digits.append(c);
+                                } else if (digits.length() > 0) {
+                                    break;
+                                }
+                            }
+                            try {
+                                confidence = Math.max(0, Math.min(100,
+                                        Integer.parseInt(digits.toString())));
+                            } catch (Exception ignored) {
+                                confidence = 0;
+                            }
+                            break;
+                        }
+                    }
+
+                    signalText.setText(displaySignal);
+                    signalText.setTextColor(displayColour);
+                    statusText.setText(
+                            "SAVED CHART • LOCAL VISION AI\n" +
+                            details +
+                            "\n\nExperimental confidence: " + confidence + "%" +
+                            "\nConfidence is not a verified win probability."
+                    );
+
+                    saveHistory(displaySignal, confidence, 0, 0);
+                    refreshCount();
+                });
+            }, "DiabloSavedChartAI");
+
+            aiThread.start();
+            return;
+        }
+
+        return analyseBitmapHeuristicFallback(bitmap);
+    }
+
+    // Colour-count fallback used only when the local vision model is unavailable.
+    private void analyseBitmapHeuristicFallback(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
             Toast.makeText(
                     this,
@@ -579,19 +695,10 @@ public class MainActivity extends Activity {
             return;
         }
 
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        if (width < 2 || height < 2) {
-            Toast.makeText(
-                    this,
-                    "Image is too small to analyse.",
-                    Toast.LENGTH_LONG
-            ).show();
-            return;
-        }
-
         int step = Math.max(
+                1,
+                Math.max(width, height) / 500
+        );        int step = Math.max(
                 1,
                 Math.max(width, height) / 500
         );
