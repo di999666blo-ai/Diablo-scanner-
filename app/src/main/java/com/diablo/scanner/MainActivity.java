@@ -76,7 +76,6 @@ public class MainActivity extends Activity {
         if (prefs != null) {
             refreshCount();
             refreshLatestResult();
-            refreshAIModelStatus();
             refreshControlSummary();
         }
     }
@@ -165,9 +164,8 @@ public class MainActivity extends Activity {
         addButton("SIGNAL HISTORY", v -> showHistory());
         addButton("CLEAR HISTORY", v -> clearHistory());
 
-        addSectionTitle("SETTINGS & AI CORE");
-        addButton("SETTINGS / DURATION / TIMEFRAME / MODE", v -> showSettings());
-        addButton("SET UP AI MODEL FILES", v -> showAIModelSetup());
+        addSectionTitle("SETTINGS & LOCAL ANALYZER");
+        addButton("SETTINGS / DURATION / TIMEFRAME / MODE / TIMING", v -> showSettings());
 
         TextView instructions = new TextView(this);
 
@@ -188,13 +186,11 @@ public class MainActivity extends Activity {
         root.addView(instructions);
 
         TextView aiStatus = new TextView(this);
-        aiStatus.setTextColor(Color.LTGRAY);
+        aiStatus.setTextColor(Color.rgb(140, 220, 170));
         aiStatus.setTextSize(12);
         aiStatus.setPadding(8, 8, 8, 12);
-        aiStatus.setTag("ai_model_status");
+        aiStatus.setText("LOCAL CHART ENGINE: BUILT IN • NO GGUF MODEL DOWNLOAD REQUIRED");
         root.addView(aiStatus);
-
-        refreshAIModelStatus();
 
         TextView warning = new TextView(this);
 
@@ -203,8 +199,10 @@ public class MainActivity extends Activity {
                 "DIABLO SCANNER includes basic visual chart analysis and " +
                 "source code for a local vision AI engine. Actual AI operation " +
                 "must be verified on the phone.\n\n" +
-                "AI confidence is not a verified probability of winning. " +
-                "No signal guarantees profit. The app does not place trades."
+                "Saved screenshots are analysed locally without a downloaded model. " +
+                "Live analysis reads pixels from the captured screen; it is not a broker data feed. " +
+                "The experimental visual score is not a verified win probability. No signal guarantees profit. " +
+                "The app does not place trades."
         );
 
         warning.setTextColor(Color.rgb(255, 190, 120));
@@ -277,80 +275,6 @@ public class MainActivity extends Activity {
 
         root.addView(button, params);
         button.setOnClickListener(listener);
-    }
-
-    // AI MODEL FILE SETUP
-
-    private void showAIModelSetup() {
-        String[] options = {
-                "Choose SmolVLM text model",
-                "Choose SmolVLM image projector",
-                "Check model file status"
-        };
-
-        new AlertDialog.Builder(this)
-                .setTitle("DIABLO AI MODEL SETUP")
-                .setItems(options, (dialog, which) -> {
-
-                    if (which == 0) {
-                        AIModelSetup.chooseTextModel(this);
-
-                    } else if (which == 1) {
-                        AIModelSetup.chooseImageModel(this);
-
-                    } else {
-                        boolean ready =
-                                AIModelSetup.areBothModelsSelected(this);
-
-                        String message;
-
-                        if (ready) {
-                            message =
-                                    "Both model files are available to the app, either bundled in this APK or selected from storage.\n\n" +
-                                    "The local vision engine still needs a successful build and on-phone inference test.";
-                        } else {
-                            message =
-                                    "One or both model files are missing.\n\n" +
-                                    "Select the SmolVLM text model and its matching " +
-                                    "image projector using the two setup options.";
-                        }
-
-                        new AlertDialog.Builder(this)
-                                .setTitle("AI model status")
-                                .setMessage(message)
-                                .setPositiveButton("OK", null)
-                                .show();
-                    }
-                })
-                .setNegativeButton("CLOSE", null)
-                .show();
-    }
-
-    private void refreshAIModelStatus() {
-        if (root == null) {
-            return;
-        }
-
-        View view = root.findViewWithTag("ai_model_status");
-
-        if (!(view instanceof TextView)) {
-            return;
-        }
-
-        TextView label = (TextView) view;
-
-        if (AIModelSetup.areBothModelsSelected(this)) {
-            label.setText(
-                    "AI MODEL FILES: AVAILABLE\n" +
-                    "SmolVLM brain + image projector are bundled or selected. " +
-                    "The first analysis prepares them in app storage; actual inference still needs phone testing."
-            );
-        } else {
-            label.setText(
-                    "AI MODEL FILES: NOT SET UP\n" +
-                    "Tap SET UP AI MODEL FILES to select both GGUF files."
-            );
-        }
     }
 
     // LIVE SCREEN CAPTURE
@@ -521,16 +445,6 @@ public class MainActivity extends Activity {
             Intent data
     ) {
         super.onActivityResult(requestCode, resultCode, data);
-
-        if (AIModelSetup.handleResult(
-                this,
-                requestCode,
-                resultCode,
-                data
-        )) {
-            refreshAIModelStatus();
-            return;
-        }
 
         if (requestCode == REQUEST_SCREEN_CAPTURE) {
             if (resultCode != RESULT_OK || data == null) {
