@@ -53,6 +53,7 @@ public class FloatingBubbleService extends Service {
     private boolean expanded = false;
     private boolean tradeActive = false;
     private boolean awaitingResult = false;
+    private int scanRayFrame = 0;
 
     private long tradeStartMs = 0L;
     private long tradeDurationMs = DEFAULT_TRADE_DURATION_MS;
@@ -253,7 +254,7 @@ public class FloatingBubbleService extends Service {
 
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     if (!moved) {
-                        expandPanel();
+                        requestOneScan();
                     }
                     return true;
                 }
@@ -342,6 +343,13 @@ public class FloatingBubbleService extends Service {
 
         addButton(
                 layout,
+                "◢ SCAN CURRENT CHART ONCE",
+                Color.rgb(120, 48, 30),
+                v -> requestOneScan()
+        );
+
+        addButton(
+                layout,
                 "I TOOK TRADE",
                 Color.rgb(30, 100, 55),
                 v -> startTrade()
@@ -418,10 +426,71 @@ public class FloatingBubbleService extends Service {
         updateStats();
     }
 
+    // ONE TAP = ONE FRAME = ONE RESULT
+
+    private void requestOneScan() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+
+        if (!prefs.getBoolean("screen_capture_active", false)) {
+            prefs.edit()
+                    .putString("scan_status", "NEEDS_CAPTURE")
+                    .putString("scan_message", "Start LIVE SCREEN CAPTURE from the dashboard first, then tap D to analyse once.")
+                    .apply();
+            expandPanel();
+            refreshLatestResult();
+            return;
+        }
+
+        prefs.edit()
+                .putString("scan_status", "SCANNING")
+                .putString("scan_message", "Capturing the visible chart for one analysis...")
+                .apply();
+
+        try {
+            Intent intent = new Intent(this, ScreenCaptureService.class);
+            intent.setAction(ScreenCaptureService.ACTION_ANALYZE_ONCE);
+            startService(intent);
+        } catch (Exception error) {
+            prefs.edit()
+                    .putString("scan_status", "WAIT")
+                    .putString("scan_message", "Could not request a scan. Restart screen capture and try again.")
+                    .apply();
+        }
+
+        expandPanel();
+        refreshLatestResult();
+    }
+
     // READ LATEST RESULT
 
     private void refreshLatestResult() {
         if (signalView == null || detailsView == null) {
+            return;
+        }
+
+        SharedPreferences statusPrefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String scanStatus = statusPrefs.getString("scan_status", "WAIT");
+
+        if ("SCANNING".equals(scanStatus)) {
+            String[] ray = {"◢", "◣", "◤", "◥"};
+            String currentRay = ray[scanRayFrame++ % ray.length];
+            signalView.setText(currentRay + " SCANNING");
+            signalView.setTextColor(Color.CYAN);
+            detailsView.setText(
+                    "BLACK-RAY SCAN ACTIVE\n" +
+                    "Reading one frame from the visible chart.\n" +
+                    "No repeat signals will be generated automatically."
+            );
+            return;
+        }
+
+        if ("NEEDS_CAPTURE".equals(scanStatus)) {
+            signalView.setText("WAIT");
+            signalView.setTextColor(Color.YELLOW);
+            detailsView.setText(statusPrefs.getString(
+                    "scan_message",
+                    "Start live screen capture from the dashboard first."
+            ));
             return;
         }
 
