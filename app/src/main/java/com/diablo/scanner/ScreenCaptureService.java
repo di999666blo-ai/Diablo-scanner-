@@ -392,29 +392,49 @@ public class ScreenCaptureService extends Service {
                 return;
             }
 
-            // Prefer the bundled SmolVLM vision model for the actual chart reading.
-            // The colour-only method below is used only when the model pair is unavailable.
-            if (LocalVisionAI.modelsReady(this)) {
-                startAIAnalysis(bitmap);
-                return;
-            }
-
-            // Fallback only when the bundled/selected vision model is unavailable.
-            // Approximate central chart area.
+            // Approximate the visible chart area, excluding most of the app header
+            // and bottom controls before sending the frame to the vision model.
             int left = (int) (width * 0.05);
             int right = (int) (width * 0.95);
-
             int top = (int) (height * 0.15);
             int bottom = (int) (height * 0.85);
 
             left = Math.max(0, Math.min(left, width - 1));
             right = Math.max(left + 1, Math.min(right, width));
-
             top = Math.max(0, Math.min(top, height - 1));
             bottom = Math.max(top + 1, Math.min(bottom, height));
 
             int chartWidth = right - left;
             int chartHeight = bottom - top;
+
+            // Prefer the bundled SmolVLM vision model for the actual chart reading.
+            // The colour-only method below is used only when the model pair is unavailable.
+            if (LocalVisionAI.modelsReady(this)) {
+                Bitmap chartOnly = null;
+                try {
+                    chartOnly = Bitmap.createBitmap(
+                            bitmap,
+                            left,
+                            top,
+                            chartWidth,
+                            chartHeight
+                    );
+                    startAIAnalysis(chartOnly);
+                } catch (Exception error) {
+                    SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                    state.edit()
+                            .putString("scan_status", "WAIT")
+                            .putString("scan_message", "Could not crop the chart area. Tap D to retry.")
+                            .apply();
+                } finally {
+                    if (chartOnly != null && chartOnly != bitmap && !chartOnly.isRecycled()) {
+                        chartOnly.recycle();
+                    }
+                }
+                return;
+            }
+
+            // Fallback only when the bundled/selected vision model is unavailable.
 
             int step = Math.max(
                     1,
