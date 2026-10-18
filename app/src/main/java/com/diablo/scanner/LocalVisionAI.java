@@ -221,6 +221,18 @@ public final class LocalVisionAI {
             String asset
     ) throws Exception {
 
+        File installed = new File(
+                context.getApplicationInfo().nativeLibraryDir,
+                "libdiablo_llama.so"
+        );
+
+        if (installed.isFile() && installed.canRead()) {
+            if (!installed.canExecute() && !installed.setExecutable(true, true)) {
+                throw new Exception("Android did not allow the packaged AI engine to execute.");
+            }
+            return installed;
+        }
+
         File destination = new File(
                 context.getFilesDir(),
                 ENGINE
