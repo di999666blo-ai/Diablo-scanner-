@@ -142,10 +142,25 @@ public final class AIModelSetup {
         String textModel = prefs.getString(TEXT_MODEL, "");
         String imageModel = prefs.getString(IMAGE_MODEL, "");
 
-        return textModel != null &&
-               imageModel != null &&
-               new File(textModel).exists() &&
-               new File(imageModel).exists();
+        boolean selectedFilesExist =
+                textModel != null &&
+                imageModel != null &&
+                new File(textModel).isFile() &&
+                new File(imageModel).isFile();
+
+        if (selectedFilesExist) {
+            return true;
+        }
+
+        // The production APK bundles this exact model pair.
+        try (InputStream model =
+                     activity.getAssets().open("models/diablo-text-model.gguf");
+             InputStream projector =
+                     activity.getAssets().open("models/diablo-image-projector.gguf")) {
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     public static String getTextModelPath(Activity activity) {
