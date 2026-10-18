@@ -431,11 +431,26 @@ public class ScreenCaptureService extends Service {
         final Bitmap analysisBitmap;
         try {
             analysisBitmap = capturedChart.copy(Bitmap.Config.ARGB_8888, false);
-            if (analysisBitmap == null) { aiRunning.set(false); return; }
+            if (analysisBitmap == null) {
+                aiRunning.set(false);
+                getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
+                        .putString("scan_status", "AI_ERROR")
+                        .putString("scan_message", "Could not prepare chart image for AI analysis.")
+                        .apply();
+                return;
+            }
         } catch (Exception error) {
             aiRunning.set(false);
+            getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
+                    .putString("scan_status", "AI_ERROR")
+                    .putString("scan_message", "Could not prepare chart image: " + error.getClass().getSimpleName())
+                    .apply();
             return;
         }
+        getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
+                .putString("scan_status", "AI_PROCESSING")
+                .putString("scan_message", "AI BUSY • Analysing chart with SmolVLM...")
+                .apply();
         try {
             aiExecutor.execute(() -> {
                 try {
@@ -443,7 +458,7 @@ public class ScreenCaptureService extends Service {
                     if (result != null) saveAIResult(result);
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
-                    state.edit().putString("scan_status", "WAIT")
+                    state.edit().putString("scan_status", "AI_ERROR")
                             .putString("scan_message", "Local chart analysis failed safely. Tap D to retry.")
                             .apply();
                 } finally {
@@ -538,14 +553,30 @@ public class ScreenCaptureService extends Service {
                 updated.put(old.get(i));
             }
 
+            String lowerDetails = details.toLowerCase(Locale.ROOT);
+            boolean engineError = lowerDetails.contains("timed out")
+                    || lowerDetails.contains("local ai error")
+                    || lowerDetails.contains("engine failed")
+                    || lowerDetails.contains("engine is missing")
+                    || lowerDetails.contains("unsupported")
+                    || lowerDetails.contains("could not")
+                    || lowerDetails.contains("missing or incomplete");
+            String finalStatus = engineError ? "AI_ERROR"
+                    : "WAIT".equals(aiSignal) ? "ANALYSIS_COMPLETE_WAIT" : "AI_READY";
+            String statusMessage = engineError
+                    ? "AI ERROR • " + details
+                    : "WAIT".equals(aiSignal)
+                    ? "Analysis complete. AI is ready, but no reliable direction was returned. " + details
+                    : "AI READY • " + displaySignal + " • " + details;
+
             prefs.edit()
                     .putString("history", updated.toString())
                     .putString("latest_ai_details", details)
                     .putString("latest_ai_signal", displaySignal)
                     .putInt("latest_ai_score", score)
                     .putString("latest_ai_time", item.getString("time"))
-                    .putString("scan_status", "READY")
-                    .putString("scan_message", displaySignal + " • " + details)
+                    .putString("scan_status", finalStatus)
+                    .putString("scan_message", statusMessage)
                     .apply();
 
         } catch (Exception ignored) {
