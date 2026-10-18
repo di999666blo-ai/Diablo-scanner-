@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
             refreshCount();
             refreshLatestResult();
             refreshAIModelStatus();
+            refreshControlSummary();
         }
     }
 
@@ -139,8 +140,18 @@ public class MainActivity extends Activity {
         countText.setTextColor(Color.LTGRAY);
         countText.setTextSize(12);
         countText.setGravity(Gravity.CENTER);
-        countText.setPadding(0, 0, 0, 16);
+        countText.setPadding(0, 0, 0, 10);
         root.addView(countText);
+
+        TextView controlSummary = new TextView(this);
+        controlSummary.setTag("control_summary");
+        controlSummary.setTextColor(Color.rgb(235, 205, 160));
+        controlSummary.setTextSize(12);
+        controlSummary.setGravity(Gravity.CENTER);
+        controlSummary.setPadding(12, 12, 12, 12);
+        controlSummary.setBackgroundColor(Color.rgb(38, 32, 27));
+        root.addView(controlSummary);
+        refreshControlSummary();
 
         addSectionTitle("CHART LAB");
         addButton("ANALYSE SAVED CHART", v -> chooseChart());
@@ -201,6 +212,32 @@ public class MainActivity extends Activity {
         warning.setGravity(Gravity.CENTER);
         warning.setPadding(8, 20, 8, 8);
         root.addView(warning);
+    }
+
+    private void refreshControlSummary() {
+        if (root == null || prefs == null) {
+            return;
+        }
+
+        View view = root.findViewWithTag("control_summary");
+        if (!(view instanceof TextView)) {
+            return;
+        }
+
+        String mode = prefs.getString("trading_mode", "TIMED");
+        String modeLabel = "SCALPING".equals(mode)
+                ? "MODE 2 • SCALPING SETUP"
+                : "MODE 1 • TIMED SIGNAL";
+
+        String timeframe = prefs.getString("chart_timeframe", "1m");
+        long duration = prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS);
+
+        ((TextView) view).setText(
+                "ACTIVE CONFIGURATION\n" +
+                modeLabel +
+                "\nChart timeframe: " + timeframe +
+                "\nTrade duration: " + formatDuration(duration)
+        );
     }
 
     private void addSectionTitle(String text) {
@@ -1028,6 +1065,7 @@ public class MainActivity extends Activity {
                 .setSingleChoiceItems(options, selected, (dialog, which) -> {
                     prefs.edit().putString("chart_timeframe", values[which]).apply();
                     dialog.dismiss();
+                    refreshControlSummary();
                     Toast.makeText(this, "Chart timeframe saved: " + options[which],
                             Toast.LENGTH_LONG).show();
                 })
@@ -1047,6 +1085,7 @@ public class MainActivity extends Activity {
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     prefs.edit().putString("trading_mode", values[which]).apply();
                     dialog.dismiss();
+                    refreshControlSummary();
                     Toast.makeText(this, "Trading mode saved: " + labels[which],
                             Toast.LENGTH_LONG).show();
                 })
@@ -1105,6 +1144,7 @@ public class MainActivity extends Activity {
 
                             dialog.dismiss();
 
+                            refreshControlSummary();
                             Toast.makeText(
                                     this,
                                     "Trade duration saved: " +
@@ -1154,6 +1194,7 @@ public class MainActivity extends Activity {
                                 .putLong(TRADE_DURATION_MS, duration)
                                 .apply();
 
+                        refreshControlSummary();
                         Toast.makeText(
                                 this,
                                 "Trade duration saved: " +
