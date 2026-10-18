@@ -127,8 +127,8 @@ jobs:
 
           test -s app/src/main/assets/models/diablo-text-model.gguf
           test -s app/src/main/assets/models/diablo-image-projector.gguf
-          test -s app/src/main/jniLibs/arm64-v8a/llama-mtmd-cli
-          test -s app/src/main/jniLibs/armeabi-v7a/llama-mtmd-cli
+          test -s app/src/main/jniLibs/arm64-v8a/libdiablo_llama.so
+          test -s app/src/main/jniLibs/armeabi-v7a/libdiablo_llama.so
 
           echo "AI models and both engine binaries exist."
 
