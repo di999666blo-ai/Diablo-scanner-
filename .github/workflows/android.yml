@@ -75,8 +75,8 @@ jobs:
 
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
 
-          mkdir -p app/src/main/jniLibs/arm64-v8a
-          mkdir -p app/src/main/jniLibs/armeabi-v7a
+          mkdir -p app/src/main/assets/arm64-v8a
+          mkdir -p app/src/main/assets/armeabi-v7a
 
           for ABI in arm64-v8a armeabi-v7a; do
             echo "Building llama.cpp for $ABI"
@@ -112,13 +112,13 @@ jobs:
             fi
 
             cp "$BIN" \
-              "app/src/main/jniLibs/$ABI/libdiablo_llama.so"
+              "app/src/main/assets/$ABI/llama-mtmd-cli"
 
             chmod 755 \
-              "app/src/main/jniLibs/$ABI/libdiablo_llama.so"
+              "app/src/main/assets/$ABI/llama-mtmd-cli"
 
             ls -lh \
-              "app/src/main/jniLibs/$ABI/libdiablo_llama.so"
+              "app/src/main/assets/$ABI/llama-mtmd-cli"
           done
 
       - name: Verify bundled AI files
@@ -127,8 +127,8 @@ jobs:
 
           test -s app/src/main/assets/models/diablo-text-model.gguf
           test -s app/src/main/assets/models/diablo-image-projector.gguf
-          test -s app/src/main/jniLibs/arm64-v8a/libdiablo_llama.so
-          test -s app/src/main/jniLibs/armeabi-v7a/libdiablo_llama.so
+          test -s app/src/main/assets/arm64-v8a/llama-mtmd-cli
+          test -s app/src/main/assets/armeabi-v7a/llama-mtmd-cli
 
           echo "AI models and both engine binaries exist."
 
@@ -148,7 +148,8 @@ jobs:
 
           grep -q "assets/models/diablo-text-model.gguf" apk-contents.txt
           grep -q "assets/models/diablo-image-projector.gguf" apk-contents.txt
-          grep -q "libdiablo_llama.so" apk-contents.txt
+          grep -q "assets/arm64-v8a/llama-mtmd-cli" apk-contents.txt
+          grep -q "assets/armeabi-v7a/llama-mtmd-cli" apk-contents.txt
 
           ls -lh "$APK"
           echo "APK contains the expected AI model and engine files."
