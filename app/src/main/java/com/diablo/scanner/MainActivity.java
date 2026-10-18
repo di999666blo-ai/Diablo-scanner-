@@ -189,7 +189,7 @@ public class MainActivity extends Activity {
         aiStatus.setTextColor(Color.rgb(140, 220, 170));
         aiStatus.setTextSize(12);
         aiStatus.setPadding(8, 8, 8, 12);
-        aiStatus.setText("LOCAL CHART ENGINE: BUILT IN • NO GGUF MODEL DOWNLOAD REQUIRED");
+        aiStatus.setText("SMOLVLM VISION AI: MODEL + IMAGE PROJECTOR + NATIVE ENGINE ARE PACKAGED IN THIS APK");
         root.addView(aiStatus);
 
         TextView warning = new TextView(this);
@@ -529,7 +529,7 @@ public class MainActivity extends Activity {
         }
         signalText.setText("ANALYSING…");
         signalText.setTextColor(Color.CYAN);
-        statusText.setText("Running the on-device chart analyzer. Saved screenshots work offline.");
+        statusText.setText("SmolVLM vision AI is analysing the saved chart. Please wait.");
         final Bitmap analysisBitmap;
         try {
             analysisBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
@@ -546,7 +546,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
             } catch (Exception e) {
                 result = new LocalVisionAI.Result("WAIT", "Local chart analysis failed safely. Please try a clearer screenshot.");
             } finally {
@@ -569,8 +569,8 @@ public class MainActivity extends Activity {
                 }
                 signalText.setText(display);
                 signalText.setTextColor(colour);
-                statusText.setText("SAVED CHART • OFFLINE ANALYZER\n" + (details == null ? "" : details));
-                saveHistory(display, confidence, 0, 0, "SAVED_LOCAL");
+                statusText.setText("SAVED CHART • SMOLVLM VISION AI\n" + (details == null ? "" : details));
+                saveHistory(display, confidence, 0, 0, "SAVED_AI");
                 refreshCount();
             });
         }, "DiabloSavedChartAnalyzer").start();

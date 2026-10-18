@@ -439,7 +439,7 @@ public class ScreenCaptureService extends Service {
         try {
             aiExecutor.execute(() -> {
                 try {
-                    LocalVisionAI.Result result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                    LocalVisionAI.Result result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     if (result != null) saveAIResult(result);
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
