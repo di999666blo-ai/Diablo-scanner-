@@ -691,7 +691,7 @@ public class MainActivity extends Activity {
                         "\nConfidence is not a verified win probability."
                 );
 
-                saveHistory(displaySignal, confidence, 0, 0);
+                saveHistory(displaySignal, confidence, 0, 0, "SAVED_AI");
                 refreshCount();
             });
         }, "DiabloSavedChartAI");
@@ -797,6 +797,16 @@ public class MainActivity extends Activity {
             long green,
             long redPixels
     ) {
+        saveHistory(signal, score, green, redPixels, "SAVED_SCREENSHOT");
+    }
+
+    private void saveHistory(
+            String signal,
+            int score,
+            long green,
+            long redPixels,
+            String source
+    ) {
         try {
             JSONArray old = new JSONArray(
                     prefs.getString(HISTORY, "[]")
@@ -817,6 +827,7 @@ public class MainActivity extends Activity {
             item.put("score", score);
             item.put("green", green);
             item.put("red", redPixels);
+            item.put("source", source);
 
             updated.put(item);
 
@@ -875,11 +886,22 @@ public class MainActivity extends Activity {
                 signalText.setTextColor(Color.YELLOW);
             }
 
-            statusText.setText(
-                    "Latest saved visual result\nTime: " + time +
-                    "\nVisual balance score: " + score +
-                    "%\n\nThis is not a live market signal."
-            );
+            String source = latest.optString("source", "SAVED_SCREENSHOT");
+            if ("LIVE_AI".equals(source) || "SAVED_AI".equals(source)) {
+                statusText.setText(
+                        ("LIVE_AI".equals(source) ? "Latest live AI result" : "Latest saved-chart AI result") +
+                        "\nTime: " + time +
+                        "\nExperimental AI confidence estimate: " + score + "%" +
+                        "\nThis is not a verified probability of winning."
+                );
+            } else {
+                statusText.setText(
+                        ("LIVE_SCREEN".equals(source) ? "Latest live visual fallback" : "Latest saved-chart visual fallback") +
+                        "\nTime: " + time +
+                        "\nVisual balance score: " + score +
+                        "%\nThis is a colour comparison, not AI prediction."
+                );
+            }
 
         } catch (Exception e) {
             signalText.setText("WAIT");
@@ -912,12 +934,20 @@ public class MainActivity extends Activity {
             for (int i = 0; i < history.length(); i++) {
                 JSONObject item = history.getJSONObject(i);
 
+                String source = item.optString("source", "SAVED_SCREENSHOT");
+                boolean aiResult = "LIVE_AI".equals(source) || "SAVED_AI".equals(source);
                 text.append(item.optString("time", "Unknown time"))
                         .append(" — ")
                         .append(item.optString("signal", "WAIT"))
                         .append(" (")
                         .append(item.optInt("score", 0))
-                        .append("% visual balance score)\n\n");
+                        .append(aiResult ? "% experimental AI confidence)" : "% visual balance score)")
+                        .append("\nSource: ")
+                        .append("LIVE_AI".equals(source) ? "Live local AI" :
+                                "SAVED_AI".equals(source) ? "Saved-chart local AI" :
+                                "LIVE_SCREEN".equals(source) ? "Live visual fallback" :
+                                "Saved-chart visual fallback")
+                        .append("\n\n");
             }
 
             new AlertDialog.Builder(this)
