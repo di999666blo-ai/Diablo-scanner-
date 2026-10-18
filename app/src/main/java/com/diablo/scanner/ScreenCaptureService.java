@@ -707,14 +707,26 @@ public class ScreenCaptureService extends Service {
             aiSignal = "WAIT";
         }
 
-        String displaySignal;
+        String mode = getSharedPreferences("diablo_scanner", MODE_PRIVATE)
+                .getString("trading_mode", "TIMED");
 
-        if ("UP".equals(aiSignal)) {
-            displaySignal = "UP BIAS";
-        } else if ("DOWN".equals(aiSignal)) {
-            displaySignal = "DOWN BIAS";
+        String displaySignal;
+        if ("SCALPING".equalsIgnoreCase(mode)) {
+            if ("UP".equals(aiSignal)) {
+                displaySignal = "BUY";
+            } else if ("DOWN".equals(aiSignal)) {
+                displaySignal = "SELL";
+            } else {
+                displaySignal = "WAIT";
+            }
         } else {
-            displaySignal = "WAIT";
+            if ("UP".equals(aiSignal)) {
+                displaySignal = "UP BIAS";
+            } else if ("DOWN".equals(aiSignal)) {
+                displaySignal = "DOWN BIAS";
+            } else {
+                displaySignal = "WAIT";
+            }
         }
 
         String details = result.details == null
