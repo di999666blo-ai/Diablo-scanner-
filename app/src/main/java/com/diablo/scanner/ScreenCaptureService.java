@@ -352,7 +352,14 @@ public class ScreenCaptureService extends Service {
             analyseCapturedBitmap(croppedBitmap);
 
         } catch (Exception ignored) {
-            // A failed frame must not stop screen capture.
+            // A failed requested frame must return to WAIT so the user can retry.
+            SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+            if ("SCANNING".equals(state.getString("scan_status", "WAIT"))) {
+                state.edit()
+                        .putString("scan_status", "WAIT")
+                        .putString("scan_message", "Could not read this frame. Keep the chart visible and tap D to retry.")
+                        .apply();
+            }
         } finally {
 
             if (image != null) {
@@ -583,7 +590,11 @@ public class ScreenCaptureService extends Service {
             startAIAnalysis(bitmap);
 
         } catch (Exception ignored) {
-            // A failed analysis must not stop screen capture.
+            SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+            state.edit()
+                    .putString("scan_status", "WAIT")
+                    .putString("scan_message", "Chart analysis could not start. Tap D to retry.")
+                    .apply();
         }
     }
 
