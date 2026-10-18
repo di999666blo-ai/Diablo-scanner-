@@ -393,18 +393,43 @@ public final class LocalVisionAI {
                 }
             }
 
+            SharedPreferences scannerPrefs = context.getSharedPreferences(
+                    "diablo_scanner",
+                    Context.MODE_PRIVATE
+            );
+
+            String timeframe = scannerPrefs.getString("chart_timeframe", "1m");
+            String mode = scannerPrefs.getString("trading_mode", "TIMED");
+
+            String modeInstructions;
+            if ("SCALPING".equalsIgnoreCase(mode)) {
+                modeInstructions =
+                        "The selected mode is SCALPING SETUP. After DIRECTION, " +
+                        "CONFIDENCE, and REASON, return ENTRY, TAKE_PROFIT, and " +
+                        "STOP_LOSS. Use price values only if they are clearly readable " +
+                        "on the screenshot; otherwise write N/A. Never invent prices. " +
+                        "Do not treat a visual guess as a guaranteed entry.";
+            } else {
+                modeInstructions =
+                        "The selected mode is TIMED SIGNAL. Give only the directional " +
+                        "chart read and a brief reason; do not invent entry, take-profit, " +
+                        "or stop-loss prices.";
+            }
+
             String prompt =
                     "You are an experimental visual trading-chart assistant. " +
-                    "Analyze only the visible chart. Consider recent candle " +
-                    "bodies and wicks, short-term momentum, visible support " +
-                    "and resistance, and chart clarity. Do not invent prices " +
-                    "or indicators. Return these fields on separate lines: " +
+                    "The selected chart timeframe is " + timeframe + ". " +
+                    "Analyze only what is visible in the screenshot. Consider recent " +
+                    "candle bodies and wicks, short-term momentum, visible support " +
+                    "and resistance, volatility, reversals, and chart clarity. " +
+                    "Do not invent prices or indicators. Return these fields on separate lines: " +
                     "DIRECTION: UP or DOWN or WAIT; " +
                     "CONFIDENCE: integer from 0 to 100; " +
                     "REASON: one short sentence. " +
+                    modeInstructions + " " +
                     "Choose WAIT if evidence is unclear or contradictory. " +
                     "Confidence is not a verified probability of winning. " +
-                    "Never promise profit.";
+                    "Never promise profit and never execute a trade.";
 
             ProcessBuilder builder = new ProcessBuilder(
                     engine.getAbsolutePath(),
