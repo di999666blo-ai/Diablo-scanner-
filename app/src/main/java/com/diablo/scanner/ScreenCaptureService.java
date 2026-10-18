@@ -392,222 +392,26 @@ public class ScreenCaptureService extends Service {
                 return;
             }
 
-            // Approximate the visible chart area, excluding most of the app header
-            // and bottom controls before sending the frame to the vision model.
-            int left = (int) (width * 0.05);
-            int right = (int) (width * 0.95);
-            int top = (int) (height * 0.15);
-            int bottom = (int) (height * 0.85);
-
-            left = Math.max(0, Math.min(left, width - 1));
-            right = Math.max(left + 1, Math.min(right, width));
-            top = Math.max(0, Math.min(top, height - 1));
-            bottom = Math.max(top + 1, Math.min(bottom, height));
-
-            int chartWidth = right - left;
-            int chartHeight = bottom - top;
-
-            // Prefer the bundled SmolVLM vision model for the actual chart reading.
-            // The colour-only method below is used only when the model pair is unavailable.
-            if (LocalVisionAI.modelsReady(this)) {
-                Bitmap chartOnly = null;
-                try {
-                    chartOnly = Bitmap.createBitmap(
-                            bitmap,
-                            left,
-                            top,
-                            chartWidth,
-                            chartHeight
-                    );
-                    startAIAnalysis(chartOnly);
-                } catch (Exception error) {
-                    SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
-                    state.edit()
-                            .putString("scan_status", "WAIT")
-                            .putString("scan_message", "Could not crop the chart area. Tap D to retry.")
-                            .apply();
-                } finally {
-                    if (chartOnly != null && chartOnly != bitmap && !chartOnly.isRecycled()) {
-                        chartOnly.recycle();
-                    }
-                }
+            // Crop the central chart area and run the same local strategy engine
+            // used by the saved-chart picker. This needs no bundled model files.
+            int left = Math.max(0, (int)(width * 0.05));
+            int right = Math.min(width, (int)(width * 0.95));
+            int top = Math.max(0, (int)(height * 0.12));
+            int bottom = Math.min(height, (int)(height * 0.88));
+            if (right - left < 50 || bottom - top < 50) {
+                SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                state.edit().putString("scan_status", "WAIT")
+                        .putString("scan_message", "Chart area is too small. Open the chart full-screen and tap D again.")
+                        .apply();
                 return;
             }
-
-            // Fallback only when the bundled/selected vision model is unavailable.
-
-            int step = Math.max(
-                    1,
-                    Math.max(chartWidth, chartHeight) / 250
-            );
-
-            long green = 0;
-            long red = 0;
-
-            long upperGreen = 0;
-            long upperRed = 0;
-
-            long middleGreen = 0;
-            long middleRed = 0;
-
-            long lowerGreen = 0;
-            long lowerRed = 0;
-
-            for (int y = top; y < bottom; y += step) {
-                for (int x = left; x < right; x += step) {
-
-                    int pixel = bitmap.getPixel(x, y);
-
-                    int r = Color.red(pixel);
-                    int g = Color.green(pixel);
-                    int b = Color.blue(pixel);
-
-                    boolean isGreen =
-                            g > 95 &&
-                            g > r * 1.22 &&
-                            g > b * 1.08;
-
-                    boolean isRed =
-                            r > 105 &&
-                            r > g * 1.22 &&
-                            r > b * 1.12;
-
-                    if (isGreen) {
-                        green++;
-
-                        if (y < top + chartHeight / 3) {
-                            upperGreen++;
-                        } else if (y < top + 2 * chartHeight / 3) {
-                            middleGreen++;
-                        } else {
-                            lowerGreen++;
-                        }
-
-                    } else if (isRed) {
-                        red++;
-
-                        if (y < top + chartHeight / 3) {
-                            upperRed++;
-                        } else if (y < top + 2 * chartHeight / 3) {
-                            middleRed++;
-                        } else {
-                            lowerRed++;
-                        }
-                    }
-                }
+            Bitmap chartOnly = null;
+            try {
+                chartOnly = Bitmap.createBitmap(bitmap, left, top, right-left, bottom-top);
+                startAIAnalysis(chartOnly);
+            } finally {
+                if (chartOnly != null && !chartOnly.isRecycled()) chartOnly.recycle();
             }
-
-            long total = green + red;
-
-            SharedPreferences prefs = getSharedPreferences(
-                    "diablo_scanner",
-                    MODE_PRIVATE
-            );
-
-            int threshold = prefs.getInt("threshold", 15);
-
-            String signal = "WAIT";
-            int score = 0;
-
-            /*
-             * Existing colour-based heuristic.
-             * Its score is not a measured win probability.
-             */
-
-            if (total >= 20) {
-
-                double overallDifference =
-                        Math.abs(green - red) / (double) total;
-
-                double upperTotal = upperGreen + upperRed;
-                double middleTotal = middleGreen + middleRed;
-                double lowerTotal = lowerGreen + lowerRed;
-
-                double upperBalance =
-                        upperTotal == 0
-                                ? 0
-                                : (upperGreen - upperRed) / upperTotal;
-
-                double middleBalance =
-                        middleTotal == 0
-                                ? 0
-                                : (middleGreen - middleRed) / middleTotal;
-
-                double lowerBalance =
-                        lowerTotal == 0
-                                ? 0
-                                : (lowerGreen - lowerRed) / lowerTotal;
-
-                double zoneDirection =
-                        (upperBalance +
-                         middleBalance +
-                         lowerBalance) / 3.0;
-
-                double combinedScore =
-                        (0.65 * (green - red) / total)
-                        + (0.35 * zoneDirection);
-
-                if (overallDifference >= threshold / 100.0
-                        && combinedScore > 0.12) {
-
-                    signal = "UP BIAS";
-
-                } else if (overallDifference >= threshold / 100.0
-                        && combinedScore < -0.12) {
-
-                    signal = "DOWN BIAS";
-
-                } else {
-                    signal = "WAIT";
-                }
-
-                score = (int) Math.round(
-                        Math.min(
-                                95,
-                                50 + overallDifference * 45
-                        )
-                );
-
-                if ("WAIT".equals(signal)) {
-                    score = Math.min(score, 50);
-                }
-            }
-
-            // Preserve the existing chart memory feature.
-            String patternMemory =
-                    ChartMemory.rememberAndCompare(
-                            this,
-                            bitmap,
-                            signal,
-                            score
-                    );
-
-            // Save the existing live scanner result.
-            saveLiveResult(
-                    prefs,
-                    signal,
-                    score,
-                    green,
-                    red
-            );
-
-            prefs.edit()
-                    .putString(
-                            "latest_pattern_memory",
-                            patternMemory
-                    )
-                    .putInt(
-                            "chart_pattern_count",
-                            ChartMemory.getPatternCount(this)
-                    )
-                    .apply();
-
-            /*
-             * NEW AI CONNECTION:
-             * Send a safe copy of the captured chart to the AI
-             * on a background thread. The live capture continues.
-             */
-            startAIAnalysis(bitmap);
 
         } catch (Exception ignored) {
             SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
@@ -619,71 +423,36 @@ public class ScreenCaptureService extends Service {
     }
 
     // ================================================
-    // CONNECT LOCAL VISION AI TO LIVE SCREEN CAPTURE
+    // RUN THE SHARED ON-DEVICE CHART ANALYZER
     // ================================================
-
     private void startAIAnalysis(Bitmap capturedChart) {
-
-        // Do not run AI until both model files have been selected.
-        if (!LocalVisionAI.modelsReady(this)) {
-            return;
-        }
-
-        // Never start multiple expensive AI jobs simultaneously.
-        if (!aiRunning.compareAndSet(false, true)) {
-            return;
-        }
-
-        final Bitmap aiBitmap;
-
+        if (capturedChart == null || capturedChart.isRecycled()) return;
+        if (!aiRunning.compareAndSet(false, true)) return;
+        final Bitmap analysisBitmap;
         try {
-            aiBitmap = capturedChart.copy(
-                    Bitmap.Config.ARGB_8888,
-                    false
-            );
-
-            if (aiBitmap == null) {
-                aiRunning.set(false);
-                return;
-            }
-
+            analysisBitmap = capturedChart.copy(Bitmap.Config.ARGB_8888, false);
+            if (analysisBitmap == null) { aiRunning.set(false); return; }
         } catch (Exception error) {
             aiRunning.set(false);
             return;
         }
-
         try {
             aiExecutor.execute(() -> {
-
                 try {
-                    LocalVisionAI.Result result =
-                            LocalVisionAI.analyze(
-                                    getApplicationContext(),
-                                    aiBitmap
-                            );
-
-                    if (result != null) {
-                        saveAIResult(result);
-                    }
-
-                } catch (Exception ignored) {
-                    // AI failure must not stop live screen capture.
+                    LocalVisionAI.Result result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                    if (result != null) saveAIResult(result);
+                } catch (Exception error) {
+                    SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                    state.edit().putString("scan_status", "WAIT")
+                            .putString("scan_message", "Local chart analysis failed safely. Tap D to retry.")
+                            .apply();
                 } finally {
-
-                    if (!aiBitmap.isRecycled()) {
-                        aiBitmap.recycle();
-                    }
-
+                    if (!analysisBitmap.isRecycled()) analysisBitmap.recycle();
                     aiRunning.set(false);
                 }
             });
-
         } catch (Exception error) {
-
-            if (!aiBitmap.isRecycled()) {
-                aiBitmap.recycle();
-            }
-
+            if (!analysisBitmap.isRecycled()) analysisBitmap.recycle();
             aiRunning.set(false);
         }
     }
