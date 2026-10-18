@@ -676,12 +676,15 @@ public class MainActivity extends Activity {
 
                 String displaySignal;
                 int displayColour;
+                boolean scalpingMode = "SCALPING".equalsIgnoreCase(
+                        prefs.getString("trading_mode", "TIMED")
+                );
 
                 if ("UP".equals(direction)) {
-                    displaySignal = "UP BIAS";
+                    displaySignal = scalpingMode ? "BUY" : "UP BIAS";
                     displayColour = Color.rgb(50, 220, 120);
                 } else if ("DOWN".equals(direction)) {
-                    displaySignal = "DOWN BIAS";
+                    displaySignal = scalpingMode ? "SELL" : "DOWN BIAS";
                     displayColour = red;
                 } else {
                     displaySignal = "WAIT";
@@ -915,9 +918,9 @@ public class MainActivity extends Activity {
 
             signalText.setText(signal);
 
-            if (signal.contains("UP")) {
+            if (signal.contains("UP") || signal.contains("BUY")) {
                 signalText.setTextColor(Color.rgb(50, 220, 120));
-            } else if (signal.contains("DOWN")) {
+            } else if (signal.contains("DOWN") || signal.contains("SELL")) {
                 signalText.setTextColor(red);
             } else {
                 signalText.setTextColor(Color.YELLOW);
