@@ -449,6 +449,7 @@ public class FloatingBubbleService extends Service {
 
         prefs.edit()
                 .putString("scan_status", "SCANNING")
+                .putLong("scan_started_at", System.currentTimeMillis())
                 .putString("scan_message", "Capturing the visible chart for one analysis...")
                 .apply();
 
@@ -477,16 +478,36 @@ public class FloatingBubbleService extends Service {
         SharedPreferences statusPrefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String scanStatus = statusPrefs.getString("scan_status", "WAIT");
 
-        if ("SCANNING".equals(scanStatus)) {
+        if ("SCANNING".equals(scanStatus) || "AI_PROCESSING".equals(scanStatus)) {
+            long startedAt = statusPrefs.getLong("scan_started_at", System.currentTimeMillis());
+            long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - startedAt) / 1000L);
             String[] ray = {"◢", "◣", "◤", "◥"};
             String currentRay = ray[scanRayFrame++ % ray.length];
-            signalView.setText(currentRay + " SCANNING");
+            boolean processingAI = "AI_PROCESSING".equals(scanStatus);
+            signalView.setText(currentRay + (processingAI ? " AI BUSY" : " SCANNING"));
             signalView.setTextColor(Color.CYAN);
+            String progress = elapsedSeconds < 10L
+                    ? "Elapsed: " + elapsedSeconds + "s / 10s target"
+                    : "DELAYED: " + elapsedSeconds + "s elapsed (10s target exceeded)";
             detailsView.setText(
                     "BLACK-RAY SCAN ACTIVE\n" +
-                    "Reading one frame from the visible chart.\n" +
-                    "No repeat signals will be generated automatically."
+                    (processingAI ? "AI PROCESSING • AI BUSY\n" : "Capturing visible chart...\n") +
+                    progress + "\n" +
+                    (elapsedSeconds >= 90L
+                            ? "ANALYSIS TIMEOUT WARNING: model is taking too long."
+                            : elapsedSeconds >= 10L
+                            ? "Still working. Keep the chart open; do not tap again."
+                            : "Please wait. One scan only; no repeated signals.")
             );
+            return;
+        }
+
+        if ("AI_ERROR".equals(scanStatus)) {
+            signalView.setText("AI ERROR");
+            signalView.setTextColor(Color.RED);
+            detailsView.setText("AI ERROR • Analysis failed\n" +
+                    statusPrefs.getString("scan_message", "The AI could not complete this scan.") +
+                    "\nCheck AI model/engine and storage, then tap D to retry.");
             return;
         }
 
@@ -601,6 +622,11 @@ public class FloatingBubbleService extends Service {
 
         StringBuilder message = new StringBuilder();
 
+        if ("AI_READY".equals(scanStatus)) {
+            message.append("AI READY • ANALYSIS COMPLETE\n");
+        } else if ("ANALYSIS_COMPLETE_WAIT".equals(scanStatus)) {
+            message.append("AI READY • ANALYSIS COMPLETE • WAIT\n");
+        }
         message.append(source);
         message.append("\nLast result: ").append(time);
 
