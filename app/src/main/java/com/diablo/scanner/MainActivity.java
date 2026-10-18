@@ -109,9 +109,9 @@ public class MainActivity extends Activity {
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("D EDITION • VISUAL CHART SCANNER");
-        subtitle.setTextSize(12);
-        subtitle.setTextColor(red);
+        subtitle.setText("2026 FUTURISTIC-RUSTIC • LOCAL VISION CORE");
+        subtitle.setTextSize(11);
+        subtitle.setTextColor(Color.rgb(215, 164, 91));
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setPadding(0, 4, 0, 22);
         root.addView(subtitle);
@@ -142,13 +142,20 @@ public class MainActivity extends Activity {
         countText.setPadding(0, 0, 0, 16);
         root.addView(countText);
 
+        addSectionTitle("CHART LAB");
         addButton("ANALYSE SAVED CHART", v -> chooseChart());
+
+        addSectionTitle("LIVE SCANNER");
         addButton("START LIVE SCREEN CAPTURE", v -> requestScreenCapture());
         addButton("STOP SCREEN CAPTURE", v -> stopScreenCapture());
         addButton("START FLOATING BUBBLE", v -> startFloatingBubble());
+
+        addSectionTitle("TRADE TRACKING");
         addButton("SIGNAL HISTORY", v -> showHistory());
         addButton("CLEAR HISTORY", v -> clearHistory());
-        addButton("SETTINGS / TRADE DURATION", v -> showSettings());
+
+        addSectionTitle("SETTINGS & AI CORE");
+        addButton("SETTINGS / DURATION / TIMEFRAME / MODE", v -> showSettings());
         addButton("SET UP AI MODEL FILES", v -> showAIModelSetup());
 
         TextView instructions = new TextView(this);
@@ -201,7 +208,7 @@ public class MainActivity extends Activity {
 
         heading.setText(text);
         heading.setTextSize(13);
-        heading.setTextColor(red);
+        heading.setTextColor(Color.rgb(215, 164, 91));
         heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER);
         heading.setPadding(0, 12, 0, 4);
@@ -955,6 +962,8 @@ public class MainActivity extends Activity {
     private void showSettings() {
         String[] options = {
                 "Set trade duration",
+                "Set chart timeframe",
+                "Select trading mode",
                 "Set visual sensitivity"
         };
 
@@ -963,11 +972,55 @@ public class MainActivity extends Activity {
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
                         showTradeDurationSettings();
+                    } else if (which == 1) {
+                        showChartTimeframeSettings();
+                    } else if (which == 2) {
+                        showTradingModeSettings();
                     } else {
                         showSensitivitySettings();
                     }
                 })
                 .setNegativeButton("CLOSE", null)
+                .show();
+    }
+
+    private void showChartTimeframeSettings() {
+        String[] options = {"30 seconds", "1 minute", "2 minutes", "5 minutes"};
+        String[] values = {"30s", "1m", "2m", "5m"};
+        String current = prefs.getString("chart_timeframe", "1m");
+        int selected = 1;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(current)) selected = i;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Chart timeframe")
+                .setSingleChoiceItems(options, selected, (dialog, which) -> {
+                    prefs.edit().putString("chart_timeframe", values[which]).apply();
+                    dialog.dismiss();
+                    Toast.makeText(this, "Chart timeframe saved: " + options[which],
+                            Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private void showTradingModeSettings() {
+        String[] labels = {"Mode 1 — Timed Signal", "Mode 2 — Scalping Setup"};
+        String[] values = {"TIMED", "SCALPING"};
+        String current = prefs.getString("trading_mode", "TIMED");
+        int selected = "SCALPING".equals(current) ? 1 : 0;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Trading mode")
+                .setMessage("Mode 1 gives a directional chart read. Mode 2 asks the AI for a visible-chart scalping setup. Entry/TP/SL are shown only when the chart makes them readable.")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    prefs.edit().putString("trading_mode", values[which]).apply();
+                    dialog.dismiss();
+                    Toast.makeText(this, "Trading mode saved: " + labels[which],
+                            Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("CANCEL", null)
                 .show();
     }
 
