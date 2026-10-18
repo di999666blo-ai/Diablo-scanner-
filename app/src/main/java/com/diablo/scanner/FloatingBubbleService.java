@@ -431,6 +431,12 @@ public class FloatingBubbleService extends Service {
     private void requestOneScan() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
 
+        if ("SCANNING".equals(prefs.getString("scan_status", "WAIT"))) {
+            expandPanel();
+            refreshLatestResult();
+            return;
+        }
+
         if (!prefs.getBoolean("screen_capture_active", false)) {
             prefs.edit()
                     .putString("scan_status", "NEEDS_CAPTURE")
