@@ -682,6 +682,13 @@ public class MainActivity extends Activity {
                         "\nExperimental AI confidence estimate: " + score + "%" +
                         "\nThis is not a verified probability of winning."
                 );
+            } else if ("LIVE_TIMED".equals(source) || "SAVED_TIMED".equals(source)) {
+                statusText.setText(
+                        ("LIVE_TIMED".equals(source) ? "Latest live Timed Signal result" : "Latest saved-chart Timed Signal result") +
+                        "\nTime: " + time +
+                        "\nExperimental image-analysis strength: " + score + "%" +
+                        "\nThis is not a measured win probability."
+                );
             } else {
                 statusText.setText(
                         ("LIVE_SCREEN".equals(source) ? "Latest live visual fallback" : "Latest saved-chart visual fallback") +
@@ -724,15 +731,18 @@ public class MainActivity extends Activity {
 
                 String source = item.optString("source", "SAVED_SCREENSHOT");
                 boolean aiResult = "LIVE_AI".equals(source) || "SAVED_AI".equals(source);
+                boolean timedResult = "LIVE_TIMED".equals(source) || "SAVED_TIMED".equals(source);
                 text.append(item.optString("time", "Unknown time"))
                         .append(" — ")
                         .append(item.optString("signal", "WAIT"))
                         .append(" (")
                         .append(item.optInt("score", 0))
-                        .append(aiResult ? "% experimental AI confidence)" : "% visual balance score)")
+                        .append(aiResult ? "% experimental AI confidence)" : timedResult ? "% image-analysis strength)" : "% visual balance score)")
                         .append("\nSource: ")
                         .append("LIVE_AI".equals(source) ? "Live local AI" :
                                 "SAVED_AI".equals(source) ? "Saved-chart local AI" :
+                                "LIVE_TIMED".equals(source) ? "Live Timed Signal rules" :
+                                "SAVED_TIMED".equals(source) ? "Saved-chart Timed Signal rules" :
                                 "LIVE_SCREEN".equals(source) ? "Live visual fallback" :
                                 "Saved-chart visual fallback")
                         .append("\n\n");
