@@ -590,6 +590,8 @@ public class MainActivity extends Activity {
                 signalText.setText(display);
                 signalText.setTextColor(colour);
                 statusText.setText((scalpingMode ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • FAST TIMED SIGNAL\n") + (details == null ? "" : details));
+                prefs.edit().putString("scan_status", "SAVED_READY")
+                        .putString("scan_message", "Saved chart analysis complete.").apply();
                 saveHistory(display, confidence, 0, 0, scalpingMode ? "SAVED_AI" : "SAVED_TIMED");
                 refreshCount();
             });
