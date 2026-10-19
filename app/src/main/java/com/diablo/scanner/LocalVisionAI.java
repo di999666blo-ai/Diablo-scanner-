@@ -37,6 +37,15 @@ public final class LocalVisionAI {
 
     private static final long ANALYSIS_TIMEOUT_SECONDS = 90L;
 
+    private static void publishProgress(Context context, String message) {
+        if (context == null) return;
+        context.getSharedPreferences("diablo_scanner", Context.MODE_PRIVATE)
+                .edit()
+                .putString("scan_status", "AI_PROCESSING")
+                .putString("scan_message", message)
+                .apply();
+    }
+
     private LocalVisionAI() {
     }
 
@@ -321,10 +330,12 @@ public final class LocalVisionAI {
 
         try {
 
+            publishProgress(context, "AI step 1/5: Checking the bundled model and vision projector...");
             File[] models = prepareModels(context);
 
             File model = models[0];
             File projector = models[1];
+            publishProgress(context, "AI step 2/5: Model files are ready. Checking the Android inference engine...");
 
             String engineAsset = findEngineAsset();
 
@@ -339,6 +350,7 @@ public final class LocalVisionAI {
                     context,
                     engineAsset
             );
+            publishProgress(context, "AI step 3/5: Inference engine ready. Preparing and resizing the chart image...");
 
             imageFile = new File(
                     context.getCacheDir(),
@@ -416,6 +428,8 @@ public final class LocalVisionAI {
                         "or stop-loss prices.";
             }
 
+            publishProgress(context, "AI step 4/5: Chart prepared. Running SmolVLM visual inference; this stage may take longer on this phone...");
+
             String prompt =
                     "You are an experimental visual trading-chart assistant. " +
                     "The selected chart timeframe is " + timeframe + ". " +
@@ -447,6 +461,7 @@ public final class LocalVisionAI {
             builder.redirectErrorStream(true);
 
             process = builder.start();
+            publishProgress(context, "AI step 5/5: Model process started. Waiting for the chart interpretation and checking the engine output...");
 
             final Process running = process;
 
@@ -495,6 +510,7 @@ public final class LocalVisionAI {
 
             if (!finished) {
 
+                publishProgress(context, "AI timed out after " + ANALYSIS_TIMEOUT_SECONDS + " seconds. The engine did not finish; check diagnostics and device memory.");
                 process.destroyForcibly();
 
                 return new Result(
