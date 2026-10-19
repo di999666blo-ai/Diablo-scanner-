@@ -734,7 +734,8 @@ public class MainActivity extends Activity {
         final boolean scalpingMode = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
         signalText.setText("ANALYSING…");
         signalText.setTextColor(Color.CYAN);
-        statusText.setText(scalpingMode ? "AI step 1/5: Preparing SmolVLM vision analysis..." : "Timed Signal: running lightweight chart rules...");
+        statusText.setText("Preparing shared SmolVLM vision analysis for " +
+                (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...");
         final Bitmap analysisBitmap;
         try {
             analysisBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
@@ -758,16 +759,15 @@ public class MainActivity extends Activity {
                 savedProgressHandler.postDelayed(this, 700L);
             }
         };
-        prefs.edit().putString("scan_message", scalpingMode
-                ? "AI step 1/5: Preparing SmolVLM vision analysis..."
-                : "Timed Signal: running lightweight on-device chart rules...").apply();
+        prefs.edit().putString("scan_message", "Preparing shared SmolVLM vision analysis for " +
+                (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...").apply();
         savedProgressHandler.post(savedProgressUpdater);
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                result = scalpingMode
-                        ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
-                        : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                // Keep saved-chart analysis on the same bundled vision model as live scans.
+                // The selected mode controls the prompt and result format.
+                result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
             } catch (Exception e) {
                 result = new LocalVisionAI.Result("WAIT", "Local chart analysis failed safely. Please try a clearer screenshot.");
             } finally {
@@ -791,7 +791,7 @@ public class MainActivity extends Activity {
                 }
                 signalText.setText(display);
                 signalText.setTextColor(colour);
-                statusText.setText((scalpingMode ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • FAST TIMED SIGNAL\n") + (details == null ? "" : details));
+                statusText.setText((scalpingMode ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • SMOLVLM AI TIMED SIGNAL\n") + (details == null ? "" : details));
                 prefs.edit().putString("scan_status", "SAVED_READY")
                         .putString("scan_message", "Saved chart analysis complete.").apply();
                 saveHistory(display, confidence, 0, 0, scalpingMode ? "SAVED_AI" : "SAVED_TIMED");
