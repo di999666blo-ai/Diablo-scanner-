@@ -511,7 +511,8 @@ public class FloatingBubbleService extends Service {
     private void requestOneScan() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
 
-        if ("SCANNING".equals(prefs.getString("scan_status", "WAIT"))) {
+        String currentStatus = prefs.getString("scan_status", "WAIT");
+        if ("SCANNING".equals(currentStatus) || "AI_PROCESSING".equals(currentStatus)) {
             expandPanel();
             refreshLatestResult();
             return;
