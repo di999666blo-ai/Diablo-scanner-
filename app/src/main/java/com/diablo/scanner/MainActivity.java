@@ -546,7 +546,10 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                boolean scalpingMode = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
+                result = scalpingMode
+                        ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
+                        : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
             } catch (Exception e) {
                 result = new LocalVisionAI.Result("WAIT", "Local chart analysis failed safely. Please try a clearer screenshot.");
             } finally {
@@ -569,8 +572,8 @@ public class MainActivity extends Activity {
                 }
                 signalText.setText(display);
                 signalText.setTextColor(colour);
-                statusText.setText("SAVED CHART • SMOLVLM VISION AI\n" + (details == null ? "" : details));
-                saveHistory(display, confidence, 0, 0, "SAVED_AI");
+                statusText.setText((scalping ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • FAST TIMED SIGNAL\n") + (details == null ? "" : details));
+                saveHistory(display, confidence, 0, 0, scalping ? "SAVED_AI" : "SAVED_TIMED");
                 refreshCount();
             });
         }, "DiabloSavedChartAnalyzer").start();
