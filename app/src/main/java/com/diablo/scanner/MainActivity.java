@@ -148,7 +148,9 @@ public class MainActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
 
-        addButton("‹  BACK TO DASHBOARD", v -> buildDashboard());
+        if (!"DIABLO SCANNER".equals(title)) {
+            addButton("‹  BACK TO DASHBOARD", v -> buildDashboard());
+        }
 
         TextView brand = new TextView(this);
         brand.setText("◈  DIABLO SCANNER");
@@ -227,10 +229,11 @@ public class MainActivity extends Activity {
             addButton("CHOOSE CHART FROM GALLERY", v -> chooseChart());
             addButton("OPEN AI SCANNER", v -> openPage("AI SCANNER"));
         } else if ("AI ENGINE".equals(page)) {
-            SharedPreferences ai = getSharedPreferences("diablo_vision_ai", MODE_PRIVATE);
+            SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
             String lastSignal = ai.getString("latest_ai_signal", "No AI result recorded yet");
             String lastDetails = ai.getString("latest_ai_details", "No AI explanation recorded yet.");
-            addInfoPanel("ENGINE STATUS IS DIAGNOSTIC ONLY. A packaged model does not prove the native runtime is successfully running on this phone.");
+            boolean modelFilesReady = LocalVisionAI.modelsReady(this);
+            addInfoPanel("MODEL FILE CHECK: " + (modelFilesReady ? "PACKAGED MODEL FILES DETECTED" : "MODEL FILES NOT DETECTED") + "\nNative runtime execution still needs a real on-device test.");
             addSectionTitle("LATEST ENGINE OUTPUT");
             addInfoPanel("Last AI result: " + lastSignal + "\n\n" + lastDetails);
             addButton("RUN LIVE SCAN", v -> openPage("AI SCANNER"));
