@@ -8,7 +8,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.graphics.Typeface;
+import android.graphics.Typeface;\nimport android.graphics.drawable.GradientDrawable;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
@@ -54,7 +54,7 @@ public class MainActivity extends Activity {
 
     private final int red = Color.rgb(255, 45, 65);
     private final int background = Color.rgb(12, 12, 16);
-    private final int panelColor = Color.rgb(30, 30, 38);
+    private final int panelColor = Color.rgb(31, 29, 27);\n    private final int amber = Color.rgb(215, 164, 91);
     private final int white = Color.WHITE;
 
     @Override
@@ -96,7 +96,7 @@ public class MainActivity extends Activity {
 
         TextView logo = new TextView(this);
         logo.setText("D");
-        logo.setTextSize(62);
+        logo.setTextSize(62);\n        logo.setBackground(makePanel(Color.rgb(28, 25, 23), amber, 3, 24));\n        logo.setPadding(0, 6, 0, 6);
         logo.setTextColor(red);
         logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         logo.setGravity(Gravity.CENTER);
@@ -104,7 +104,7 @@ public class MainActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText("DIABLO SCANNER");
-        title.setTextSize(25);
+        title.setTextSize(25);\n        title.setLetterSpacing(0.08f);
         title.setTextColor(white);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
@@ -150,7 +150,7 @@ public class MainActivity extends Activity {
         controlSummary.setTextSize(12);
         controlSummary.setGravity(Gravity.CENTER);
         controlSummary.setPadding(12, 12, 12, 12);
-        controlSummary.setBackgroundColor(Color.rgb(38, 32, 27));
+        controlSummary.setBackground(makePanel(Color.rgb(38, 32, 27), amber, 1, 16));
         root.addView(controlSummary);
         refreshControlSummary();
 
@@ -231,13 +231,25 @@ public class MainActivity extends Activity {
 
         String timeframe = prefs.getString("chart_timeframe", "1m");
         long duration = prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS);
+        String profile = prefs.getString("timed_analysis_profile", "BALANCED");
+        String profileLabel = "FAST".equals(profile) ? "FAST SCAN"
+                : "PRECISION".equals(profile) ? "PRECISION CHECK" : "BALANCED";
 
         ((TextView) view).setText(
-                "ACTIVE CONFIGURATION\n" +
+                "◈ ACTIVE CONFIGURATION\n" +
                 modeLabel +
                 "\nChart timeframe: " + timeframe +
-                "\nTrade duration: " + formatDuration(duration)
+                "\nTrade duration: " + formatDuration(duration) +
+                "\nTimed engine: " + profileLabel
         );
+    }
+
+    private GradientDrawable makePanel(int fill, int stroke, int strokeWidth, int radius) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(fill);
+        shape.setCornerRadius(radius * getResources().getDisplayMetrics().density);
+        shape.setStroke(Math.max(1, (int) (strokeWidth * getResources().getDisplayMetrics().density)), stroke);
+        return shape;
     }
 
     private void addSectionTitle(String text) {
@@ -245,7 +257,7 @@ public class MainActivity extends Activity {
 
         heading.setText(text);
         heading.setTextSize(13);
-        heading.setTextColor(Color.rgb(215, 164, 91));
+        heading.setTextColor(amber);\n        heading.setLetterSpacing(0.12f);
         heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER);
         heading.setPadding(0, 12, 0, 4);
@@ -808,15 +820,16 @@ public class MainActivity extends Activity {
 
     private void showSettings() {
         String[] options = {
-                "Set trade duration",
-                "Set chart timeframe",
-                "Select trading mode",
-                "Set visual sensitivity",
-                "Choose candle timing (forming/close)"
+                "Trade duration",
+                "Chart timeframe",
+                "Trading mode",
+                "Timed analysis speed / precision",
+                "Visual sensitivity",
+                "Candle timing (forming/close)"
         };
 
         new AlertDialog.Builder(this)
-                .setTitle("DIABLO SETTINGS")
+                .setTitle("DIABLO CONTROL DECK")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
                         showTradeDurationSettings();
@@ -825,12 +838,36 @@ public class MainActivity extends Activity {
                     } else if (which == 2) {
                         showTradingModeSettings();
                     } else if (which == 3) {
+                        showTimedAnalysisProfileSettings();
+                    } else if (which == 4) {
                         showSensitivitySettings();
                     } else {
                         showSignalTimingSettings();
                     }
                 })
                 .setNegativeButton("CLOSE", null)
+                .show();
+    }
+
+    private void showTimedAnalysisProfileSettings() {
+        String[] labels = {
+                "FAST — quicker, lighter scan",
+                "BALANCED — recommended default",
+                "PRECISION — slower, stricter confirmation"
+        };
+        String[] values = {"FAST", "BALANCED", "PRECISION"};
+        String current = prefs.getString("timed_analysis_profile", "BALANCED");
+        int selected = "FAST".equals(current) ? 0 : "PRECISION".equals(current) ? 2 : 1;
+        new AlertDialog.Builder(this)
+                .setTitle("Timed Signal engine")
+                .setMessage("Choose the balance between scan speed and stricter visual confirmation. This changes analysis settings, not the broker chart timeframe. No profile guarantees a winning signal.")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    prefs.edit().putString("timed_analysis_profile", values[which]).apply();
+                    dialog.dismiss();
+                    refreshControlSummary();
+                    Toast.makeText(this, "Timed engine: " + labels[which], Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("CANCEL", null)
                 .show();
     }
 
