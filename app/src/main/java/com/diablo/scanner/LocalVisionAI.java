@@ -412,6 +412,9 @@ public final class LocalVisionAI {
 
             String timeframe = scannerPrefs.getString("chart_timeframe", "1m");
             String mode = scannerPrefs.getString("trading_mode", "TIMED");
+            long tradeDurationMs = scannerPrefs.getLong("trade_duration_ms", 60000L);
+            String timedProfile = scannerPrefs.getString("timed_analysis_profile", "BALANCED");
+            String candleTiming = scannerPrefs.getString("signal_timing", "FORMING");
 
             String modeInstructions;
             if ("SCALPING".equalsIgnoreCase(mode)) {
@@ -423,16 +426,21 @@ public final class LocalVisionAI {
                         "Do not treat a visual guess as a guaranteed entry.";
             } else {
                 modeInstructions =
-                        "The selected mode is TIMED SIGNAL. Give only the directional " +
-                        "chart read and a brief reason; do not invent entry, take-profit, " +
-                        "or stop-loss prices.";
+                        "The selected mode is TIMED SIGNAL. The configured trade duration is " +
+                        formatDuration(tradeDurationMs) + " and the analysis profile is " +
+                        timedProfile + ". Use the selected duration to frame the timing discussion, " +
+                        "but do not claim the screenshot can predict the future or guarantee expiry outcome. " +
+                        "Give only the directional chart read and a brief reason; do not invent entry, " +
+                        "take-profit, or stop-loss prices.";
             }
 
             publishProgress(context, "AI step 4/5: Chart prepared. Running SmolVLM visual inference; this stage may take longer on this phone...");
 
             String prompt =
                     "You are an experimental visual trading-chart assistant. " +
-                    "The selected chart timeframe is " + timeframe + ". " +
+                    "The selected chart timeframe is " + timeframe + " and configured trade duration is " +
+                    formatDuration(tradeDurationMs) + ". The candle timing preference is " + candleTiming + ". " +
+                    "Use these settings as context only; a static screenshot cannot reveal future price movement. " +
                     "Analyze only what is visible in the screenshot. Consider recent " +
                     "candle bodies and wicks, short-term momentum, visible support " +
                     "and resistance, volatility, reversals, and chart clarity. " +
