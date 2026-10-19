@@ -13,6 +13,8 @@ import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
@@ -543,6 +545,20 @@ public class MainActivity extends Activity {
             statusText.setText("Could not prepare the screenshot. Try another image.");
             return;
         }
+        final java.util.concurrent.atomic.AtomicBoolean savedAnalysisDone = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final Handler savedProgressHandler = new Handler(Looper.getMainLooper());
+        final Runnable savedProgressUpdater = new Runnable() {
+            @Override public void run() {
+                if (savedAnalysisDone.get()) return;
+                String stage = prefs.getString("scan_message", "Preparing saved chart analysis...");
+                statusText.setText("SAVED CHART ANALYSIS\n" + stage + "\nPlease wait; one analysis is running.");
+                savedProgressHandler.postDelayed(this, 700L);
+            }
+        };
+        prefs.edit().putString("scan_message", scalpingMode
+                ? "AI step 1/5: Preparing SmolVLM vision analysis..."
+                : "Timed Signal: running lightweight on-device chart rules...").apply();
+        savedProgressHandler.post(savedProgressUpdater);
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
@@ -557,6 +573,8 @@ public class MainActivity extends Activity {
             }
             final LocalVisionAI.Result finalResult = result;
             runOnUiThread(() -> {
+                savedAnalysisDone.set(true);
+                savedProgressHandler.removeCallbacks(savedProgressUpdater);
                 String direction = finalResult == null || finalResult.signal == null ? "WAIT" :
                         finalResult.signal.trim().toUpperCase(Locale.ROOT);
                 boolean scalping = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
