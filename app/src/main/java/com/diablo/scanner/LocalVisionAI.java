@@ -626,6 +626,19 @@ public final class LocalVisionAI {
         }
     }
 
+    private static String formatDuration(long durationMs) {
+        long seconds = Math.max(1L, durationMs / 1000L);
+        if (seconds < 60L) {
+            return seconds + (seconds == 1L ? " second" : " seconds");
+        }
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+        if (remainingSeconds == 0L) {
+            return minutes + (minutes == 1L ? " minute" : " minutes");
+        }
+        return minutes + "m " + remainingSeconds + "s";
+    }
+
     private static String parseDirection(String output) {
 
         if (output == null || output.trim().isEmpty()) {
