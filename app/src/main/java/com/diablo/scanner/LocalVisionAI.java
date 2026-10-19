@@ -455,6 +455,7 @@ public final class LocalVisionAI {
                     "-m", model.getAbsolutePath(),
                     "--mmproj", projector.getAbsolutePath(),
                     "--no-mmproj-offload",
+                    "--no-display-prompt",
                     "--image", imageFile.getAbsolutePath(),
                     "-p", prompt,
                     "-n", "96",
@@ -603,32 +604,28 @@ public final class LocalVisionAI {
             return "WAIT";
         }
 
+        String found = "WAIT";
         String upper = output.toUpperCase(Locale.ROOT);
 
+        // Read all matching lines and keep the last valid direction. This avoids
+        // treating prompt examples such as "UP or DOWN or WAIT" as a signal.
         for (String line : upper.split("\\r?\\n")) {
-
             String cleaned = line.trim();
+            if (!cleaned.startsWith("DIRECTION:")) continue;
 
-            if (!cleaned.startsWith("DIRECTION:")) {
-                continue;
+            String value = cleaned.substring("DIRECTION:".length())
+                    .trim()
+                    .replaceAll("[;,.]+$", "")
+                    .trim();
+
+            if ("UP".equals(value) || "UP BIAS".equals(value)) {
+                found = "UP";
+            } else if ("DOWN".equals(value) || "DOWN BIAS".equals(value)) {
+                found = "DOWN";
+            } else if ("WAIT".equals(value)) {
+                found = "WAIT";
             }
-
-            String value = cleaned.substring(
-                    "DIRECTION:".length()
-            ).trim();
-
-            if (value.startsWith("UP")
-                    && !value.startsWith("UPDATE")) {
-                return "UP";
-            }
-
-            if (value.startsWith("DOWN")) {
-                return "DOWN";
-            }
-
-            return "WAIT";
         }
 
-        return "WAIT";
-    }
-}
+        return found;
+    }}
