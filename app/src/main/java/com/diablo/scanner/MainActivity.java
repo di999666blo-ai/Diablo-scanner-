@@ -8,7 +8,8 @@ import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.graphics.Typeface;\nimport android.graphics.drawable.GradientDrawable;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
@@ -54,7 +55,8 @@ public class MainActivity extends Activity {
 
     private final int red = Color.rgb(255, 45, 65);
     private final int background = Color.rgb(12, 12, 16);
-    private final int panelColor = Color.rgb(31, 29, 27);\n    private final int amber = Color.rgb(215, 164, 91);
+    private final int panelColor = Color.rgb(31, 29, 27);
+    private final int amber = Color.rgb(255, 45, 65);
     private final int white = Color.WHITE;
 
     @Override
@@ -82,7 +84,187 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    // FUTURISTIC RUSTIC BLACK-AND-RED HOME DASHBOARD
     private void buildDashboard() {
+        createPageShell("DIABLO SCANNER", "CHART INTELLIGENCE SYSTEM");
+        addInfoPanel("● SCREEN SCANNER  •  READY TO CONFIGURE");
+        addSectionTitle("LATEST RESULT");
+        signalText = new TextView(this);
+        signalText.setText("WAIT");
+        signalText.setTextSize(34);
+        signalText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        signalText.setTextColor(Color.YELLOW);
+        signalText.setGravity(Gravity.CENTER);
+        signalText.setPadding(0, 14, 0, 4);
+        root.addView(signalText);
+
+        statusText = new TextView(this);
+        statusText.setText("Open AI Scanner to capture a live chart or analyse a saved chart.");
+        statusText.setTextSize(13);
+        statusText.setTextColor(white);
+        statusText.setGravity(Gravity.CENTER);
+        statusText.setPadding(8, 4, 8, 12);
+        root.addView(statusText);
+
+        countText = new TextView(this);
+        countText.setTextColor(Color.LTGRAY);
+        countText.setTextSize(12);
+        countText.setGravity(Gravity.CENTER);
+        countText.setPadding(0, 0, 0, 10);
+        root.addView(countText);
+
+        TextView controlSummary = new TextView(this);
+        controlSummary.setTag("control_summary");
+        controlSummary.setTextColor(Color.rgb(255, 150, 160));
+        controlSummary.setTextSize(12);
+        controlSummary.setGravity(Gravity.CENTER);
+        controlSummary.setPadding(12, 12, 12, 12);
+        controlSummary.setBackground(makePanel(Color.rgb(27, 16, 19), red, 1, 16));
+        root.addView(controlSummary);
+        refreshControlSummary();
+
+        addSectionTitle("COMMAND DECK");
+        addButton("◈  AI SCANNER", v -> openPage("AI SCANNER"));
+        addButton("⚙  CONFIGURATION", v -> openPage("CONFIGURATION"));
+        addButton("▤  SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
+        addButton("▧  SAVED CHARTS", v -> openPage("SAVED CHARTS"));
+        addButton("◎  AI ENGINE STATUS", v -> openPage("AI ENGINE"));
+
+        addInfoPanel("BLACK + RED INDUSTRIAL THEME  •  SCROLLABLE SCREENS  •  MANUAL TRADING ONLY");
+        refreshCount();
+        refreshLatestResult();
+    }
+
+    private void createPageShell(String title, String subtitle) {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(background);
+
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(18, 18, 18, 24);
+        root.setBackgroundColor(background);
+        scroll.addView(root);
+        setContentView(scroll);
+
+        addButton("‹  BACK TO DASHBOARD", v -> buildDashboard());
+
+        TextView brand = new TextView(this);
+        brand.setText("◈  DIABLO SCANNER");
+        brand.setTextSize(12);
+        brand.setTextColor(red);
+        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        brand.setLetterSpacing(0.12f);
+        brand.setGravity(Gravity.CENTER);
+        brand.setPadding(0, 8, 0, 4);
+        root.addView(brand);
+
+        TextView heading = new TextView(this);
+        heading.setText(title);
+        heading.setTextSize(25);
+        heading.setTextColor(white);
+        heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        heading.setLetterSpacing(0.04f);
+        heading.setGravity(Gravity.CENTER);
+        heading.setPadding(0, 6, 0, 2);
+        root.addView(heading);
+
+        TextView sub = new TextView(this);
+        sub.setText(subtitle);
+        sub.setTextSize(11);
+        sub.setTextColor(Color.rgb(255, 110, 125));
+        sub.setGravity(Gravity.CENTER);
+        sub.setPadding(0, 0, 0, 18);
+        root.addView(sub);
+    }
+
+    private void addInfoPanel(String text) {
+        TextView panel = new TextView(this);
+        panel.setText(text);
+        panel.setTextColor(Color.rgb(245, 205, 210));
+        panel.setTextSize(12);
+        panel.setGravity(Gravity.CENTER);
+        panel.setPadding(14, 14, 14, 14);
+        panel.setBackground(makePanel(Color.rgb(26, 15, 18), red, 1, 14));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 7, 0, 10);
+        root.addView(panel, params);
+    }
+
+    private void openPage(String page) {
+        createPageShell(page, "FUTURISTIC RUSTIC  •  BLACK / RED CONTROL SYSTEM");
+
+        if ("AI SCANNER".equals(page)) {
+            addInfoPanel("LIVE CHART CAPTURE  •  BLACK RAY SCAN  •  ONE SIGNAL PER TAP");
+            addSectionTitle("LIVE SCANNER CONTROLS");
+            addButton("START LIVE SCREEN CAPTURE", v -> requestScreenCapture());
+            addButton("STOP SCREEN CAPTURE", v -> stopScreenCapture());
+            addButton("START FLOATING D BUBBLE", v -> startFloatingBubble());
+            addButton("ANALYSE A SAVED CHART", v -> chooseChart());
+            addInfoPanel("Keep the trading chart visible while scanning. Signals are for manual review; no trades are executed.");
+        } else if ("CONFIGURATION".equals(page)) {
+            addInfoPanel("Change settings here. Each control opens its own selection screen.");
+            addSectionTitle("SCAN CONFIGURATION");
+            addButton("TRADE DURATION", v -> showTradeDurationSettings());
+            addButton("CHART TIMEFRAME", v -> showChartTimeframeSettings());
+            addButton("TRADING MODE", v -> showTradingModeSettings());
+            addButton("TIMED SIGNAL SPEED / PRECISION", v -> showTimedAnalysisProfileSettings());
+            addButton("VISUAL SENSITIVITY", v -> showSensitivitySettings());
+            addButton("CANDLE TIMING", v -> showSignalTimingSettings());
+            addButton("ALL SETTINGS MENU", v -> showSettings());
+            addInfoPanel("Your saved settings are kept on this phone.");
+        } else if ("SIGNAL HISTORY".equals(page)) {
+            renderHistoryPage();
+            addButton("CLEAR SIGNAL HISTORY", v -> {
+                clearHistory();
+                openPage("SIGNAL HISTORY");
+            });
+        } else if ("SAVED CHARTS".equals(page)) {
+            addInfoPanel("Choose a chart image from your phone gallery to analyse it.");
+            addButton("CHOOSE CHART FROM GALLERY", v -> chooseChart());
+            addButton("OPEN AI SCANNER", v -> openPage("AI SCANNER"));
+        } else if ("AI ENGINE".equals(page)) {
+            SharedPreferences ai = getSharedPreferences("diablo_vision_ai", MODE_PRIVATE);
+            String lastSignal = ai.getString("latest_ai_signal", "No AI result recorded yet");
+            String lastDetails = ai.getString("latest_ai_details", "No AI explanation recorded yet.");
+            addInfoPanel("ENGINE STATUS IS DIAGNOSTIC ONLY. A packaged model does not prove the native runtime is successfully running on this phone.");
+            addSectionTitle("LATEST ENGINE OUTPUT");
+            addInfoPanel("Last AI result: " + lastSignal + "\n\n" + lastDetails);
+            addButton("RUN LIVE SCAN", v -> openPage("AI SCANNER"));
+            addButton("OPEN CONFIGURATION", v -> openPage("CONFIGURATION"));
+        }
+    }
+
+    private void renderHistoryPage() {
+        addSectionTitle("SAVED SIGNAL RECORDS");
+        try {
+            JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
+            if (history.length() == 0) {
+                addInfoPanel("No saved signals yet. Run one scan to create a history entry.");
+                return;
+            }
+            StringBuilder text = new StringBuilder();
+            int count = Math.min(history.length(), 50);
+            for (int i = 0; i < count; i++) {
+                JSONObject item = history.getJSONObject(i);
+                text.append(i + 1).append(". ")
+                    .append(item.optString("signal", "WAIT"))
+                    .append("  •  ")
+                    .append(item.optString("time", "Unknown time"))
+                    .append("\n")
+                    .append(item.optString("details", "No details saved"))
+                    .append("\n\n------------------------------\n\n");
+            }
+            addInfoPanel(text.toString());
+        } catch (Exception error) {
+            addInfoPanel("Could not read signal history. Existing saved data has not been deleted.");
+        }
+    }
+
+    private void buildLegacyDashboard() {
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(background);
 
@@ -96,7 +278,9 @@ public class MainActivity extends Activity {
 
         TextView logo = new TextView(this);
         logo.setText("D");
-        logo.setTextSize(62);\n        logo.setBackground(makePanel(Color.rgb(28, 25, 23), amber, 3, 24));\n        logo.setPadding(0, 6, 0, 6);
+        logo.setTextSize(62);
+        logo.setBackground(makePanel(Color.rgb(27, 16, 19), amber, 3, 24));
+        logo.setPadding(0, 6, 0, 6);
         logo.setTextColor(red);
         logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         logo.setGravity(Gravity.CENTER);
@@ -104,7 +288,8 @@ public class MainActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText("DIABLO SCANNER");
-        title.setTextSize(25);\n        title.setLetterSpacing(0.08f);
+        title.setTextSize(25);
+        title.setLetterSpacing(0.08f);
         title.setTextColor(white);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
@@ -113,7 +298,7 @@ public class MainActivity extends Activity {
         TextView subtitle = new TextView(this);
         subtitle.setText("2026 FUTURISTIC-RUSTIC • LOCAL VISION CORE");
         subtitle.setTextSize(11);
-        subtitle.setTextColor(Color.rgb(215, 164, 91));
+        subtitle.setTextColor(Color.rgb(255, 45, 65));
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setPadding(0, 4, 0, 22);
         root.addView(subtitle);
@@ -146,11 +331,11 @@ public class MainActivity extends Activity {
 
         TextView controlSummary = new TextView(this);
         controlSummary.setTag("control_summary");
-        controlSummary.setTextColor(Color.rgb(235, 205, 160));
+        controlSummary.setTextColor(Color.rgb(255, 150, 160));
         controlSummary.setTextSize(12);
         controlSummary.setGravity(Gravity.CENTER);
         controlSummary.setPadding(12, 12, 12, 12);
-        controlSummary.setBackground(makePanel(Color.rgb(38, 32, 27), amber, 1, 16));
+        controlSummary.setBackground(makePanel(Color.rgb(27, 16, 19), amber, 1, 16));
         root.addView(controlSummary);
         refreshControlSummary();
 
@@ -207,7 +392,7 @@ public class MainActivity extends Activity {
                 "The app does not place trades."
         );
 
-        warning.setTextColor(Color.rgb(255, 190, 120));
+        warning.setTextColor(Color.rgb(255, 125, 140));
         warning.setTextSize(12);
         warning.setGravity(Gravity.CENTER);
         warning.setPadding(8, 20, 8, 8);
@@ -257,7 +442,8 @@ public class MainActivity extends Activity {
 
         heading.setText(text);
         heading.setTextSize(13);
-        heading.setTextColor(amber);\n        heading.setLetterSpacing(0.12f);
+        heading.setTextColor(amber);
+        heading.setLetterSpacing(0.12f);
         heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER);
         heading.setPadding(0, 12, 0, 4);
@@ -275,9 +461,10 @@ public class MainActivity extends Activity {
         button.setTextColor(white);
         button.setTextSize(14);
         button.setAllCaps(false);
-        button.setBackgroundTintList(
-                ColorStateList.valueOf(panelColor)
-        );
+        button.setBackground(makePanel(panelColor, red, 1, 14));
+        button.setBackgroundTintList(null);
+        button.setPadding(12, 8, 12, 8);
+        button.setLetterSpacing(0.02f);
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(
