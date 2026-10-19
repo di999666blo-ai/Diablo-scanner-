@@ -529,9 +529,10 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Unable to analyse this image.", Toast.LENGTH_LONG).show();
             return;
         }
+        final boolean scalpingMode = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
         signalText.setText("ANALYSING…");
         signalText.setTextColor(Color.CYAN);
-        statusText.setText("SmolVLM vision AI is analysing the saved chart. Please wait.");
+        statusText.setText(scalpingMode ? "AI step 1/5: Preparing SmolVLM vision analysis..." : "Timed Signal: running lightweight chart rules...");
         final Bitmap analysisBitmap;
         try {
             analysisBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
@@ -562,7 +563,6 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                boolean scalpingMode = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
                 result = scalpingMode
                         ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
                         : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
@@ -577,9 +577,8 @@ public class MainActivity extends Activity {
                 savedProgressHandler.removeCallbacks(savedProgressUpdater);
                 String direction = finalResult == null || finalResult.signal == null ? "WAIT" :
                         finalResult.signal.trim().toUpperCase(Locale.ROOT);
-                boolean scalping = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
-                String display = "UP".equals(direction) ? (scalping ? "BUY" : "UP") :
-                        "DOWN".equals(direction) ? (scalping ? "SELL" : "DOWN") : "WAIT";
+                String display = "UP".equals(direction) ? (scalpingMode ? "BUY" : "UP") :
+                        "DOWN".equals(direction) ? (scalpingMode ? "SELL" : "DOWN") : "WAIT";
                 int colour = "UP".equals(direction) ? Color.rgb(50,220,120) :
                         "DOWN".equals(direction) ? red : Color.YELLOW;
                 String details = finalResult == null ? "No result returned." : finalResult.details;
@@ -590,8 +589,8 @@ public class MainActivity extends Activity {
                 }
                 signalText.setText(display);
                 signalText.setTextColor(colour);
-                statusText.setText((scalping ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • FAST TIMED SIGNAL\n") + (details == null ? "" : details));
-                saveHistory(display, confidence, 0, 0, scalping ? "SAVED_AI" : "SAVED_TIMED");
+                statusText.setText((scalpingMode ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • FAST TIMED SIGNAL\n") + (details == null ? "" : details));
+                saveHistory(display, confidence, 0, 0, scalpingMode ? "SAVED_AI" : "SAVED_TIMED");
                 refreshCount();
             });
         }, "DiabloSavedChartAnalyzer").start();
