@@ -392,8 +392,7 @@ public class ScreenCaptureService extends Service {
                 return;
             }
 
-            // Crop the central chart area and run the same local strategy engine
-            // used by the saved-chart picker. This needs no bundled model files.
+            // Crop the central chart area before passing it to the bundled local vision model.
             int left = Math.max(0, (int)(width * 0.05));
             int right = Math.min(width, (int)(width * 0.95));
             int top = Math.max(0, (int)(height * 0.12));
@@ -451,17 +450,17 @@ public class ScreenCaptureService extends Service {
         String selectedMode = scanPrefs.getString("trading_mode", "TIMED");
         boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
         scanPrefs.edit()
-                .putString("scan_status", scalpingMode ? "AI_PROCESSING" : "SCANNING")
-                .putString("scan_message", scalpingMode
-                        ? "AI step 1/5: Preparing SmolVLM vision analysis..."
-                        : "Timed Signal: running the lightweight on-device chart rules...")
+                .putString("scan_status", "AI_PROCESSING")
+                .putString("scan_message", "Preparing the shared SmolVLM vision analysis for " +
+                        (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...")
                 .apply();
         try {
             aiExecutor.execute(() -> {
                 try {
-                    LocalVisionAI.Result result = scalpingMode
-                            ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
-                            : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                    // Both modes use the same bundled vision model. The saved trading_mode
+                    // preference changes the model instructions inside LocalVisionAI.
+                    LocalVisionAI.Result result =
+                            LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     if (result != null) saveAIResult(result);
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
