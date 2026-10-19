@@ -44,7 +44,7 @@ public final class ChartAnalyzer {
         int threshold = prefs.getInt("threshold", 15);
         String timeframe = prefs.getString("chart_timeframe", "1m");
         String mode = prefs.getString("trading_mode", "TIMED");
-        String timing = prefs.getString("signal_timing", "CLOSE");
+        String timing = prefs.getString("signal_timing", "CLOSE");\n        String profile = prefs.getString("timed_analysis_profile", "BALANCED");
         long duration = prefs.getLong("trade_duration_ms", 60000L);
         int w = bitmap.getWidth(), h = bitmap.getHeight();
         int step = Math.max(1, Math.max(w,h)/600);
@@ -80,7 +80,7 @@ public final class ChartAnalyzer {
                     "\nCONFIDENCE: 0%\nThis is image-based analysis, not a direct broker data feed.");
         }
 
-        int lookback = duration <= 60000L ? 5 : duration <= 180000L ? 8 : 12;
+        int lookback = "PRECISION".equals(profile) ? (duration <= 60000L ? 8 : duration <= 180000L ? 12 : 16)\n                : "FAST".equals(profile) ? (duration <= 60000L ? 4 : duration <= 180000L ? 6 : 9)\n                : (duration <= 60000L ? 5 : duration <= 180000L ? 8 : 12);
         int recentStart=Math.max(0,candles.size()-lookback);
         int recentUp=0,recentDown=0,recentFlat=0;
         for(int i=recentStart;i<candles.size();i++) {
@@ -95,7 +95,7 @@ public final class ChartAnalyzer {
         double score=(0.48*overall)+(0.38*recentBalance)+(0.14*Math.max(-1,Math.min(1,visualSlope*3.0)));
         double strength=Math.abs(score);
         double expiryAdjustment = duration <= 60000L ? 0.06 : duration <= 180000L ? 0.03 : 0.0;
-        double required=Math.max(0.10, Math.min(0.38, threshold/100.0 + expiryAdjustment));
+        double profileAdjustment = "PRECISION".equals(profile) ? 0.06 : "FAST".equals(profile) ? 0.02 : 0.0;\n        double required=Math.max(0.10, Math.min(0.42, threshold/100.0 + expiryAdjustment + profileAdjustment));
         int confirmationGap = duration <= 60000L ? 3 : 2;
         String signal="WAIT";
         if(score>required && recentUp>=recentDown+confirmationGap) signal="UP";
@@ -115,7 +115,7 @@ public final class ChartAnalyzer {
         details.append("Recent coloured columns: ").append(recentUp).append(" bullish, ").append(recentDown).append(" bearish, ").append(recentFlat).append(" mixed\n");
         details.append("Read: ").append(directionText).append(".\n");
         details.append("CONFIDENCE: ").append(confidence).append("%\n");
-        details.append("Confidence is an experimental image-strength score, not a measured win probability. No broker feed or OCR price reading is available.");
+        details.append("Confidence is an experimental image-strength score, not a measured win probability. No broker feed or OCR price reading is available.");\n        details.append("\\nSpeed/precision profile changes sampling and confirmation threshold; it does not make this pixel-based analyzer a trained AI model.");
         if("SCALPING".equalsIgnoreCase(mode)) {
             details.append("\nEntry/TP/SL: not shown because reliable numeric price levels cannot be read from this image. Do not invent prices.");
         } else {
