@@ -554,6 +554,7 @@ public class ScreenCaptureService extends Service {
             item.put("green", 0);
             item.put("red", 0);
             item.put("source", "SCALPING".equalsIgnoreCase(mode) ? "LIVE_AI" : "LIVE_TIMED");
+            item.put("details", details);
 
             updated.put(item);
 
