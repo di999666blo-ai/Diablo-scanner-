@@ -898,6 +898,7 @@ public class MainActivity extends Activity {
                 "15 seconds",
                 "30 seconds",
                 "1 minute",
+                "3 minutes",
                 "5 minutes",
                 "Custom duration (seconds)"
         };
@@ -911,7 +912,8 @@ public class MainActivity extends Activity {
                 : current == 15000L ? 1
                 : current == 30000L ? 2
                 : current == 60000L ? 3
-                : current == 300000L ? 4
+                : current == 180000L ? 4
+                : current == 300000L ? 5
                 : -1;
 
         new AlertDialog.Builder(this)
@@ -925,7 +927,7 @@ public class MainActivity extends Activity {
                         selected,
                         (dialog, which) -> {
 
-                            if (which == 5) {
+                            if (which == 6) {
                                 dialog.dismiss();
                                 showCustomTradeDuration();
                                 return;
@@ -935,6 +937,7 @@ public class MainActivity extends Activity {
                                     : which == 1 ? 15000L
                                     : which == 2 ? 30000L
                                     : which == 3 ? 60000L
+                                    : which == 4 ? 180000L
                                     : 300000L;
 
                             prefs.edit()
