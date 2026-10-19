@@ -451,16 +451,18 @@ public class ScreenCaptureService extends Service {
         boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
         scanPrefs.edit()
                 .putString("scan_status", "AI_PROCESSING")
-                .putString("scan_message", "Preparing the shared SmolVLM vision analysis for " +
-                        (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...")
+                .putString("scan_message", scalpingMode
+                        ? "Preparing SmolVLM AI for Scalping Setup..."
+                        : "Running fast Timed Signal chart strategy...")
                 .apply();
         try {
             aiExecutor.execute(() -> {
                 try {
-                    // Both modes use the same bundled vision model. The saved trading_mode
-                    // preference changes the model instructions inside LocalVisionAI.
-                    LocalVisionAI.Result result =
-                            LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                    // Timed Signal uses the fast image-feature strategy; Scalping Setup
+                    // uses the bundled SmolVLM vision model.
+                    LocalVisionAI.Result result = scalpingMode
+                            ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
+                            : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
                     if (result != null) saveAIResult(result);
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
