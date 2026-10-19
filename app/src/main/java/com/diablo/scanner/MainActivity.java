@@ -765,9 +765,11 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                // Keep saved-chart analysis on the same bundled vision model as live scans.
-                // The selected mode controls the prompt and result format.
-                result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                // Keep saved-chart mode routing identical to live scanning:
+                // fast strategy for Timed Signal, SmolVLM for Scalping Setup.
+                result = scalpingMode
+                        ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
+                        : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
             } catch (Exception e) {
                 result = new LocalVisionAI.Result("WAIT", "Local chart analysis failed safely. Please try a clearer screenshot.");
             } finally {
