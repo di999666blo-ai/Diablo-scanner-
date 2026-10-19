@@ -948,7 +948,7 @@ public class MainActivity extends Activity {
                         selected,
                         (dialog, which) -> {
 
-                            if (which == 6) {
+                            if (which == 12) {
                                 dialog.dismiss();
                                 showCustomTradeDuration();
                                 return;
