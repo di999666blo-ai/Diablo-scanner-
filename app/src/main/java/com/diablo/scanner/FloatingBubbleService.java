@@ -610,13 +610,14 @@ public class FloatingBubbleService extends Service {
                             "SAVED_SCREENSHOT"
                     );
 
-                    if ("LIVE_AI".equals(sourceValue)) {
-                        continue;
-                    }
+                    boolean scalpingSelected = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
+                    if (scalpingSelected && ("LIVE_TIMED".equals(sourceValue) || "SAVED_TIMED".equals(sourceValue))) continue;
+                    if (!scalpingSelected && ("LIVE_AI".equals(sourceValue) || "SAVED_AI".equals(sourceValue))) continue;
 
                     signal = item.optString("signal", "WAIT");
                     time = item.optString("time", "Unknown time");
                     score = item.optInt("score", 0);
+                    explanation = item.optString("details", "");
 
                     if ("LIVE_SCREEN".equals(sourceValue)) {
                         source = "Source: Live screen colour analysis";
@@ -664,7 +665,9 @@ public class FloatingBubbleService extends Service {
         if ("AI_READY".equals(scanStatus)) {
             message.append("AI READY • ANALYSIS COMPLETE\n");
         } else if ("ANALYSIS_COMPLETE_WAIT".equals(scanStatus)) {
-            message.append("AI READY • ANALYSIS COMPLETE • WAIT\n");
+            message.append("ANALYSIS COMPLETE • WAIT\n");
+        } else if ("SIGNAL_READY".equals(scanStatus)) {
+            message.append("TIMED SIGNAL • ANALYSIS COMPLETE\n");
         }
         message.append(source);
         message.append("\nLast result: ").append(time);
@@ -695,18 +698,13 @@ public class FloatingBubbleService extends Service {
             message.append("\nMemory comparison: ")
                     .append(patternMemory);
 
-            message.append(
-                    "\n\nBasic visual analysis is not an AI prediction."
-            );
-
-            if (aiSignal == null || aiSignal.trim().isEmpty()) {
-                message.append(
-                        "\nAI result unavailable. Select both model files and check the engine."
-                );
+            if (explanation != null && !explanation.trim().isEmpty()) {
+                message.append("\\n\\nTimed Signal explanation:\\n").append(explanation.trim());
+            }
+            if ("SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"))) {
+                message.append("\\n\\nAI result unavailable or not yet available. Check the AI diagnostic message and retry.");
             } else {
-                message.append(
-                        "\nThe last AI result is old or not yet available. Waiting for a fresh result."
-                );
+                message.append("\\n\\nFast image-rule analysis is not an AI prediction.");
             }
         }
 
