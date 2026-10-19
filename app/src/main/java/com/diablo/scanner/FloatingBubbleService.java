@@ -19,6 +19,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.json.JSONArray;
@@ -429,11 +430,28 @@ public class FloatingBubbleService extends Service {
                 v -> stopSelf()
         );
 
-        panel = layout;
+        // Keep the expanded panel within the visible screen. Its contents
+        // scroll vertically so every control remains reachable on small phones.
+        ScrollView scrollContainer = new ScrollView(this);
+        scrollContainer.setFillViewport(false);
+        scrollContainer.setVerticalScrollBarEnabled(true);
+        scrollContainer.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        scrollContainer.addView(
+                layout,
+                new ScrollView.LayoutParams(
+                        ScrollView.LayoutParams.MATCH_PARENT,
+                        ScrollView.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        panel = scrollContainer;
+
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int maxPanelHeight = Math.max(300, (int) (screenHeight * 0.72f));
 
         panelParams = makeParams(
                 290,
-                WindowManager.LayoutParams.WRAP_CONTENT
+                maxPanelHeight
         );
 
         panelParams.gravity = Gravity.TOP | Gravity.START;
