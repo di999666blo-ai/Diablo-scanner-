@@ -49,6 +49,7 @@ public class FloatingBubbleService extends Service {
     private TextView detailsView;
     private TextView tradeStatusView;
     private TextView statsView;
+    private TextView modeButton;
 
     private boolean expanded = false;
     private boolean tradeActive = false;
@@ -264,7 +265,7 @@ public class FloatingBubbleService extends Service {
         });
     }
 
-    private void addButton(
+    private TextView addButton(
             LinearLayout layout,
             String label,
             int backgroundColor,
@@ -285,6 +286,30 @@ public class FloatingBubbleService extends Service {
 
         layout.addView(button, params);
         button.setOnClickListener(listener);
+        return button;
+    }
+
+    private String currentModeLabel() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String mode = prefs.getString("trading_mode", "TIMED");
+        return "SCALPING".equalsIgnoreCase(mode)
+                ? "MODE: AI SCALPING"
+                : "MODE: TIMED SIGNAL";
+    }
+
+    private void toggleTradingMode() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String current = prefs.getString("trading_mode", "TIMED");
+        String next = "SCALPING".equalsIgnoreCase(current) ? "TIMED" : "SCALPING";
+        prefs.edit()
+                .putString("trading_mode", next)
+                .putString("scan_message", "Mode selected: " + ("SCALPING".equals(next) ? "AI Scalping" : "Timed Signal") + ". Tap SCAN to analyse.")
+                .apply();
+        if (modeButton != null) modeButton.setText(currentModeLabel());
+        if (detailsView != null) {
+            detailsView.setText("Selected: " + ("SCALPING".equals(next) ? "AI Scalping" : "Timed Signal") +
+                    "\nTap SCAN CURRENT CHART ONCE to start one analysis.");
+        }
     }
 
     // EXPANDED BUBBLE PANEL
@@ -340,6 +365,13 @@ public class FloatingBubbleService extends Service {
 
         statsView = makeText("", 12, Color.LTGRAY);
         layout.addView(statsView);
+
+        modeButton = addButton(
+                layout,
+                currentModeLabel(),
+                Color.rgb(45, 45, 65),
+                v -> toggleTradingMode()
+        );
 
         addButton(
                 layout,
@@ -417,6 +449,7 @@ public class FloatingBubbleService extends Service {
             detailsView = null;
             tradeStatusView = null;
             statsView = null;
+            modeButton = null;
             showBubble();
             return;
         }
@@ -489,10 +522,11 @@ public class FloatingBubbleService extends Service {
             String progress = elapsedSeconds < 10L
                     ? "Elapsed: " + elapsedSeconds + "s / 10s target"
                     : "DELAYED: " + elapsedSeconds + "s elapsed (10s target exceeded)";
+            String stageMessage = statusPrefs.getString("scan_message", "Preparing chart analysis...");
             detailsView.setText(
                     "BLACK-RAY SCAN ACTIVE\n" +
                     (processingAI ? "AI PROCESSING • AI BUSY\n" : "Capturing visible chart...\n") +
-                    progress + "\n" +
+                    progress + "\n" + stageMessage + "\n" +
                     (elapsedSeconds >= 90L
                             ? "ANALYSIS TIMEOUT WARNING: model is taking too long."
                             : elapsedSeconds >= 10L
