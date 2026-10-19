@@ -447,19 +447,27 @@ public class ScreenCaptureService extends Service {
                     .apply();
             return;
         }
-        getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
-                .putString("scan_status", "AI_PROCESSING")
-                .putString("scan_message", "AI BUSY • Analysing chart with SmolVLM...")
+        SharedPreferences scanPrefs = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+        String selectedMode = scanPrefs.getString("trading_mode", "TIMED");
+        boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
+        scanPrefs.edit()
+                .putString("scan_status", scalpingMode ? "AI_PROCESSING" : "SCANNING")
+                .putString("scan_message", scalpingMode
+                        ? "AI step 1/5: Preparing SmolVLM vision analysis..."
+                        : "Timed Signal: running the lightweight on-device chart rules...")
                 .apply();
         try {
             aiExecutor.execute(() -> {
                 try {
-                    LocalVisionAI.Result result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                    LocalVisionAI.Result result = scalpingMode
+                            ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
+                            : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
                     if (result != null) saveAIResult(result);
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
                     state.edit().putString("scan_status", "AI_ERROR")
-                            .putString("scan_message", "Local chart analysis failed safely. Tap D to retry.")
+                            .putString("scan_message", "Chart analysis failed: " + error.getClass().getSimpleName() +
+                                    (error.getMessage() == null ? "" : " — " + error.getMessage()) + ". Tap D to retry.")
                             .apply();
                 } finally {
                     if (!analysisBitmap.isRecycled()) analysisBitmap.recycle();
@@ -545,7 +553,7 @@ public class ScreenCaptureService extends Service {
             item.put("score", score);
             item.put("green", 0);
             item.put("red", 0);
-            item.put("source", "LIVE_AI");
+            item.put("source", "SCALPING".equalsIgnoreCase(mode) ? "LIVE_AI" : "LIVE_TIMED");
 
             updated.put(item);
 
@@ -562,12 +570,13 @@ public class ScreenCaptureService extends Service {
                     || lowerDetails.contains("could not")
                     || lowerDetails.contains("missing or incomplete");
             String finalStatus = engineError ? "AI_ERROR"
-                    : "WAIT".equals(aiSignal) ? "ANALYSIS_COMPLETE_WAIT" : "AI_READY";
+                    : "WAIT".equals(aiSignal) ? "ANALYSIS_COMPLETE_WAIT"
+                    : "SCALPING".equalsIgnoreCase(mode) ? "AI_READY" : "SIGNAL_READY";
             String statusMessage = engineError
                     ? "AI ERROR • " + details
                     : "WAIT".equals(aiSignal)
-                    ? "Analysis complete. AI is ready, but no reliable direction was returned. " + details
-                    : "AI READY • " + displaySignal + " • " + details;
+                    ? "Analysis complete. No reliable direction was returned. " + details
+                    : ("SCALPING".equalsIgnoreCase(mode) ? "AI READY • " : "TIMED SIGNAL READY • ") + displaySignal + " • " + details;
 
             prefs.edit()
                     .putString("history", updated.toString())
