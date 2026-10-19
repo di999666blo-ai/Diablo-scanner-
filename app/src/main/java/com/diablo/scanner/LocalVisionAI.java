@@ -489,22 +489,42 @@ public final class LocalVisionAI {
 
                     byte[] buffer = new byte[4096];
                     int count;
+                    String lastStage = "";
 
                     while ((count = input.read(buffer)) != -1) {
 
+                        String outputSoFar;
                         synchronized (captured) {
-
-                            int remaining =
-                                    MAX_OUTPUT_BYTES - captured.size();
-
+                            int remaining = MAX_OUTPUT_BYTES - captured.size();
                             if (remaining > 0) {
-
-                                captured.write(
-                                        buffer,
-                                        0,
-                                        Math.min(count, remaining)
-                                );
+                                captured.write(buffer, 0, Math.min(count, remaining));
                             }
+                            outputSoFar = new String(
+                                    captured.toByteArray(),
+                                    java.nio.charset.StandardCharsets.UTF_8
+                            ).toLowerCase(Locale.ROOT);
+                        }
+
+                        // Surface meaningful model progress while tokens arrive.
+                        // These are progress observations, not proof of a valid trade.
+                        String stage = null;
+                        if (outputSoFar.contains("direction:") || outputSoFar.contains("reason:")) {
+                            stage = "AI has drafted its direction and reason; checking the final result...";
+                        } else if (outputSoFar.contains("breakout: not confirmed")) {
+                            stage = "AI reports no confirmed breakout yet; weighing whether to WAIT...";
+                        } else if (outputSoFar.contains("breakout:")) {
+                            stage = "AI is checking whether a breakout is confirmed...";
+                        } else if (outputSoFar.contains("resistance:")) {
+                            stage = "AI has checked the visible resistance area...";
+                        } else if (outputSoFar.contains("support:")) {
+                            stage = "AI has checked the visible support area...";
+                        } else if (outputSoFar.contains("trend:")) {
+                            stage = "AI is reading candle trend and momentum...";
+                        }
+
+                        if (stage != null && !stage.equals(lastStage)) {
+                            publishProgress(context, stage);
+                            lastStage = stage;
                         }
                     }
 
