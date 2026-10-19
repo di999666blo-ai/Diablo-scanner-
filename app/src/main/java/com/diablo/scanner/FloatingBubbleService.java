@@ -65,6 +65,25 @@ public class FloatingBubbleService extends Service {
     private final Handler handler =
             new Handler(Looper.getMainLooper());
 
+    private static final long AUTO_SCAN_INTERVAL_MS = 10000L;
+
+    private final Runnable autoScanRunnable = new Runnable() {
+        @Override
+        public void run() {
+            SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+            if (!prefs.getBoolean("auto_scan_enabled", false)) return;
+
+            if (prefs.getBoolean("screen_capture_active", false)) {
+                String status = prefs.getString("scan_status", "WAIT");
+                if (!"SCANNING".equals(status) && !"AI_PROCESSING".equals(status)) {
+                    requestAutomaticScan();
+                }
+            }
+
+            handler.postDelayed(this, AUTO_SCAN_INTERVAL_MS);
+        }
+    };
+
     private final Runnable refreshRunnable = new Runnable() {
         @Override
         public void run() {
@@ -91,6 +110,9 @@ public class FloatingBubbleService extends Service {
         showBubble();
 
         handler.postDelayed(refreshRunnable, 1000L);
+        if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("auto_scan_enabled", false)) {
+            handler.postDelayed(autoScanRunnable, AUTO_SCAN_INTERVAL_MS);
+        }
     }
 
     private void createForegroundNotification() {
@@ -383,6 +405,13 @@ public class FloatingBubbleService extends Service {
 
         addButton(
                 layout,
+                autoScanButtonLabel(),
+                Color.rgb(55, 55, 90),
+                v -> toggleAutoScan()
+        );
+
+        addButton(
+                layout,
                 "I TOOK TRADE",
                 Color.rgb(30, 100, 55),
                 v -> startTrade()
@@ -517,6 +546,52 @@ public class FloatingBubbleService extends Service {
 
         expandPanel();
         refreshLatestResult();
+    }
+
+    private String autoScanButtonLabel() {
+        boolean enabled = getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getBoolean("auto_scan_enabled", false);
+        return enabled ? "AUTO SCAN: ON • EVERY 10 SECONDS" : "AUTO SCAN: OFF • EVERY 10 SECONDS";
+    }
+
+    private void toggleAutoScan() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        boolean enable = !prefs.getBoolean("auto_scan_enabled", false);
+        prefs.edit().putBoolean("auto_scan_enabled", enable).apply();
+
+        handler.removeCallbacks(autoScanRunnable);
+        if (enable) {
+            handler.postDelayed(autoScanRunnable, 1000L);
+        }
+        if (detailsView != null) {
+            detailsView.setText(enable
+                    ? "Automatic scanning enabled: one chart scan every 10 seconds while screen capture is active. A scan already running will not be duplicated."
+                    : "Automatic scanning stopped. Tap SCAN CURRENT CHART ONCE whenever you want a manual scan.");
+        }
+        if (expanded && panel != null) {
+            // Refresh the visible button label by rebuilding the panel on the next user action.
+            // Keep the current panel stable; status text confirms the saved setting.
+        }
+    }
+
+    private void requestAutomaticScan() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (!prefs.getBoolean("screen_capture_active", false)) return;
+
+        prefs.edit()
+                .putString("scan_status", "SCANNING")
+                .putLong("scan_started_at", System.currentTimeMillis())
+                .putString("scan_message", "Automatic scan: capturing the visible chart...")
+                .apply();
+        try {
+            Intent intent = new Intent(this, ScreenCaptureService.class);
+            intent.setAction(ScreenCaptureService.ACTION_ANALYZE_ONCE);
+            startService(intent);
+        } catch (Exception error) {
+            prefs.edit().putString("scan_status", "WAIT")
+                    .putString("scan_message", "Automatic scan could not start. Check screen capture permission.")
+                    .apply();
+        }
     }
 
     // READ LATEST RESULT
@@ -1050,6 +1125,7 @@ public class FloatingBubbleService extends Service {
     @Override
     public void onDestroy() {
         handler.removeCallbacks(refreshRunnable);
+        handler.removeCallbacks(autoScanRunnable);
 
         if (bubble != null) {
             try {
