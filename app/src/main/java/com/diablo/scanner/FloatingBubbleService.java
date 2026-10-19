@@ -586,7 +586,8 @@ public class FloatingBubbleService extends Service {
 
         int aiScore = aiPrefs.getInt("latest_ai_score", 0);
 
-        if (isFreshAIResult(aiSignal, aiTime)) {
+        if ("SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"))
+                && isFreshAIResult(aiSignal, aiTime)) {
             signal = normaliseSignal(aiSignal);
             time = aiTime;
             source = "Source: Local AI chart analysis";
@@ -619,6 +620,10 @@ public class FloatingBubbleService extends Service {
 
                     if ("LIVE_SCREEN".equals(sourceValue)) {
                         source = "Source: Live screen colour analysis";
+                    } else if ("LIVE_TIMED".equals(sourceValue)) {
+                        source = "Source: Fast timed-signal rules";
+                    } else if ("SAVED_TIMED".equals(sourceValue)) {
+                        source = "Source: Saved-chart timed-signal rules";
                     } else {
                         source = "Source: Saved screenshot analysis";
                     }
