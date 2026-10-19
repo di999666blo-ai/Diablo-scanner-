@@ -414,7 +414,7 @@ public final class LocalVisionAI {
             String mode = scannerPrefs.getString("trading_mode", "TIMED");
             long tradeDurationMs = scannerPrefs.getLong("trade_duration_ms", 60000L);
             String timedProfile = scannerPrefs.getString("timed_analysis_profile", "BALANCED");
-            String candleTiming = scannerPrefs.getString("signal_timing", "FORMING");
+            String candleTiming = scannerPrefs.getString("signal_timing", "CLOSE");
 
             String modeInstructions;
             if ("SCALPING".equalsIgnoreCase(mode)) {
