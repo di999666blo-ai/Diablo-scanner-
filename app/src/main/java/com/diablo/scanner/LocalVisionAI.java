@@ -33,9 +33,9 @@ public final class LocalVisionAI {
             "diablo-image-projector.gguf";
 
     private static final int MAX_OUTPUT_BYTES = 100000;
-    private static final int MAX_IMAGE_DIMENSION = 640;
+    private static final int MAX_IMAGE_DIMENSION = 512;
 
-    private static final long ANALYSIS_TIMEOUT_SECONDS = 90L;
+    private static final long ANALYSIS_TIMEOUT_SECONDS = 60L;
 
     private static void publishProgress(Context context, String message) {
         if (context == null) return;
@@ -437,6 +437,11 @@ public final class LocalVisionAI {
                     "candle bodies and wicks, short-term momentum, visible support " +
                     "and resistance, volatility, reversals, and chart clarity. " +
                     "Do not invent prices or indicators. Return these fields on separate lines: " +
+                    "TREND: bullish, bearish, sideways, or unclear; " +
+                    "SUPPORT: visible level or not clear; " +
+                    "RESISTANCE: visible level or not clear; " +
+                    "BREAKOUT: confirmed, not confirmed, or not visible; " +
+                    "MOMENTUM: bullish, bearish, mixed, or unclear; " +
                     "DIRECTION: UP or DOWN or WAIT; " +
                     "CONFIDENCE: integer from 0 to 100; " +
                     "REASON: one short sentence. " +
@@ -452,7 +457,7 @@ public final class LocalVisionAI {
                     "--no-mmproj-offload",
                     "--image", imageFile.getAbsolutePath(),
                     "-p", prompt,
-                    "-n", "120",
+                    "-n", "96",
                     "-c", "2048",
                     "-t", "2",
                     "--temp", "0.1"
