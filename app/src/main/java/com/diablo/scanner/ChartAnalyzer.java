@@ -45,6 +45,7 @@ public final class ChartAnalyzer {
         String timeframe = prefs.getString("chart_timeframe", "1m");
         String mode = prefs.getString("trading_mode", "TIMED");
         String timing = prefs.getString("signal_timing", "CLOSE");
+        long duration = prefs.getLong("trade_duration_ms", 60000L);
         int w = bitmap.getWidth(), h = bitmap.getHeight();
         int step = Math.max(1, Math.max(w,h)/600);
         int xStep = Math.max(2, w/180);
@@ -79,7 +80,8 @@ public final class ChartAnalyzer {
                     "\nCONFIDENCE: 0%\nThis is image-based analysis, not a direct broker data feed.");
         }
 
-        int recentStart=Math.max(0,candles.size()-8);
+        int lookback = duration <= 60000L ? 5 : duration <= 180000L ? 8 : 12;
+        int recentStart=Math.max(0,candles.size()-lookback);
         int recentUp=0,recentDown=0,recentFlat=0;
         for(int i=recentStart;i<candles.size();i++) {
             int d=candles.get(i).direction();
@@ -87,15 +89,17 @@ public final class ChartAnalyzer {
         }
         double overall=(totalGreen-totalRed)/(double)total;
         double recentBalance=(recentUp-recentDown)/(double)Math.max(1,recentUp+recentDown);
-        int firstY=candles.get(Math.max(0,candles.size()-Math.min(8,candles.size()))).y;
+        int firstY=candles.get(Math.max(0,candles.size()-Math.min(lookback,candles.size()))).y;
         int lastY=candles.get(candles.size()-1).y;
         double visualSlope=(firstY-lastY)/(double)h; // positive means later regions trend visually upward
         double score=(0.48*overall)+(0.38*recentBalance)+(0.14*Math.max(-1,Math.min(1,visualSlope*3.0)));
         double strength=Math.abs(score);
-        double required=Math.max(0.10, Math.min(0.35, threshold/100.0));
+        double expiryAdjustment = duration <= 60000L ? 0.06 : duration <= 180000L ? 0.03 : 0.0;
+        double required=Math.max(0.10, Math.min(0.38, threshold/100.0 + expiryAdjustment));
+        int confirmationGap = duration <= 60000L ? 3 : 2;
         String signal="WAIT";
-        if(score>required && recentUp>=recentDown+2) signal="UP";
-        else if(score < -required && recentDown>=recentUp+2) signal="DOWN";
+        if(score>required && recentUp>=recentDown+confirmationGap) signal="UP";
+        else if(score < -required && recentDown>=recentUp+confirmationGap) signal="DOWN";
 
         int confidence=(int)Math.round(Math.max(0,Math.min(79, 42+strength*48)));
         if("WAIT".equals(signal)) confidence=Math.min(confidence,49);
@@ -105,6 +109,7 @@ public final class ChartAnalyzer {
         details.append("ON-DEVICE CHART ANALYSIS\n");
         details.append("Mode: ").append("SCALPING".equalsIgnoreCase(mode)?"Scalping":"Timed signal").append("\n");
         details.append("Chart timeframe setting: ").append(timeframe).append("\n");
+        details.append("Timed strategy: ").append(duration <= 60000L ? "1-minute fast confirmation" : duration <= 180000L ? "3-minute balanced confirmation" : "5-minute broader-lookback confirmation").append("\n");
         details.append("Timing: ").append(timingText).append("\n");
         details.append("Visual candle columns: ").append(columnsWithColour).append("\n");
         details.append("Recent coloured columns: ").append(recentUp).append(" bullish, ").append(recentDown).append(" bearish, ").append(recentFlat).append(" mixed\n");
@@ -114,7 +119,6 @@ public final class ChartAnalyzer {
         if("SCALPING".equalsIgnoreCase(mode)) {
             details.append("\nEntry/TP/SL: not shown because reliable numeric price levels cannot be read from this image. Do not invent prices.");
         } else {
-            long duration=prefs.getLong("trade_duration_ms",60000L);
             details.append("\nSelected tracking duration: ").append(formatDuration(duration));
         }
         if("CLOSE".equalsIgnoreCase(timing)) details.append("\nNote: a screenshot cannot prove the candle has closed; capture again after the candle closes.");
