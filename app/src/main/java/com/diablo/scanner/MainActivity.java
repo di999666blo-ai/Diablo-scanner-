@@ -835,10 +835,17 @@ public class MainActivity extends Activity {
     }
 
     private void showChartTimeframeSettings() {
-        String[] options = {"30 seconds", "1 minute", "2 minutes", "5 minutes"};
-        String[] values = {"30s", "1m", "2m", "5m"};
+        String[] options = {
+                "15 seconds", "30 seconds", "1 minute", "2 minutes", "3 minutes",
+                "5 minutes", "10 minutes", "15 minutes", "30 minutes",
+                "1 hour", "4 hours", "1 day"
+        };
+        String[] values = {
+                "15s", "30s", "1m", "2m", "3m", "5m", "10m", "15m",
+                "30m", "1h", "4h", "1d"
+        };
         String current = prefs.getString("chart_timeframe", "1m");
-        int selected = 1;
+        int selected = 2;
         for (int i = 0; i < values.length; i++) {
             if (values[i].equals(current)) selected = i;
         }
@@ -897,11 +904,17 @@ public class MainActivity extends Activity {
     private void showTradeDurationSettings() {
         String[] options = {
                 "5 seconds",
+                "10 seconds",
                 "15 seconds",
                 "30 seconds",
                 "1 minute",
+                "2 minutes",
                 "3 minutes",
                 "5 minutes",
+                "10 minutes",
+                "15 minutes",
+                "30 minutes",
+                "1 hour",
                 "Custom duration (seconds)"
         };
 
@@ -911,11 +924,17 @@ public class MainActivity extends Activity {
         );
 
         int selected = current == 5000L ? 0
-                : current == 15000L ? 1
-                : current == 30000L ? 2
-                : current == 60000L ? 3
-                : current == 180000L ? 4
-                : current == 300000L ? 5
+                : current == 10000L ? 1
+                : current == 15000L ? 2
+                : current == 30000L ? 3
+                : current == 60000L ? 4
+                : current == 120000L ? 5
+                : current == 180000L ? 6
+                : current == 300000L ? 7
+                : current == 600000L ? 8
+                : current == 900000L ? 9
+                : current == 1800000L ? 10
+                : current == 3600000L ? 11
                 : -1;
 
         new AlertDialog.Builder(this)
@@ -936,11 +955,17 @@ public class MainActivity extends Activity {
                             }
 
                             long duration = which == 0 ? 5000L
-                                    : which == 1 ? 15000L
-                                    : which == 2 ? 30000L
-                                    : which == 3 ? 60000L
-                                    : which == 4 ? 180000L
-                                    : 300000L;
+                                    : which == 1 ? 10000L
+                                    : which == 2 ? 15000L
+                                    : which == 3 ? 30000L
+                                    : which == 4 ? 60000L
+                                    : which == 5 ? 120000L
+                                    : which == 6 ? 180000L
+                                    : which == 7 ? 300000L
+                                    : which == 8 ? 600000L
+                                    : which == 9 ? 900000L
+                                    : which == 10 ? 1800000L
+                                    : 3600000L;
 
                             prefs.edit()
                                     .putLong(TRADE_DURATION_MS, duration)
