@@ -166,10 +166,11 @@ public class FloatingBubbleService extends Service {
     }
 
     private GradientDrawable makeBackground(int color) {
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(color);
+        GradientDrawable shape = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(35, 18, 17), color, Color.rgb(10, 10, 15)});
         shape.setCornerRadius(24);
-        shape.setStroke(2, Color.rgb(255, 35, 65));
+        shape.setStroke(2, Color.rgb(255, 145, 48));
         return shape;
     }
 
@@ -212,11 +213,12 @@ public class FloatingBubbleService extends Service {
     // MOVABLE D BUBBLE
 
     private void showBubble() {
-        TextView icon = makeText("D", 25, Color.WHITE);
-
-        icon.setBackground(
-                makeBackground(Color.rgb(10, 10, 16))
-        );
+        TextView icon = makeText("D", 25, Color.rgb(255, 105, 55));
+        icon.setBackground(makeBackground(Color.rgb(15, 12, 15)));
+        icon.setElevation(10f);
+        icon.setScaleX(0.94f);
+        icon.setScaleY(0.94f);
+        icon.animate().scaleX(1f).scaleY(1f).setDuration(850).start();
 
         bubble = icon;
 
@@ -297,6 +299,8 @@ public class FloatingBubbleService extends Service {
         TextView button = makeText(label, 13, Color.WHITE);
 
         button.setBackground(makeBackground(backgroundColor));
+        button.setMinHeight((int) (44 * getResources().getDisplayMetrics().density));
+        button.setLetterSpacing(0.025f);
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(
@@ -357,17 +361,11 @@ public class FloatingBubbleService extends Service {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(12, 10, 12, 10);
-        layout.setBackground(
-                makeBackground(Color.rgb(12, 12, 18))
-        );
+        layout.setBackground(makeBackground(Color.rgb(13, 12, 16)));
+        layout.setElevation(12f);
 
-        layout.addView(
-                makeText(
-                        "DIABLO SCANNER",
-                        16,
-                        Color.rgb(255, 45, 65)
-                )
-        );
+        layout.addView(makeText("◈  DIABLO SCANNER  ◈", 16, Color.rgb(255, 105, 55)));
+        layout.addView(makeText("LIVE TERMINAL  •  CHART → AI → SIGNAL", 10, Color.rgb(255, 165, 70)));
 
         signalView = makeText("WAIT", 27, Color.YELLOW);
         layout.addView(signalView);
@@ -476,16 +474,14 @@ public class FloatingBubbleService extends Service {
         panel = scrollContainer;
 
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        int maxPanelHeight = Math.max(300, (int) (screenHeight * 0.72f));
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int panelWidth = Math.min((int) (310 * getResources().getDisplayMetrics().density), screenWidth - 24);
+        int maxPanelHeight = Math.max(280, (int) (screenHeight * 0.72f));
 
-        panelParams = makeParams(
-                290,
-                maxPanelHeight
-        );
-
+        panelParams = makeParams(panelWidth, maxPanelHeight);
         panelParams.gravity = Gravity.TOP | Gravity.START;
-        panelParams.x = oldX;
-        panelParams.y = oldY;
+        panelParams.x = Math.max(8, Math.min(oldX, screenWidth - panelWidth - 8));
+        panelParams.y = Math.max(8, Math.min(oldY, screenHeight - maxPanelHeight - 8));
 
         try {
             windowManager.addView(panel, panelParams);
