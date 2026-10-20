@@ -127,6 +127,17 @@ public class MainActivity extends Activity {
         root.addView(controlSummary);
         refreshControlSummary();
 
+        addSectionTitle("SELECT YOUR SCAN MODE");
+        addButton("MODE 1  •  TIMED SIGNAL", v -> {
+            prefs.edit().putString("trading_mode", "TIMED").apply();
+            openPage("AI SCANNER");
+        });
+        addButton("MODE 2  •  AI SCALPING WORKFLOW", v -> {
+            prefs.edit().putString("trading_mode", "SCALPING").apply();
+            openPage("AI SCANNER");
+        });
+        addInfoPanel("SCALPING WORKFLOW: open the floating D panel, tap START GUIDED SCALPING, then manually change the broker chart through 4H → 15M → 1M. Confirm and scan each stage; the app cannot change the broker timeframe itself.");
+
         addSectionTitle("COMMAND DECK");
         addButton("◈  AI SCANNER", v -> openPage("AI SCANNER"));
         addButton("⚙  CONFIGURATION", v -> openPage("CONFIGURATION"));
@@ -293,8 +304,13 @@ public class MainActivity extends Activity {
             addButton("START LIVE SCREEN CAPTURE", v -> requestScreenCapture());
             addButton("STOP SCREEN CAPTURE", v -> stopScreenCapture());
             addButton("START FLOATING D BUBBLE", v -> startFloatingBubble());
+            addButton("START GUIDED SCALPING (4H → 15M → 1M)", v -> {
+                prefs.edit().putString("trading_mode", "SCALPING").apply();
+                startFloatingBubble();
+                Toast.makeText(this, "Tap the floating D, expand it, then choose START GUIDED SCALPING.", Toast.LENGTH_LONG).show();
+            });
             addButton("ANALYSE A SAVED CHART", v -> chooseChart());
-            addInfoPanel("Keep the trading chart visible while scanning. Signals are for manual review; no trades are executed.");
+            addInfoPanel("Timed Signal uses the lightweight image analyzer. Scalping uses the bundled SmolVLM vision model. Keep the chart visible, confirm each timeframe manually, and wait for the scan to finish. Signals are manual-review only; no broker trades are executed.");
         } else if ("CONFIGURATION".equals(page)) {
             addInfoPanel("Change settings here. Each control opens its own selection screen.");
             addSectionTitle("SCAN CONFIGURATION");
