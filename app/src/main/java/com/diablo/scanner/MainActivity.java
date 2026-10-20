@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
     private void buildDashboard() {
         createPageShell("DIABLO SCANNER", "CHART INTELLIGENCE SYSTEM");
         addInfoPanel("● SCREEN SCANNER  •  READY TO CONFIGURE");
+        addTransmissionPanel();
         addSectionTitle("LATEST RESULT");
         signalText = new TextView(this);
         signalText.setText("WAIT");
@@ -181,6 +182,37 @@ public class MainActivity extends Activity {
         root.addView(sub);
     }
 
+    // Animated signal-transmission strip with a live green scan pulse.
+    private void addTransmissionPanel() {
+        final TextView transmission = new TextView(this);
+        transmission.setText("◉  AUTO TRANSMISSION   ›   CHART LOCK   ›   AI ANALYSIS   ›   SIGNAL");
+        transmission.setTextColor(Color.rgb(105, 255, 155));
+        transmission.setTextSize(11);
+        transmission.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        transmission.setLetterSpacing(0.035f);
+        transmission.setGravity(Gravity.CENTER);
+        transmission.setSingleLine(true);
+        transmission.setPadding(12, 15, 12, 15);
+        transmission.setBackground(makePanel(Color.rgb(8, 25, 19), Color.rgb(32, 190, 95), 1, 13));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 5, 0, 9);
+        root.addView(transmission, params);
+        transmission.setAlpha(0.72f);
+        transmission.animate().alpha(1f).translationX(5f).setDuration(650)
+                .withEndAction(() -> {
+                    if (transmission.isAttachedToWindow()) {
+                        transmission.animate().alpha(0.78f).translationX(-5f).setDuration(650)
+                                .withEndAction(() -> {
+                                    if (transmission.isAttachedToWindow()) {
+                                        transmission.animate().alpha(1f).translationX(0f).setDuration(650).start();
+                                    }
+                                }).start();
+                    }
+                }).start();
+    }
+
     private void addInfoPanel(String text) {
         TextView panel = new TextView(this);
         panel.setText(text);
@@ -201,6 +233,7 @@ public class MainActivity extends Activity {
 
         if ("AI SCANNER".equals(page)) {
             addInfoPanel("LIVE CHART CAPTURE  •  BLACK RAY SCAN  •  ONE SIGNAL PER TAP");
+            addTransmissionPanel();
             addSectionTitle("LIVE SCANNER CONTROLS");
             addButton("START LIVE SCREEN CAPTURE", v -> requestScreenCapture());
             addButton("STOP SCREEN CAPTURE", v -> stopScreenCapture());
