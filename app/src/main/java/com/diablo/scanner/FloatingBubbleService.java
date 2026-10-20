@@ -540,7 +540,10 @@ public class FloatingBubbleService extends Service {
         handler.removeCallbacks(autoScanRunnable);
         if (modeButton != null) modeButton.setText(currentModeLabel());
         if (detailsView != null) detailsView.setText(guidedInstructions(0));
-        refreshLatestResult();
+        if (signalView != null) {
+            signalView.setText("GUIDED 1/3");
+            signalView.setTextColor(Color.rgb(255, 145, 48));
+        }
     }
 
     private String guidedInstructions(int stage) {
