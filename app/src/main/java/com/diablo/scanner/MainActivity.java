@@ -182,7 +182,7 @@ public class MainActivity extends Activity {
         root.addView(sub);
     }
 
-    // Animated signal-transmission strip with a live green scan pulse.
+    // Animated signal-transmission strip with a continuous green scan pulse.
     private void addTransmissionPanel() {
         final TextView transmission = new TextView(this);
         transmission.setText("◉  AUTO TRANSMISSION   ›   CHART LOCK   ›   AI ANALYSIS   ›   SIGNAL");
@@ -199,18 +199,16 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 5, 0, 9);
         root.addView(transmission, params);
-        transmission.setAlpha(0.72f);
-        transmission.animate().alpha(1f).translationX(5f).setDuration(650)
-                .withEndAction(() -> {
-                    if (transmission.isAttachedToWindow()) {
-                        transmission.animate().alpha(0.78f).translationX(-5f).setDuration(650)
-                                .withEndAction(() -> {
-                                    if (transmission.isAttachedToWindow()) {
-                                        transmission.animate().alpha(1f).translationX(0f).setDuration(650).start();
-                                    }
-                                }).start();
-                    }
-                }).start();
+        transmission.setAlpha(0.78f);
+        transmission.post(() -> animateTransmission(transmission));
+    }
+
+    private void animateTransmission(final TextView transmission) {
+        if (!transmission.isAttachedToWindow()) return;
+        float nextX = transmission.getTranslationX() >= 0f ? -5f : 5f;
+        float nextAlpha = transmission.getAlpha() > 0.85f ? 0.72f : 1f;
+        transmission.animate().alpha(nextAlpha).translationX(nextX).setDuration(700)
+                .withEndAction(() -> animateTransmission(transmission)).start();
     }
 
     private void addInfoPanel(String text) {
