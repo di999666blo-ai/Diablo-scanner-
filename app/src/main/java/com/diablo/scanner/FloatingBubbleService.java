@@ -401,6 +401,15 @@ public class FloatingBubbleService extends Service {
                 v -> requestOneScan()
         );
 
+        addButton(layout, "START GUIDED SCALPING • 4H → 15M → 1M",
+                Color.rgb(100, 25, 35), v -> startGuidedScalping());
+        addButton(layout, "CONFIRM TIMEFRAME & SCAN",
+                Color.rgb(75, 40, 30), v -> confirmGuidedTimeframeAndScan());
+        addButton(layout, "NEXT TIMEFRAME",
+                Color.rgb(45, 35, 65), v -> advanceGuidedTimeframe());
+        addButton(layout, "END GUIDED SCALPING",
+                Color.rgb(45, 35, 35), v -> endGuidedScalping());
+
         addButton(
                 layout,
                 autoScanButtonLabel(),
@@ -500,6 +509,95 @@ public class FloatingBubbleService extends Service {
         refreshLatestResult();
         updateTradeStatus();
         updateStats();
+    }
+
+    // Guided workflow: user must manually change the broker timeframe.
+    private static final String[] GUIDED_TIMEFRAMES = {"4h", "15m", "1m"};
+
+    private void startGuidedScalping() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        prefs.edit().putString("trading_mode", "SCALPING")
+                .putBoolean("auto_scan_enabled", false)
+                .putInt("guided_scalping_stage", 0)
+                .putLong("guided_scalping_started_at", System.currentTimeMillis())
+                .putString("chart_timeframe", GUIDED_TIMEFRAMES[0])
+                .putString("guided_scalping_status", "WAITING_FOR_4H")
+                .putString("scan_message", "GUIDED SCALPING 1/3: Manually change the broker chart to 4H. The app cannot change or verify the broker timeframe. Then tap CONFIRM TIMEFRAME & SCAN.")
+                .apply();
+        handler.removeCallbacks(autoScanRunnable);
+        if (modeButton != null) modeButton.setText(currentModeLabel());
+        if (detailsView != null) detailsView.setText(guidedInstructions(0));
+        refreshLatestResult();
+    }
+
+    private String guidedInstructions(int stage) {
+        String tf = GUIDED_TIMEFRAMES[Math.max(0, Math.min(stage, GUIDED_TIMEFRAMES.length - 1))];
+        return "GUIDED SCALPING • STEP " + (stage + 1) + "/3\n" +
+                "Required broker timeframe: " + tf.toUpperCase(java.util.Locale.ROOT) + "\n" +
+                "1. Change the broker chart timeframe manually.\n" +
+                "2. Check that the visible chart matches this step.\n" +
+                "3. Tap CONFIRM TIMEFRAME & SCAN.\n" +
+                "4. Wait for this scan to finish before NEXT TIMEFRAME.\n\n" +
+                "Elapsed workflow time: " + guidedElapsed() + "\n" +
+                "The app cannot verify the broker timeframe from the screenshot alone. Each stage is saved separately; no combined setup is claimed until all three stages have been reviewed.";
+    }
+
+    private String guidedElapsed() {
+        long started = getSharedPreferences(PREFS, MODE_PRIVATE).getLong("guided_scalping_started_at", 0L);
+        if (started <= 0L) return "not started";
+        long seconds = Math.max(0L, (System.currentTimeMillis() - started) / 1000L);
+        return String.format(java.util.Locale.ROOT, "%02d:%02d", seconds / 60L, seconds % 60L);
+    }
+
+    private void confirmGuidedTimeframeAndScan() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        int stage = prefs.getInt("guided_scalping_stage", -1);
+        if (stage < 0 || stage >= GUIDED_TIMEFRAMES.length) {
+            if (detailsView != null) detailsView.setText("Tap START GUIDED SCALPING first.");
+            return;
+        }
+        String status = prefs.getString("scan_status", "WAIT");
+        if ("SCANNING".equals(status) || "AI_PROCESSING".equals(status)) {
+            if (detailsView != null) detailsView.setText("A scan is already running. Wait for it to finish before scanning this stage again.");
+            return;
+        }
+        prefs.edit().putString("chart_timeframe", GUIDED_TIMEFRAMES[stage])
+                .putString("guided_scalping_status", "SCANNING_" + GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT))
+                .putString("scan_message", "GUIDED SCALPING STEP " + (stage + 1) + "/3. You confirmed the visible chart timeframe as " + GUIDED_TIMEFRAMES[stage] + "; broker timeframe is not machine-verified.")
+                .apply();
+        requestOneScan();
+    }
+
+    private void advanceGuidedTimeframe() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        int stage = prefs.getInt("guided_scalping_stage", -1);
+        if (stage < 0 || stage >= GUIDED_TIMEFRAMES.length) {
+            if (detailsView != null) detailsView.setText("Tap START GUIDED SCALPING first.");
+            return;
+        }
+        String status = prefs.getString("scan_status", "WAIT");
+        if ("SCANNING".equals(status) || "AI_PROCESSING".equals(status)) {
+            if (detailsView != null) detailsView.setText("The current AI scan is still running. Wait for its result before moving to the next timeframe.");
+            return;
+        }
+        if (stage >= GUIDED_TIMEFRAMES.length - 1) {
+            prefs.edit().putString("guided_scalping_status", "COMPLETE").apply();
+            if (detailsView != null) detailsView.setText("GUIDED SCALPING 3/3 COMPLETE. Review the separate 4H, 15M and 1M history entries together. Broker timeframe was not machine-verified; no validated combined win probability is calculated.\nElapsed: " + guidedElapsed());
+            return;
+        }
+        int next = stage + 1;
+        prefs.edit().putInt("guided_scalping_stage", next)
+                .putString("chart_timeframe", GUIDED_TIMEFRAMES[next])
+                .putString("guided_scalping_status", "WAITING_FOR_" + GUIDED_TIMEFRAMES[next].toUpperCase(java.util.Locale.ROOT))
+                .putString("scan_message", "GUIDED SCALPING STEP " + (next + 1) + "/3: Manually change the broker chart to " + GUIDED_TIMEFRAMES[next].toUpperCase(java.util.Locale.ROOT) + ", then tap CONFIRM TIMEFRAME & SCAN.")
+                .apply();
+        if (detailsView != null) detailsView.setText(guidedInstructions(next));
+    }
+
+    private void endGuidedScalping() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("guided_scalping_stage", -1)
+                .putString("guided_scalping_status", "STOPPED").apply();
+        if (detailsView != null) detailsView.setText("Guided scalping stopped. Completed scans remain in history.");
     }
 
     // ONE TAP = ONE FRAME = ONE RESULT
