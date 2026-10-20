@@ -55,8 +55,8 @@ public class MainActivity extends Activity {
 
     private final int red = Color.rgb(255, 45, 65);
     private final int background = Color.rgb(12, 12, 16);
-    private final int panelColor = Color.rgb(31, 29, 27);
-    private final int amber = Color.rgb(255, 45, 65);
+    private final int panelColor = Color.rgb(24, 20, 20);
+    private final int amber = Color.rgb(255, 145, 48);
     private final int white = Color.WHITE;
 
     @Override
@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
     private void buildDashboard() {
         createPageShell("DIABLO SCANNER", "CHART INTELLIGENCE SYSTEM");
         addInfoPanel("● SCREEN SCANNER  •  READY TO CONFIGURE");
+        addHeroBrandPanel();
         addTransmissionPanel();
         addSectionTitle("LATEST RESULT");
         signalText = new TextView(this);
@@ -98,6 +99,7 @@ public class MainActivity extends Activity {
         signalText.setTextColor(Color.YELLOW);
         signalText.setGravity(Gravity.CENTER);
         signalText.setPadding(0, 14, 0, 4);
+        signalText.setBackground(makePanel(Color.rgb(23, 13, 15), red, 1, 18));
         root.addView(signalText);
 
         statusText = new TextView(this);
@@ -182,6 +184,58 @@ public class MainActivity extends Activity {
         root.addView(sub);
     }
 
+    // Industrial hero card inspired by the approved Diablo Scanner concept.
+    private void addHeroBrandPanel() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(16, 18, 16, 18);
+        card.setBackground(makePanel(Color.rgb(18, 14, 15), amber, 2, 22));
+
+        TextView logo = new TextView(this);
+        logo.setText("D");
+        logo.setTextSize(44);
+        logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD_ITALIC);
+        logo.setTextColor(Color.rgb(255, 95, 50));
+        logo.setGravity(Gravity.CENTER);
+        GradientDrawable orb = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(70, 27, 16), Color.rgb(12, 10, 12), Color.rgb(48, 16, 18)});
+        orb.setShape(GradientDrawable.OVAL);
+        orb.setStroke((int) (3 * getResources().getDisplayMetrics().density), amber);
+        logo.setBackground(orb);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+                (int) (94 * getResources().getDisplayMetrics().density),
+                (int) (94 * getResources().getDisplayMetrics().density));
+        logoParams.bottomMargin = 10;
+        card.addView(logo, logoParams);
+
+        TextView tagline = new TextView(this);
+        tagline.setText("SHAZAM FOR TRADING CHARTS");
+        tagline.setTextColor(white);
+        tagline.setTextSize(12);
+        tagline.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        tagline.setLetterSpacing(0.12f);
+        tagline.setGravity(Gravity.CENTER);
+        card.addView(tagline);
+
+        TextView status = new TextView(this);
+        status.setText("LIVE VISION  •  LOCAL AI  •  MANUAL TRADING");
+        status.setTextColor(amber);
+        status.setTextSize(10);
+        status.setGravity(Gravity.CENTER);
+        status.setPadding(0, 7, 0, 0);
+        card.addView(status);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 5, 0, 10);
+        root.addView(card, params);
+        logo.setScaleX(0.97f);
+        logo.setScaleY(0.97f);
+        logo.animate().scaleX(1f).scaleY(1f).setDuration(900).start();
+    }
+
     // Animated signal-transmission strip with a continuous green scan pulse.
     private void addTransmissionPanel() {
         final TextView transmission = new TextView(this);
@@ -218,7 +272,7 @@ public class MainActivity extends Activity {
         panel.setTextSize(12);
         panel.setGravity(Gravity.CENTER);
         panel.setPadding(14, 14, 14, 14);
-        panel.setBackground(makePanel(Color.rgb(26, 15, 18), red, 1, 14));
+        panel.setBackground(makePanel(Color.rgb(25, 18, 17), amber, 1, 14));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -495,7 +549,7 @@ public class MainActivity extends Activity {
         button.setTextColor(white);
         button.setTextSize(14);
         button.setAllCaps(false);
-        button.setBackground(makePanel(panelColor, red, 1, 14));
+        button.setBackground(makePanel(panelColor, amber, 1, 14));
         button.setBackgroundTintList(null);
         button.setPadding(12, 8, 12, 8);
         button.setLetterSpacing(0.02f);
