@@ -325,6 +325,15 @@ public final class LocalVisionAI {
             );
         }
 
+        // Reject empty/non-chart screens before starting the vision model. This prevents
+        // a language model from inventing a direction when no usable chart is visible.
+        if (!hasChartLikeCandleColours(chart)) {
+            return new Result(
+                    "WAIT",
+                    "NO CHART DETECTED • I could not verify enough red/green candle pixels in this screen. Open a readable chart, then tap D again."
+            );
+        }
+
         File imageFile = null;
         Process process = null;
 
@@ -441,6 +450,9 @@ public final class LocalVisionAI {
                     "The selected chart timeframe is " + timeframe + " and configured trade duration is " +
                     formatDuration(tradeDurationMs) + ". The candle timing preference is " + candleTiming + ". " +
                     "Use these settings as context only; a static screenshot cannot reveal future price movement. " +
+                    "First verify that a real trading chart with visible candles is present. If no usable chart is visible, " +
+                    "return TREND: unclear; DIRECTION: WAIT; CONFIDENCE: 0; REASON: no chart detected. " +
+                    "Never infer a direction from the app interface, status bar, floating bubble, or prompt examples. " +
                     "Analyze only what is visible in the screenshot. Consider recent " +
                     "candle bodies and wicks, short-term momentum, visible support " +
                     "and resistance, volatility, reversals, and chart clarity. " +
@@ -463,7 +475,6 @@ public final class LocalVisionAI {
                     "-m", model.getAbsolutePath(),
                     "--mmproj", projector.getAbsolutePath(),
                     "--no-mmproj-offload",
-                    "--no-display-prompt",
                     "--image", imageFile.getAbsolutePath(),
                     "-p", prompt,
                     "-n", "96",
@@ -624,6 +635,41 @@ public final class LocalVisionAI {
                 imageFile.delete();
             }
         }
+    }
+
+    /**
+     * Conservative screen guard: a trading chart must contain a meaningful number
+     * of saturated red/green pixels distributed across several horizontal columns.
+     * This is deliberately only a chart-presence check, not a signal generator.
+     */
+    private static boolean hasChartLikeCandleColours(Bitmap bitmap) {
+        if (bitmap == null || bitmap.isRecycled()
+                || bitmap.getWidth() < 80 || bitmap.getHeight() < 60) {
+            return false;
+        }
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        int xStride = Math.max(1, width / 160);
+        int yStride = Math.max(1, height / 120);
+        int coloredPixels = 0;
+        int columnsWithCandleColour = 0;
+        for (int x = width / 30; x < width - width / 30; x += xStride) {
+            int columnCount = 0;
+            for (int y = height / 10; y < height - height / 10; y += yStride) {
+                int color = bitmap.getPixel(x, y);
+                int red = android.graphics.Color.red(color);
+                int green = android.graphics.Color.green(color);
+                int blue = android.graphics.Color.blue(color);
+                boolean greenCandle = green > 90 && green > red * 1.20 && green > blue * 1.08;
+                boolean redCandle = red > 95 && red > green * 1.20 && red > blue * 1.12;
+                if (greenCandle || redCandle) {
+                    coloredPixels++;
+                    columnCount++;
+                }
+            }
+            if (columnCount >= 2) columnsWithCandleColour++;
+        }
+        return coloredPixels >= 24 && columnsWithCandleColour >= 4;
     }
 
     private static String formatDuration(long durationMs) {
