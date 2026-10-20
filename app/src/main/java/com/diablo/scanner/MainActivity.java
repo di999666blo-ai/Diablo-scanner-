@@ -236,32 +236,35 @@ public class MainActivity extends Activity {
         logo.animate().scaleX(1f).scaleY(1f).setDuration(900).start();
     }
 
-    // Animated signal-transmission strip with a continuous green scan pulse.
+    // Diablo black-and-red scanning ray. Keep the dashboard visual language consistent
+    // with the approved mockup: no green transmission strip.
     private void addTransmissionPanel() {
         final TextView transmission = new TextView(this);
-        transmission.setText("◉  AUTO TRANSMISSION   ›   CHART LOCK   ›   AI ANALYSIS   ›   SIGNAL");
-        transmission.setTextColor(Color.rgb(105, 255, 155));
+        transmission.setText("◢  BLACK RAY STANDBY  ›  CHART LOCK  ›  AI ANALYSIS  ›  SIGNAL");
+        transmission.setTextColor(red);
         transmission.setTextSize(11);
         transmission.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         transmission.setLetterSpacing(0.035f);
         transmission.setGravity(Gravity.CENTER);
-        transmission.setSingleLine(true);
         transmission.setPadding(12, 15, 12, 15);
-        transmission.setBackground(makePanel(Color.rgb(8, 25, 19), Color.rgb(32, 190, 95), 1, 13));
+        transmission.setBackground(makePanel(Color.rgb(8, 8, 10), red, 1, 13));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 5, 0, 9);
         root.addView(transmission, params);
-        transmission.setAlpha(0.78f);
+        transmission.setAlpha(0.72f);
         transmission.post(() -> animateTransmission(transmission));
     }
 
     private void animateTransmission(final TextView transmission) {
         if (!transmission.isAttachedToWindow()) return;
-        float nextX = transmission.getTranslationX() >= 0f ? -5f : 5f;
-        float nextAlpha = transmission.getAlpha() > 0.85f ? 0.72f : 1f;
-        transmission.animate().alpha(nextAlpha).translationX(nextX).setDuration(700)
+        final String[] rayFrames = {"◢", "◣", "◤", "◥"};
+        final int frame = (int) (System.currentTimeMillis() / 350L % rayFrames.length);
+        transmission.setText(rayFrames[frame] +
+                "  BLACK RAY SCAN  ›  CHART LOCK  ›  AI ANALYSIS  ›  SIGNAL");
+        float nextAlpha = transmission.getAlpha() > 0.85f ? 0.58f : 1f;
+        transmission.animate().alpha(nextAlpha).setDuration(350)
                 .withEndAction(() -> animateTransmission(transmission)).start();
     }
 
