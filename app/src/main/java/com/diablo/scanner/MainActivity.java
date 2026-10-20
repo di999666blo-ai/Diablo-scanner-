@@ -210,7 +210,7 @@ public class MainActivity extends Activity {
         } else if ("CONFIGURATION".equals(page)) {
             addInfoPanel("Change settings here. Each control opens its own selection screen.");
             addSectionTitle("SCAN CONFIGURATION");
-            addButton("TRADE DURATION", v -> showTradeDurationSettings());
+            addButton("TRADE DURATION: " + formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS)), v -> showTradeDurationSettings());
             addButton("CHART TIMEFRAME", v -> showChartTimeframeSettings());
             addButton("TRADING MODE", v -> showTradingModeSettings());
             addButton("TIMED SIGNAL SPEED / PRECISION", v -> showTimedAnalysisProfileSettings());
@@ -1203,6 +1203,8 @@ public class MainActivity extends Activity {
                             dialog.dismiss();
 
                             refreshControlSummary();
+                            // Rebuild Configuration so the button immediately shows the saved duration.
+                            openPage("CONFIGURATION");
                             Toast.makeText(
                                     this,
                                     "Trade duration saved: " +
@@ -1253,6 +1255,8 @@ public class MainActivity extends Activity {
                                 .apply();
 
                         refreshControlSummary();
+                        // Rebuild Configuration so the custom value is visible immediately.
+                        openPage("CONFIGURATION");
                         Toast.makeText(
                                 this,
                                 "Trade duration saved: " +
