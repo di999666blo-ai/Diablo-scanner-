@@ -514,6 +514,19 @@ public class FloatingBubbleService extends Service {
     // Guided workflow: user must manually change the broker timeframe.
     private static final String[] GUIDED_TIMEFRAMES = {"4h", "15m", "1m"};
 
+    private String guidedProgressText() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        int stage = prefs.getInt("guided_scalping_stage", -1);
+        if (stage < 0 || stage >= GUIDED_TIMEFRAMES.length) return "";
+        long started = prefs.getLong("guided_scalping_started_at", 0L);
+        long elapsed = started > 0L ? Math.max(0L, (System.currentTimeMillis() - started) / 1000L) : 0L;
+        String elapsedText = String.format(java.util.Locale.ROOT, "%02d:%02d", elapsed / 60L, elapsed % 60L);
+        return "GUIDED SCALPING STEP " + (stage + 1) + "/3 • " +
+                GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT) +
+                " • workflow elapsed " + elapsedText +
+                "\nTarget: aim to finish AI processing within 5 minutes; this timer also includes manual chart switching, and completion is not guaranteed.";
+    }
+
     private void startGuidedScalping() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         prefs.edit().putString("trading_mode", "SCALPING")
@@ -714,7 +727,7 @@ public class FloatingBubbleService extends Service {
             detailsView.setText(
                     "BLACK-RAY SCAN ACTIVE\n" +
                     (processingAI ? "AI PROCESSING • AI BUSY\n" : "Capturing visible chart...\n") +
-                    progress + "\n" + stageMessage + "\n" +
+                    progress + "\n" + stageMessage + "\n" + guidedProgressText() + "\n" +
                     (elapsedSeconds >= 90L
                             ? "ANALYSIS TIMEOUT WARNING: model is taking too long."
                             : elapsedSeconds >= 10L
@@ -896,6 +909,7 @@ public class FloatingBubbleService extends Service {
             }
         }
 
+        message.append("\n\n").append(guidedProgressText());
         message.append(
                 "\n\nNo signal guarantees a winning trade. DIABLO does not place trades."
         );
