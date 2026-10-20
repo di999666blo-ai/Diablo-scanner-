@@ -90,12 +90,22 @@ public final class ChartAnalyzer {
             int d=candles.get(i).direction();
             if(d>0) recentUp++; else if(d<0) recentDown++; else recentFlat++;
         }
-        double overall=(totalGreen-totalRed)/(double)total;
+        // Give each candle-like column equal influence. Raw pixel totals let one
+        // unusually large candle dominate the entire read (often causing UP bias).
+        int allUp=0, allDown=0;
+        for (Candle candle : candles) {
+            int d=candle.direction();
+            if (d>0) allUp++;
+            else if (d<0) allDown++;
+        }
+        double overall=(allUp-allDown)/(double)Math.max(1,allUp+allDown);
         double recentBalance=(recentUp-recentDown)/(double)Math.max(1,recentUp+recentDown);
         int firstY=candles.get(Math.max(0,candles.size()-Math.min(lookback,candles.size()))).y;
         int lastY=candles.get(candles.size()-1).y;
         double visualSlope=(firstY-lastY)/(double)h; // positive means later regions trend visually upward
-        double score=(0.48*overall)+(0.38*recentBalance)+(0.14*Math.max(-1,Math.min(1,visualSlope*3.0)));
+        // Prioritize the most recent columns for short-expiry signals, while
+        // retaining the broader visual direction and candle-position slope.
+        double score=(0.25*overall)+(0.55*recentBalance)+(0.20*Math.max(-1,Math.min(1,visualSlope*3.0)));
         double strength=Math.abs(score);
         double expiryAdjustment = duration <= 60000L ? 0.06 : duration <= 180000L ? 0.03 : 0.0;
         double profileAdjustment = "PRECISION".equals(profile) ? 0.06 : "FAST".equals(profile) ? 0.02 : 0.0;
