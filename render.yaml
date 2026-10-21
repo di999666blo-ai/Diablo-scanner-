@@ -7,6 +7,8 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
+      - key: PORT
+        value: "8080"
       - key: KRONOS_MODEL_ID
         value: NeoQuasar/Kronos-mini
       - key: KRONOS_TOKENIZER_ID
