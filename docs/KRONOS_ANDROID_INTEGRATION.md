@@ -21,10 +21,10 @@ Official upstream: https://github.com/shiyu-coder/Kronos
 ## Current app state
 
 - SmolVLM assets and llama.cpp packaging are configured by `.github/workflows/android.yml`.
-- The dashboard and scalping settings now expose three saved choices: **SmolVLM**, **Kronos**, and **Hybrid**. SmolVLM and Hybrid have app-side routes; choosing Kronos is retained as the selected preference but the scan deliberately returns WAIT until the separate service is deployed, reachable, and supplied with verified structured OHLC candles. A selector alone is not a working Kronos integration.
+- The dashboard and scalping settings expose three saved choices: **SmolVLM**, **Kronos**, and **Hybrid**. SmolVLM uses the bundled llama.cpp visual route. Hybrid calls only `ChartAnalyzer` and does not depend on SmolVLM or Kronos. Choosing Kronos is retained as the selected preference but the APK deliberately returns WAIT until a genuine Android runtime and verified structured OHLC candles are integrated. A selector alone is not a working Kronos integration.
 - A saved preference such as `scalping_engine=KRONOS` is not proof of integration.
-- No Kronos weights, tokenizer, Android runtime, broker OHLC adapter, deployed service URL, or verified end-to-end Kronos prediction path are currently present in the app tree. The optional Python service includes candle validation and a forecast endpoint, but it is not automatically deployed or connected to the APK.
-- Do not treat Kronos as operational until the service is deployed, the app can submit verified candles, a real forecast succeeds, and APK/device acceptance checks pass. Hybrid currently means fast visual/candle heuristic plus SmolVLM review; it does not include a Kronos forecast.
+- No Kronos weights, tokenizer, Android runtime, broker OHLC adapter, deployed service URL, or verified end-to-end Kronos prediction path are currently present in the app tree. The optional Python service defaults to `NeoQuasar/Kronos-mini` with `NeoQuasar/Kronos-Tokenizer-2k`, includes candle validation and a forecast endpoint, but it is not automatically deployed or connected to the APK.
+- Do not treat Kronos as operational until a compatible runtime is integrated, the app can submit verified candles, a real forecast succeeds, and APK/device acceptance checks pass. Hybrid currently means standalone fast chart-image heuristic analysis; it does not include SmolVLM review or a Kronos forecast.
 
 ## Why this is intentionally not a fake integration
 
