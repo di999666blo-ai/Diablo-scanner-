@@ -31,6 +31,15 @@ jobs:
           set -e
           python -m pip install --disable-pip-version-check fastapi==0.115.12 pydantic==2.11.4 pandas==2.2.3 pytest==8.3.5 httpx==0.28.1
           PYTHONPATH=kronos-service python -m pytest -q kronos-service/test_service.py
+          test -s kronos-service/Dockerfile
+          test -s render.yaml
+          grep -q 'NeoQuasar/Kronos-mini' render.yaml
+          grep -q 'NeoQuasar/Kronos-Tokenizer-2k' render.yaml
+
+      - name: Build Kronos online runtime container
+        run: |
+          set -e
+          docker build --tag diablo-kronos-mini-api:test ./kronos-service
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
