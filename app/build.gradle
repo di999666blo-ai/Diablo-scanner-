@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+dependencies {
+    // Separate inference backend for the future dedicated Kronos ONNX export.
+    // This does not alter or replace the existing SmolVLM/llama.cpp runtime.
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'
+}
+
 android {
     namespace 'com.diablo.scanner'
     compileSdk 35
