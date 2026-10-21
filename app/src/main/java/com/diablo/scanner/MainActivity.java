@@ -218,6 +218,10 @@ public class MainActivity extends Activity {
     }
 
     private void createPageShell(String title, String subtitle) {
+        LinearLayout screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(background);
+
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(background);
@@ -226,8 +230,58 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(18, 18, 18, 24);
         root.setBackgroundColor(background);
-        scroll.addView(root);
-        setContentView(scroll);
+        scroll.addView(root, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT,
+                ScrollView.LayoutParams.WRAP_CONTENT));
+
+        screen.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // Persistent, horizontally scrollable nine-destination navigation.
+        HorizontalScrollView navScroll = new HorizontalScrollView(this);
+        navScroll.setHorizontalScrollBarEnabled(false);
+        navScroll.setFillViewport(false);
+        navScroll.setBackground(makePanel(Color.rgb(8, 8, 11), red, 1, 12));
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setGravity(Gravity.CENTER_VERTICAL);
+        String[] icons = {"⌂", "◎", "↗", "▤", "▧", "⚙", "✦", "◉", "▥"};
+        String[] labels = {"HOME", "SCAN", "SIGNAL", "HISTORY", "CHARTS", "SETTINGS", "AI", "BUBBLE", "RESULTS"};
+        String[] pages = {"HOME", "AI SCANNER", "FULL RESULTS", "SIGNAL HISTORY", "SAVED CHARTS", "CONFIGURATION", "AI ENGINE", "FLOATING BUBBLE OVERLAY", "FULL RESULTS"};
+        for (int i = 0; i < labels.length; i++) {
+            final String destination = pages[i];
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(8, 8, 8, 7);
+            TextView icon = new TextView(this);
+            icon.setText(icons[i]);
+            icon.setTextColor(red);
+            icon.setTextSize(19);
+            icon.setGravity(Gravity.CENTER);
+            TextView label = new TextView(this);
+            label.setText(labels[i]);
+            label.setTextColor(white);
+            label.setTextSize(8);
+            label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            label.setGravity(Gravity.CENTER);
+            item.addView(icon);
+            item.addView(label);
+            item.setOnClickListener(v -> {
+                if ("HOME".equals(destination)) buildDashboard();
+                else openPage(destination);
+            });
+            nav.addView(item, new LinearLayout.LayoutParams(
+                    (int) (66 * getResources().getDisplayMetrics().density),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
+        navScroll.addView(nav);
+        LinearLayout.LayoutParams navParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        navParams.setMargins(8, 4, 8, 8);
+        screen.addView(navScroll, navParams);
+        setContentView(screen);
 
         if (!"DIABLO SCANNER".equals(title)) {
             addButton("‹  BACK TO DASHBOARD", v -> buildDashboard());
