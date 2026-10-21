@@ -163,7 +163,7 @@ jobs:
           grep -q 'timedSmolButton' app/src/main/assets/dashboard.html
           grep -q 'ic_diablo_launcher_vector' app/src/main/AndroidManifest.xml
           test -s app/src/main/res/drawable/ic_diablo_launcher_vector.xml
-          grep -q 'KRONOS SELECTED BUT BLOCKED' app/src/main/assets/dashboard.html
+          grep -q 'KRONOS ONLINE SELECTED' app/src/main/assets/dashboard.html
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
