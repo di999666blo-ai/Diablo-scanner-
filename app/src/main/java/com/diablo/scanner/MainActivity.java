@@ -168,13 +168,13 @@ public class MainActivity extends Activity {
         addSectionTitle("NINE MENU SHORTCUTS");
         addButton("1  •  LAUNCHER / HOME", v -> buildDashboard());
         addButton("2  •  MAIN DASHBOARD", v -> buildDashboard());
-        addButton("3  •  FLOATING BUBBLE OVERLAY", v -> startFloatingBubble());
-        addButton("4  •  EXPANDABLE SCAN PANEL", v -> openPage("AI SCANNER"));
-        addButton("5  •  SCANNING ANIMATION / STATUS", v -> openPage("AI ENGINE"));
+        addButton("3  •  FLOATING BUBBLE OVERLAY", v -> openPage("FLOATING BUBBLE OVERLAY"));
+        addButton("4  •  EXPANDABLE SCAN PANEL", v -> openPage("EXPANDABLE SCAN PANEL"));
+        addButton("5  •  SCANNING ANIMATION / STATUS", v -> openPage("SCANNING ANIMATION"));
         addButton("6  •  SETTINGS", v -> openPage("CONFIGURATION"));
         addButton("7  •  SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
         addButton("8  •  GALLERY ANALYSIS", v -> chooseChart());
-        addButton("9  •  FULL RESULTS", v -> refreshLatestResult());
+        addButton("9  •  FULL RESULTS", v -> openPage("FULL RESULTS"));
 
         addInfoPanel("Dark navy/black surfaces • bright red accents • white text. Signals are experimental and for manual trading only.");
     }
@@ -430,6 +430,39 @@ public class MainActivity extends Activity {
             addInfoPanel("Choose a chart image from your phone gallery to analyse it.");
             addButton("CHOOSE CHART FROM GALLERY", v -> chooseChart());
             addButton("OPEN AI SCANNER", v -> openPage("AI SCANNER"));
+        } else if ("FLOATING BUBBLE OVERLAY".equals(page)) {
+            addInfoPanel("FLOATING D OVERLAY\nThe D bubble is designed to stay above your broker chart. Android may require you to grant display-over-other-apps permission.");
+            addButton("START FLOATING D BUBBLE", v -> startFloatingBubble());
+            addButton("OPEN LIVE SCANNER CONTROLS", v -> openPage("AI SCANNER"));
+            addButton("OPEN OVERLAY PERMISSION SETTINGS", v -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(this, "Overlay permission is already enabled.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else if ("EXPANDABLE SCAN PANEL".equals(page)) {
+            addInfoPanel("SCROLLABLE SCAN PANEL\nThe panel should keep its controls accessible while long analysis results scroll inside the panel.");
+            addButton("START FLOATING D BUBBLE", v -> startFloatingBubble());
+            addButton("START LIVE SCREEN CAPTURE", v -> requestScreenCapture());
+            addButton("ANALYSE A SAVED CHART", v -> chooseChart());
+            addButton("OPEN FULL RESULTS", v -> openPage("FULL RESULTS"));
+        } else if ("SCANNING ANIMATION".equals(page)) {
+            addTransmissionPanel();
+            addInfoPanel("SCAN STATUS\nThe animation is a visual progress indicator; it does not by itself prove that AI inference has completed.");
+            addButton("START LIVE SCREEN CAPTURE", v -> requestScreenCapture());
+            addButton("OPEN AI ENGINE STATUS", v -> openPage("AI ENGINE"));
+        } else if ("FULL RESULTS".equals(page)) {
+            SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
+            addSectionTitle("LATEST SIGNAL");
+            addInfoPanel(ai.getString("latest_ai_signal", "No signal recorded yet."));
+            addSectionTitle("LATEST AI EXPLANATION");
+            addInfoPanel(ai.getString("latest_ai_details", "No AI explanation recorded yet. Run a scan first."));
+            addButton("OPEN SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
+            addButton("OPEN SETTINGS", v -> openPage("CONFIGURATION"));
+            addButton("RUN ANOTHER SCAN", v -> openPage("AI SCANNER"));
         } else if ("AI ENGINE".equals(page)) {
             SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
             String lastSignal = ai.getString("latest_ai_signal", "No AI result recorded yet");
