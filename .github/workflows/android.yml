@@ -132,6 +132,20 @@ jobs:
 
           echo "AI models and both engine binaries exist."
 
+      - name: Check hybrid mode wiring
+        run: |
+          set -e
+          grep -q 'timed_smolvlm_enabled' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'combineTimedHybrid' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'timed_smolvlm' app/src/main/java/com/diablo/scanner/MainActivity.java
+          grep -q 'timedSmolButton' app/src/main/assets/dashboard.html
+          echo "Timed Signal fast-primary and optional SmolVLM controls are present."
+
+      - name: Run Android unit tests
+        run: |
+          set -e
+          gradle --no-daemon testDebugUnitTest
+
       - name: Build Android APK
         run: |
           set -e
@@ -143,6 +157,9 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
+          unzip -t "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.diablo.scanner'"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "application-label:'DIABLO SCANNER'"
 
           unzip -l "$APK" > apk-contents.txt
 
