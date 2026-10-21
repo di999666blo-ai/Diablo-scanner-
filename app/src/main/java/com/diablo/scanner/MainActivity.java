@@ -19,6 +19,10 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
+import android.webkit.WebView;
+import android.webkit.WebSettings;
+import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -31,6 +35,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -47,6 +52,7 @@ public class MainActivity extends Activity {
     public static final String TRADE_DURATION_MS = "trade_duration_ms";
     public static final long DEFAULT_TRADE_DURATION_MS = 60000L;
 
+    private WebView dashboardWebView;
     private LinearLayout root;
     private TextView signalText;
     private TextView statusText;
@@ -62,31 +68,175 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
 
-        getWindow().setStatusBarColor(background);
-        getWindow().setNavigationBarColor(Color.BLACK);
+        getWindow().setStatusBarColor(Color.rgb(5, 7, 12));
+        getWindow().setNavigationBarColor(Color.rgb(5, 7, 12));
 
-        buildDashboard();
-        refreshCount();
-        refreshLatestResult();
+        dashboardWebView = new WebView(this);
+        dashboardWebView.setBackgroundColor(Color.rgb(5, 7, 12));
+        WebSettings settings = dashboardWebView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        dashboardWebView.addJavascriptInterface(new DashboardBridge(), "DiabloAndroid");
+        dashboardWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                refreshDashboardWebView();
+            }
+        });
+        setContentView(dashboardWebView);
+        loadDashboardAsset();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-
         if (prefs != null) {
             refreshCount();
             refreshLatestResult();
             refreshControlSummary();
+            refreshDashboardWebView();
         }
     }
 
+    private void loadDashboardAsset() {
+        try (InputStream input = getAssets().open("dashboard.html");
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            String html = new String(output.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+            dashboardWebView.loadDataWithBaseURL(
+                    "https://appassets.androidplatform.net/",
+                    html, "text/html", "UTF-8", null);
+        } catch (Exception error) {
+            Toast.makeText(this, "Dashboard failed to load: " + error.getMessage(),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
 
-    // Dashboard redesign: dark navy/black surfaces, bright red accents, white text.
-    // Existing capture, AI, history, settings and overlay implementations are retained.
+    private void refreshDashboardWebView() {
+        if (dashboardWebView == null) return;
+        dashboardWebView.post(() -> dashboardWebView.evaluateJavascript(
+                "if (window.refreshDashboard) window.refreshDashboard();", null));
+    }
+
+    private void runDashboardAction(String action) {
+        if (action == null) return;
+        switch (action) {
+            case "start_live_scan":
+                prefs.edit().putString("trading_mode", "TIMED").apply();
+                requestScreenCapture();
+                break;
+            case "start_timed_scan":
+                prefs.edit().putString("trading_mode", "TIMED").apply();
+                requestScreenCapture();
+                break;
+            case "start_guided_scalping":
+                prefs.edit().putString("trading_mode", "SCALPING").apply();
+                startFloatingBubble();
+                Toast.makeText(this, "Guided scalping selected. Keep the chart visible and follow 4H → 15M → 1M.",
+                        Toast.LENGTH_LONG).show();
+                break;
+            case "stop_live_scan":
+                stopScreenCapture();
+                break;
+            case "start_bubble":
+                startFloatingBubble();
+                break;
+            case "choose_chart":
+                chooseChart();
+                break;
+            case "trade_duration":
+                showTradeDurationSettings();
+                break;
+            case "scan_window":
+                showTimedScanDurationSettings();
+                break;
+            case "timeframe":
+                showChartTimeframeSettings();
+                break;
+            case "trading_mode":
+                showTradingModeSettings();
+                break;
+            case "analysis_profile":
+                showTimedAnalysisProfileSettings();
+                break;
+            case "sensitivity":
+                showSensitivitySettings();
+                break;
+            case "candle_timing":
+                showSignalTimingSettings();
+                break;
+            case "all_settings":
+                showSettings();
+                break;
+            case "clear_history":
+                clearHistory();
+                break;
+            case "overlay_permission":
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                    Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(overlayIntent);
+                } else {
+                    Toast.makeText(this, "Overlay permission is already enabled.", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+                break;
+        }
+        refreshDashboardWebView();
+    }
+
+    private JSONObject dashboardData() {
+        JSONObject data = new JSONObject();
+        try {
+            SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
+            JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
+            int up = 0, down = 0, wait = 0;
+            for (int i = 0; i < history.length(); i++) {
+                String signal = history.getJSONObject(i).optString("signal", "WAIT").toUpperCase(Locale.ROOT);
+                if (signal.contains("UP") || signal.contains("BUY")) up++;
+                else if (signal.contains("DOWN") || signal.contains("SELL")) down++;
+                else wait++;
+            }
+            data.put("signal", ai.getString("latest_ai_signal", "WAIT"));
+            data.put("details", ai.getString("latest_ai_details", "No analysis recorded yet. Start a live scan or analyze a saved chart."));
+            data.put("history", history);
+            data.put("total", history.length());
+            data.put("up", up);
+            data.put("down", down);
+            data.put("wait", wait);
+            data.put("modelFilesReady", LocalVisionAI.modelsReady(this));
+            data.put("scanStatus", prefs.getString("scan_status", "READY"));
+            data.put("scanMessage", prefs.getString("scan_message", "Scanner ready. No live chart read yet."));
+            data.put("mode", prefs.getString("trading_mode", "TIMED"));
+            data.put("tradeDuration", formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS)));
+            data.put("scanWindow", formatDuration(prefs.getLong("timed_scan_duration_ms", 30000L)));
+            data.put("timeframe", prefs.getString("chart_timeframe", "1m"));
+            data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
+        } catch (Exception ignored) {
+        }
+        return data;
+    }
+
+    private final class DashboardBridge {
+        @JavascriptInterface
+        public String getDashboardData() {
+            return dashboardData().toString();
+        }
+
+        @JavascriptInterface
+        public void action(String action) {
+            runOnUiThread(() -> runDashboardAction(action));
+        }
+    }
+
     private void buildDashboard() {
         createPageShell("DIABLO SCANNER", "Shazam for Trading Charts");
         addHeroBrandPanel();
