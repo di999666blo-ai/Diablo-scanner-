@@ -1293,7 +1293,12 @@ public class MainActivity extends Activity {
             try {
                 // Keep saved-chart routing identical to live scanning.
                 if (scalpingMode) {
-                    result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                    String selectedEngine = prefs.getString("scalping_engine", "SMOLVLM");
+                    if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
+                        result = KronosRuntimeClient.forecast(getApplicationContext());
+                    } else {
+                        result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                    }
                 } else {
                     result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
                     if (prefs.getBoolean("timed_smolvlm_enabled", false) && result != null) {
