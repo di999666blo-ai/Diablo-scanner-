@@ -11,7 +11,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Online Kronos runtime adapter. Calls the configured Kronos API with explicit
@@ -44,11 +52,14 @@ public final class KronosRuntimeClient {
             JSONObject request;
             String endpoint;
             if (marketAutoFetch) {
-                request = new JSONObject();
-                request.put("symbol", prefs.getString("kronos_symbol", "EURUSD"));
-                request.put("interval", prefs.getString("kronos_interval", "1m"));
-                request.put("prediction_bars", prefs.getInt("kronos_prediction_bars", 3));
-                endpoint = baseUrl.replaceAll("/+$", "") + "/v1/forecast/market";
+                // Fetch structured public candles directly on the phone, then send those
+                // exact completed bars to the configured genuine Kronos inference service.
+                // This does not claim the PyTorch Kronos model is running locally.
+                String symbol = prefs.getString("kronos_symbol", "EURUSD");
+                String interval = prefs.getString("kronos_interval", "1m");
+                int predictionBars = prefs.getInt("kronos_prediction_bars", 3);
+                request = fetchBiQuoteForecastRequest(symbol, interval, predictionBars);
+                endpoint = baseUrl.replaceAll("/+$", "") + "/v1/forecast";
             } else {
                 request = new JSONObject(payload);
                 JSONArray candles = request.optJSONArray("candles");
@@ -123,9 +134,12 @@ public final class KronosRuntimeClient {
                         : "1d".equals(interval) ? 86400 : 0;
             }
             details.append("Timeframe: ").append(timeframeSeconds).append(" seconds\n");
-            details.append("Market data: ").append(response.optString("data_provider", "manual OHLCV input")).append("\n");
+            details.append("Market data: ").append(response.optString("data_provider",
+                    marketAutoFetch ? "biquote.io (candles fetched directly on phone)" : "manual OHLCV input")).append("\n");
             if (response.has("completed_candles_used")) {
                 details.append("Completed candles used: ").append(response.optInt("completed_candles_used")).append("\n");
+            } else if (marketAutoFetch) {
+                details.append("Completed candles used: ").append(request.optJSONArray("candles").length()).append("\n");
             }
             details.append("Observed close: ").append(lastClose).append("\n");
             details.append("First forecast OHLC: O ").append(open).append(" / H ").append(high)
@@ -146,6 +160,125 @@ public final class KronosRuntimeClient {
                             + ". Check data connection, service URL, provider feed, model availability, and market settings. No fallback engine was used.");
         } finally {
             if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static JSONObject fetchBiQuoteForecastRequest(String symbol, String interval, int predictionBars) throws Exception {
+        String cleanSymbol = symbol == null ? "" : symbol.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!cleanSymbol.matches("[A-Z0-9._-]{1,40}")) {
+            throw new IllegalArgumentException("Invalid BiQuote instrument symbol.");
+        }
+        int timeframeSeconds = intervalSeconds(interval);
+        String encodedSymbol = URLEncoder.encode(cleanSymbol, "UTF-8");
+        URL url = new URL("https://biquote.io/api/" + encodedSymbol
+                + "/ohlc?interval=" + URLEncoder.encode(interval, "UTF-8") + "&limit=200");
+        HttpURLConnection feed = null;
+        try {
+            feed = (HttpURLConnection) url.openConnection();
+            feed.setRequestMethod("GET");
+            feed.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            feed.setReadTimeout(20000);
+            feed.setRequestProperty("Accept", "application/json");
+            feed.setRequestProperty("User-Agent", "DiabloScanner/1.0");
+            int status = feed.getResponseCode();
+            InputStream stream = status >= 200 && status < 300 ? feed.getInputStream() : feed.getErrorStream();
+            String body = readFully(stream);
+            if (status < 200 || status >= 300) {
+                throw new IllegalStateException("BiQuote candle feed returned HTTP " + status);
+            }
+            JSONObject response = new JSONObject(body);
+            JSONArray bars = response.optJSONArray("bars");
+            if (bars == null) throw new IllegalStateException("BiQuote returned no OHLC bars.");
+            List<MarketCandle> completed = new ArrayList<>();
+            for (int i = 0; i < bars.length(); i++) {
+                JSONObject bar = bars.optJSONObject(i);
+                if (bar == null || bar.optBoolean("isOpen", false)) continue;
+                long timestamp = parseMarketTimestamp(bar.opt("openTime"));
+                double open = bar.optDouble("open", Double.NaN);
+                double high = bar.optDouble("high", Double.NaN);
+                double low = bar.optDouble("low", Double.NaN);
+                double close = bar.optDouble("close", Double.NaN);
+                double volume = bar.optDouble("tickVolume", bar.optDouble("volume", 0));
+                if (timestamp <= 0 || !finitePositive(open) || !finitePositive(high)
+                        || !finitePositive(low) || !finitePositive(close)
+                        || high < Math.max(open, Math.max(close, low))
+                        || low > Math.min(open, Math.min(close, high))) continue;
+                JSONObject candle = new JSONObject();
+                candle.put("timestamp", Instant.ofEpochMilli(timestamp).toString());
+                candle.put("open", open);
+                candle.put("high", high);
+                candle.put("low", low);
+                candle.put("close", close);
+                candle.put("volume", Math.max(0, volume));
+                candle.put("amount", 0);
+                completed.add(new MarketCandle(timestamp, candle));
+            }
+            Collections.sort(completed, Comparator.comparingLong(item -> item.timestamp));
+            if (completed.size() < 32) {
+                throw new IllegalStateException("BiQuote supplied only " + completed.size()
+                        + " valid completed candles; Kronos requires at least 32. Signal held at WAIT.");
+            }
+            // Reject duplicate or irregular timestamps rather than silently mislabel the timeframe.
+            long intervalMs = timeframeSeconds * 1000L;
+            List<MarketCandle> selected = completed.subList(Math.max(0, completed.size() - 200), completed.size());
+            JSONArray candles = new JSONArray();
+            long previous = -1;
+            for (MarketCandle item : selected) {
+                if (previous >= 0 && (item.timestamp <= previous
+                        || (item.timestamp - previous) % intervalMs != 0
+                        || item.timestamp - previous < intervalMs)) {
+                    throw new IllegalStateException("BiQuote candle timestamps do not align with " + interval
+                            + ". Signal held at WAIT.");
+                }
+                candles.put(item.candle);
+                previous = item.timestamp;
+            }
+            JSONObject request = new JSONObject();
+            request.put("symbol", cleanSymbol);
+            request.put("timeframe_seconds", timeframeSeconds);
+            request.put("prediction_bars", Math.max(1, Math.min(12, predictionBars)));
+            request.put("candles", candles);
+            return request;
+        } finally {
+            if (feed != null) feed.disconnect();
+        }
+    }
+
+    private static int intervalSeconds(String interval) {
+        if ("1m".equals(interval)) return 60;
+        if ("5m".equals(interval)) return 300;
+        if ("15m".equals(interval)) return 900;
+        if ("30m".equals(interval)) return 1800;
+        if ("1h".equals(interval)) return 3600;
+        if ("4h".equals(interval)) return 14400;
+        if ("1d".equals(interval)) return 86400;
+        throw new IllegalArgumentException("Unsupported BiQuote interval: " + interval);
+    }
+
+    private static long parseMarketTimestamp(Object raw) throws Exception {
+        if (raw instanceof Number) {
+            long value = ((Number) raw).longValue();
+            return value < 100000000000L ? value * 1000L : value;
+        }
+        if (raw == null) throw new IllegalArgumentException("Missing candle timestamp.");
+        String value = String.valueOf(raw).trim();
+        if (value.matches("\\d{10,13}")) {
+            long numeric = Long.parseLong(value);
+            return numeric < 100000000000L ? numeric * 1000L : numeric;
+        }
+        try {
+            return Instant.parse(value).toEpochMilli();
+        } catch (DateTimeParseException ignored) {
+            return OffsetDateTime.parse(value).toInstant().toEpochMilli();
+        }
+    }
+
+    private static final class MarketCandle {
+        final long timestamp;
+        final JSONObject candle;
+        MarketCandle(long timestamp, JSONObject candle) {
+            this.timestamp = timestamp;
+            this.candle = candle;
         }
     }
 
