@@ -9,6 +9,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: diablo-scanner-build-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -169,6 +173,9 @@ jobs:
           print("Hybrid independence routing test passed.")
           PY
           test -s docs/KRONOS_ANDROID_INTEGRATION.md
+          grep -q 'NeoQuasar/Kronos-mini' kronos-service/main.py
+          grep -q 'NeoQuasar/Kronos-Tokenizer-2k' kronos-service/main.py
+          grep -q 'Running standalone Hybrid fast candle analysis' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           echo "Hybrid controls and launcher icon resource are present."
           echo "Kronos is explicitly marked unavailable until its real runtime and OHLC path are integrated."
 
