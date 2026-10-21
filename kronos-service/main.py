@@ -216,7 +216,10 @@ def _fetch_market_candles(symbol: str, interval: str, limit: int = 200) -> list[
             continue
     candles.sort(key=lambda candle: candle.timestamp)
     # Validate the exact provider result before passing it to the model.
-    validate_candles(candles, INTERVAL_SECONDS[interval])
+    try:
+        validate_candles(candles, INTERVAL_SECONDS[interval])
+    except ValueError as exc:
+        raise RuntimeError(f"biquote did not provide enough valid completed candles: {exc}") from exc
     return candles[-512:]
 
 
