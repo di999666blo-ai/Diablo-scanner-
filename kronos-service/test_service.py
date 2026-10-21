@@ -57,3 +57,30 @@ def test_forecast_rejects_too_few_bars():
     }
     response = client.post("/v1/forecast", json=payload)
     assert response.status_code == 422
+
+
+def test_rejects_timestamp_spacing_not_aligned_to_timeframe():
+    candles = sample_candles()
+    candles[5] = Candle(
+        timestamp=candles[4].timestamp + timedelta(seconds=30),
+        open=105, high=107, low=104, close=106, volume=10, amount=1000,
+    )
+    with pytest.raises(ValueError, match="timestamp spacing must align"):
+        validate_candles(candles, timeframe_seconds=60)
+
+
+def test_forecast_rejects_bad_timeframe_spacing():
+    candles = sample_candles()
+    candles[8] = Candle(
+        timestamp=candles[7].timestamp + timedelta(seconds=30),
+        open=108, high=110, low=107, close=109, volume=10, amount=1000,
+    )
+    payload = {
+        "symbol": "TEST",
+        "timeframe_seconds": 60,
+        "prediction_bars": 3,
+        "candles": [c.model_dump(mode="json") for c in candles],
+    }
+    response = client.post("/v1/forecast", json=payload)
+    assert response.status_code == 422
+    assert "timestamp spacing must align" in response.json()["detail"]
