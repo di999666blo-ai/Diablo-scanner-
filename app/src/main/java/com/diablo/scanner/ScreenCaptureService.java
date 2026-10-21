@@ -529,16 +529,24 @@ public class ScreenCaptureService extends Service {
                     if (scalpingMode) {
                         String selectedEngine = selectedScalpingEngine;
                         if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                            // Phone-only Kronos path: fetch public completed OHLC candles, then run
-                            // the dedicated local runtime. Never call a hosted inference service.
+                            // Keep Kronos isolated from SmolVLM. If the user explicitly configured
+                            // an HTTPS inference endpoint, use the online Kronos client; otherwise
+                            // fetch public candles on-device and fail closed through the local runtime.
                             try {
-                                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
-                                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                                android.content.SharedPreferences kronosPrefs =
+                                        getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                                String serviceUrl = kronosPrefs.getString("kronos_service_url", "").trim();
+                                if (!serviceUrl.isEmpty()) {
+                                    result = KronosRuntimeClient.forecast(getApplicationContext());
+                                } else {
+                                    JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                                    result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                                }
                             } catch (Exception feedError) {
-                                result = new LocalVisionAI.Result("WAIT", "KRONOS LOCAL MARKET FEED ERROR: "
+                                result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
                                         + feedError.getClass().getSimpleName() + " — "
                                         + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
-                                        + ". No hosted service or substitute model was used.");
+                                        + ". No fallback engine was used.");
                             }
                         } else if ("HYBRID".equalsIgnoreCase(selectedEngine)) {
                             // HYBRID_STANDALONE: this engine owns its fast chart-image
