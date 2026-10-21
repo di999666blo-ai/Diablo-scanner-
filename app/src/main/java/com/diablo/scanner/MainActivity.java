@@ -1759,6 +1759,37 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    private void runKronosForecast() {
+        prefs.edit().putString("scalping_engine", "KRONOS")
+                .putString("kronos_status", "FETCHING DATA")
+                .putString("kronos_feed_note", "Connecting to Kronos service and requesting completed biquote candles...")
+                .apply();
+        refreshDashboardWebView();
+        new Thread(() -> {
+            LocalVisionAI.Result result = KronosRuntimeClient.forecast(getApplicationContext());
+            String signal = result == null || result.signal == null ? "WAIT" : result.signal.trim().toUpperCase(Locale.ROOT);
+            if (!("UP".equals(signal) || "DOWN".equals(signal))) signal = "WAIT";
+            String details = result == null || result.details == null ? "No Kronos result returned." : result.details;
+            final String finalSignal = signal;
+            final String finalDetails = details;
+            runOnUiThread(() -> {
+                prefs.edit()
+                        .putString("kronos_latest_signal", finalSignal)
+                        .putString("kronos_latest_details", finalDetails)
+                        .putString("kronos_status", "UP".equals(finalSignal) || "DOWN".equals(finalSignal) ? "FORECAST READY" : "WAIT / CHECK FEED")
+                        .putString("kronos_feed_note", finalDetails)
+                        .putString("latest_ai_signal", finalSignal)
+                        .putString("latest_ai_details", finalDetails)
+                        .putString("scan_status", "KRONOS " + finalSignal)
+                        .putString("scan_message", finalDetails)
+                        .apply();
+                saveHistory(finalSignal, 0, 0, 0, "KRONOS_MARKET_FORECAST");
+                refreshLatestResult();
+                refreshDashboardWebView();
+                Toast.makeText(this, "Kronos forecast finished: " + finalSignal, Toast.LENGTH_LONG).show();
+            });
+        }).start();
+    }
     private void showScalpingEngineSettings() {
         final String[] engineValues = {"SMOLVLM", "KRONOS", "HYBRID"};
         final String[] labels = {
