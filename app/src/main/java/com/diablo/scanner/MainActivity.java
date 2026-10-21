@@ -1767,21 +1767,28 @@ public class MainActivity extends Activity {
     }
 
     private void runKronosForecast() {
+        String configuredService = prefs.getString("kronos_service_url", "").trim();
         prefs.edit().putString("scalping_engine", "KRONOS")
                 .putString("kronos_status", "FETCHING DATA")
-                .putString("kronos_feed_note", "Connecting to Kronos service and requesting completed biquote candles...")
+                .putString("kronos_feed_note", configuredService.isEmpty()
+                        ? "Fetching completed BiQuote candles on this phone; local Kronos inference is checked next."
+                        : "Fetching completed BiQuote candles and requesting the configured HTTPS Kronos inference service.")
                 .apply();
         refreshDashboardWebView();
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
-                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                if (!configuredService.isEmpty()) {
+                    result = KronosRuntimeClient.forecast(getApplicationContext());
+                } else {
+                    JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                    result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                }
             } catch (Exception feedError) {
-                result = new LocalVisionAI.Result("WAIT", "KRONOS LOCAL MARKET FEED ERROR: "
+                result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
                         + feedError.getClass().getSimpleName() + " — "
                         + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
-                        + ". No hosted service or substitute model was used.");
+                        + ". No fallback engine was used.");
             }
             String signal = result == null || result.signal == null ? "WAIT" : result.signal.trim().toUpperCase(Locale.ROOT);
             if (!("UP".equals(signal) || "DOWN".equals(signal))) signal = "WAIT";
