@@ -158,7 +158,12 @@ jobs:
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
-          grep -q 'KRONOS SELECTED BUT UNAVAILABLE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'KronosRuntimeClient.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          test -s app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
+          grep -q 'kronos_service_url' app/src/main/java/com/diablo/scanner/MainActivity.java
+          grep -q 'kronos_candles_json' app/src/main/java/com/diablo/scanner/MainActivity.java
+          grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          grep -q 'KRONOS ONLINE FORECAST' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'HYBRID_STANDALONE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           python - <<'PY'
@@ -177,7 +182,7 @@ jobs:
           grep -q 'NeoQuasar/Kronos-Tokenizer-2k' kronos-service/main.py
           grep -q 'Running standalone Hybrid fast candle analysis' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           echo "Hybrid controls and launcher icon resource are present."
-          echo "Kronos is explicitly marked unavailable until its real runtime and OHLC path are integrated."
+          echo "Kronos online client, model pairing, and Hybrid independence checks passed."
 
       - name: Run Android unit tests
         run: |
