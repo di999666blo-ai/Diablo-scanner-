@@ -529,8 +529,17 @@ public class ScreenCaptureService extends Service {
                     if (scalpingMode) {
                         String selectedEngine = selectedScalpingEngine;
                         if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                            // Online Kronos-mini forecast; never silently fall back to another engine.
-                            result = KronosRuntimeClient.forecast(getApplicationContext());
+                            // Phone-only Kronos path: fetch public completed OHLC candles, then run
+                            // the dedicated local runtime. Never call a hosted inference service.
+                            try {
+                                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                            } catch (Exception feedError) {
+                                result = new LocalVisionAI.Result("WAIT", "KRONOS LOCAL MARKET FEED ERROR: "
+                                        + feedError.getClass().getSimpleName() + " — "
+                                        + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
+                                        + ". No hosted service or substitute model was used.");
+                            }
                         } else if ("HYBRID".equalsIgnoreCase(selectedEngine)) {
                             // HYBRID_STANDALONE: this engine owns its fast chart-image
                             // feature extraction and decision logic. It must never call
