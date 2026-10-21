@@ -30,7 +30,8 @@ public final class KronosLocalRuntime {
         MODEL_MISSING,
         TOKENIZER_MISSING,
         BACKEND_UNAVAILABLE,
-        INVALID_METADATA
+        INVALID_METADATA,
+        INFERENCE_UNAVAILABLE
     }
 
     public static final class Status {
@@ -43,7 +44,7 @@ public final class KronosLocalRuntime {
         }
 
         public boolean isReady() {
-            return state == State.READY;
+            return false; // No production-ready Kronos inference implementation is present yet.
         }
     }
 
@@ -66,8 +67,8 @@ public final class KronosLocalRuntime {
             return new Status(State.BACKEND_UNAVAILABLE,
                     "WAIT — the dedicated ONNX Runtime Android backend is not installed. No remote service or substitute forecaster will be used.");
         }
-        return new Status(State.READY,
-                "Kronos local assets and backend are present. Validate model input/output contract before enabling forecasts.");
+        return new Status(State.INFERENCE_UNAVAILABLE,
+                "WAIT — Kronos model files and Android backend were detected, but the real Kronos tokenizer, autoregressive decoding, and OHLC inverse-transform path are not implemented/validated. Forecasts remain disabled.");
     }
 
     /**
@@ -84,7 +85,7 @@ public final class KronosLocalRuntime {
             return new LocalVisionAI.Result("WAIT", status.message);
         }
         return new LocalVisionAI.Result("WAIT",
-                "KRONOS LOCAL: assets detected, but inference remains disabled until the exported model's tokenizer, tensor shapes, autoregressive decoding, and OHLC output are validated against the official Python implementation. No forecast was fabricated.");
+                "KRONOS LOCAL: inference is deliberately disabled until the official tokenizer and autoregressive model are ported and parity-tested. No forecast was fabricated.");
     }
 
     private static boolean assetExists(Context context, String path) {
