@@ -178,7 +178,7 @@ jobs:
           grep -q 'fetchBiQuoteForecastRequest' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'biquote.io/api/' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'bar.optBoolean("isOpen", false)' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
-          grep -q 'genuine on-device inference port is still incomplete' app/src/main/java/com/diablo/scanner/MainActivity.java
+          grep -q 'genuine Kronos on-device tokenizer/model inference port is still incomplete' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'HYBRID_STANDALONE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           python - <<'PY'
