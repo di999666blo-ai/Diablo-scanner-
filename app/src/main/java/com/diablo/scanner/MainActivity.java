@@ -69,6 +69,10 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        // Keep native analysis result holders alive for the existing saved-chart pipeline.
+        signalText = new TextView(this);
+        statusText = new TextView(this);
+        countText = new TextView(this);
 
         getWindow().setStatusBarColor(Color.rgb(5, 7, 12));
         getWindow().setNavigationBarColor(Color.rgb(5, 7, 12));
@@ -196,7 +200,7 @@ public class MainActivity extends Activity {
     private JSONObject dashboardData() {
         JSONObject data = new JSONObject();
         try {
-            SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
+            SharedPreferences ai = prefs;
             JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
             int up = 0, down = 0, wait = 0;
             for (int i = 0; i < history.length(); i++) {
@@ -1271,9 +1275,31 @@ public class MainActivity extends Activity {
                 prefs.edit().putString("scan_status", "SAVED_READY")
                         .putString("scan_message", "Saved chart analysis complete.").apply();
                 saveHistory(display, confidence, 0, 0, scalpingMode ? "SAVED_AI" : "SAVED_TIMED");
+                publishSavedChartResult(display, details, confidence);
                 refreshCount();
             });
         }, "DiabloSavedChartAnalyzer").start();
+    }
+
+    private void publishSavedChartResult(String signal, String details, int score) {
+        String time = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                .format(new Date());
+        prefs.edit()
+                .putString("latest_ai_signal", signal)
+                .putString("latest_ai_details", details == null ? "" : details)
+                .putInt("latest_ai_score", score)
+                .putString("latest_ai_time", time)
+                .apply();
+        try {
+            JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
+            if (history.length() > 0) {
+                JSONObject latest = history.getJSONObject(0);
+                latest.put("details", details == null ? "" : details);
+                prefs.edit().putString(HISTORY, history.toString()).apply();
+            }
+        } catch (Exception ignored) {
+        }
+        refreshDashboardWebView();
     }
 
     private void saveHistory(
