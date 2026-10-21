@@ -514,7 +514,7 @@ public class ScreenCaptureService extends Service {
                 .putString("scan_status", "AI_PROCESSING")
                 .putString("scan_message", scalpingMode
                         ? ("KRONOS".equalsIgnoreCase(selectedScalpingEngine)
-                            ? "Kronos selected; checking availability. If not connected, result will be WAIT."
+                            ? "Connecting to the configured online Kronos-mini service..."
                             : ("HYBRID".equalsIgnoreCase(selectedScalpingEngine)
                                 ? "Running standalone Hybrid fast candle analysis (no SmolVLM or Kronos dependency)..."
                                 : "Preparing SmolVLM AI for Scalping Setup..."))
@@ -529,11 +529,8 @@ public class ScreenCaptureService extends Service {
                     if (scalpingMode) {
                         String selectedEngine = selectedScalpingEngine;
                         if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                            // Never silently fall back to SmolVLM while claiming Kronos ran.
-                            result = new LocalVisionAI.Result("WAIT",
-                                    "KRONOS SELECTED BUT UNAVAILABLE: this APK has no connected Kronos inference runtime "
-                                    + "or verified structured OHLC feed. No Kronos forecast was generated. "
-                                    + "Select SmolVLM or Hybrid in Settings, or connect and verify the Kronos service first.");
+                            // Online Kronos-mini forecast; never silently fall back to another engine.
+                            result = KronosRuntimeClient.forecast(getApplicationContext());
                         } else if ("HYBRID".equalsIgnoreCase(selectedEngine)) {
                             // HYBRID_STANDALONE: this engine owns its fast chart-image
                             // feature extraction and decision logic. It must never call
