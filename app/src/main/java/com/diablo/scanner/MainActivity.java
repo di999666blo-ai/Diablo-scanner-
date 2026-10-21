@@ -224,6 +224,23 @@ public class MainActivity extends Activity {
             data.put("scanWindow", formatDuration(prefs.getLong("timed_scan_duration_ms", 30000L)));
             data.put("timeframe", prefs.getString("chart_timeframe", "1m"));
             data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
+            SharedPreferences tradePrefs = getSharedPreferences("diablo_trade_records", MODE_PRIVATE);
+            JSONArray trades = new JSONArray(tradePrefs.getString("trades", "[]"));
+            int wins = 0, losses = 0, unknownTrades = 0;
+            for (int i = 0; i < trades.length(); i++) {
+                String result = trades.getJSONObject(i).optString("result", "UNKNOWN");
+                if ("WIN".equalsIgnoreCase(result)) wins++;
+                else if ("LOSS".equalsIgnoreCase(result)) losses++;
+                else unknownTrades++;
+            }
+            int decidedTrades = wins + losses;
+            data.put("tradeCount", trades.length());
+            data.put("tradeWins", wins);
+            data.put("tradeLosses", losses);
+            data.put("tradeUnknown", unknownTrades);
+            data.put("tradeDecided", decidedTrades);
+            data.put("tradeRate", decidedTrades == 0 ? "—%" :
+                    String.format(Locale.US, "%.1f%%", wins * 100.0 / decidedTrades));
         } catch (Exception ignored) {
         }
         return data;
