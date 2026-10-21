@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from functools import lru_cache
+from math import isfinite
 from typing import Any
 
 import pandas as pd
@@ -23,12 +25,12 @@ MAX_BARS = 512
 
 class Candle(BaseModel):
     timestamp: datetime
-    open: float = Field(gt=0)
-    high: float = Field(gt=0)
-    low: float = Field(gt=0)
-    close: float = Field(gt=0)
-    volume: float = Field(default=0, ge=0)
-    amount: float = Field(default=0, ge=0)
+    open: float = Field(gt=0, allow_inf_nan=False)
+    high: float = Field(gt=0, allow_inf_nan=False)
+    low: float = Field(gt=0, allow_inf_nan=False)
+    close: float = Field(gt=0, allow_inf_nan=False)
+    volume: float = Field(default=0, ge=0, allow_inf_nan=False)
+    amount: float = Field(default=0, ge=0, allow_inf_nan=False)
 
     @field_validator("high")
     @classmethod
@@ -44,10 +46,19 @@ class ForecastRequest(BaseModel):
     candles: list[Candle] = Field(min_length=32, max_length=MAX_BARS)
 
 
-def validate_candles(candles: list[Candle]) -> None:
+def validate_candles(candles: list[Candle], timeframe_seconds: int | None = None) -> None:
     times = [c.timestamp for c in candles]
     if any(b <= a for a, b in zip(times, times[1:])):
         raise ValueError("Candle timestamps must be strictly increasing.")
+    if timeframe_seconds is not None:
+        for i, (a, b) in enumerate(zip(times, times[1:]), start=1):
+            delta = (b - a).total_seconds()
+            # Allow market-session gaps, but require each timestamp gap to align
+            # to the requested candle interval (and reject irregular/mislabeled data).
+            if delta < timeframe_seconds or delta % timeframe_seconds != 0:
+                raise ValueError(
+                    f"Candle {i}: timestamp spacing must align to timeframe_seconds={timeframe_seconds}."
+                )
     for i, c in enumerate(candles):
         if c.high < max(c.open, c.close, c.low):
             raise ValueError(f"Candle {i}: high must be >= open, close, and low.")
@@ -57,21 +68,24 @@ def validate_candles(candles: list[Candle]) -> None:
         raise ValueError("At least 32 completed candles are required.")
 
 
+@lru_cache(maxsize=1)
+def _load_predictor(model_id: str, tokenizer_id: str):
+    """Load one pinned model/tokenizer pair once per service process."""
+    from model import Kronos, KronosPredictor, KronosTokenizer
+    tokenizer = KronosTokenizer.from_pretrained(tokenizer_id)
+    model = Kronos.from_pretrained(model_id)
+    return KronosPredictor(model, tokenizer, max_context=min(MAX_BARS, 512), device="cpu")
+
+
 def build_forecast(request: ForecastRequest) -> dict[str, Any]:
     """Load the upstream model lazily so /health works without model downloads."""
     try:
-        from model import Kronos, KronosPredictor, KronosTokenizer
         import torch
+        predictor = _load_predictor(MODEL_ID, TOKENIZER_ID)
     except Exception as exc:
-        raise RuntimeError(f"Kronos dependencies are unavailable: {exc}") from exc
+        raise RuntimeError(f"Kronos dependencies/model are unavailable: {exc}") from exc
 
     try:
-        tokenizer = KronosTokenizer.from_pretrained(TOKENIZER_ID)
-        model = Kronos.from_pretrained(MODEL_ID)
-        predictor = KronosPredictor(
-            model, tokenizer, max_context=min(MAX_BARS, 512),
-            device="cpu",
-        )
         rows = [{
             "open": c.open, "high": c.high, "low": c.low, "close": c.close,
             "volume": c.volume, "amount": c.amount,
@@ -90,8 +104,13 @@ def build_forecast(request: ForecastRequest) -> dict[str, Any]:
                 sample_count=1, verbose=False,
             )
         rows = pred[["open", "high", "low", "close"]].to_dict(orient="records")
-        if not rows or any(not all(pd.notna(v) for v in row.values()) for row in rows):
-            raise ValueError("Kronos returned empty or invalid forecast values.")
+        if not rows or any(
+            not all(pd.notna(v) and isfinite(float(v)) and float(v) > 0 for v in row.values())
+            or float(row["high"]) < max(float(row["open"]), float(row["close"]), float(row["low"]))
+            or float(row["low"]) > min(float(row["open"]), float(row["close"]), float(row["high"]))
+            for row in rows
+        ):
+            raise ValueError("Kronos returned empty, non-finite, non-positive, or invalid OHLC forecast values.")
         return {
             "engine": "KRONOS",
             "model": MODEL_ID,
@@ -114,14 +133,15 @@ def health() -> dict[str, str]:
         "engine": "KRONOS",
         "model": MODEL_ID,
         "tokenizer": TOKENIZER_ID,
-        "inference": "not_checked_until_forecast_request",
+        "inference": "model_not_loaded_yet",
+        "forecast_endpoint": "/v1/forecast",
     }
 
 
 @app.post("/v1/forecast")
 def forecast(request: ForecastRequest) -> dict[str, Any]:
     try:
-        validate_candles(request.candles)
+        validate_candles(request.candles, request.timeframe_seconds)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
