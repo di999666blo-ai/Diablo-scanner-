@@ -169,9 +169,18 @@ public class FloatingBubbleService extends Service {
     private GradientDrawable makeBackground(int color) {
         GradientDrawable shape = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(35, 18, 17), color, Color.rgb(10, 10, 15)});
+                new int[]{Color.rgb(17, 29, 51), color, Color.rgb(8, 14, 30)});
         shape.setCornerRadius(24);
-        shape.setStroke(2, Color.rgb(255, 35, 55));
+        shape.setStroke(2, Color.rgb(30, 52, 90));
+        return shape;
+    }
+
+    private GradientDrawable makeBubbleBackground() {
+        GradientDrawable shape = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(255, 58, 76), Color.rgb(176, 8, 22), Color.rgb(64, 0, 8)});
+        shape.setShape(GradientDrawable.OVAL);
+        shape.setStroke(2, Color.rgb(255, 10, 31));
         return shape;
     }
 
@@ -214,9 +223,9 @@ public class FloatingBubbleService extends Service {
     // MOVABLE D BUBBLE
 
     private void showBubble() {
-        TextView icon = makeText("D", 30, Color.WHITE);
+        TextView icon = makeText("D", 24, Color.WHITE);
         icon.setShadowLayer(8f, 0f, 0f, Color.rgb(255, 10, 31));
-        icon.setBackground(makeBackground(Color.rgb(15, 12, 15)));
+        icon.setBackground(makeBubbleBackground());
         icon.setElevation(10f);
         icon.setScaleX(0.94f);
         icon.setScaleY(0.94f);
@@ -224,7 +233,7 @@ public class FloatingBubbleService extends Service {
 
         bubble = icon;
 
-        int bubbleSize = (int) (74 * getResources().getDisplayMetrics().density);
+        int bubbleSize = (int) (54 * getResources().getDisplayMetrics().density);
         bubbleParams = makeParams(bubbleSize, bubbleSize);
         bubbleParams.gravity = Gravity.TOP | Gravity.START;
         bubbleParams.x = 12;
@@ -364,7 +373,7 @@ public class FloatingBubbleService extends Service {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(12, 10, 12, 10);
-        layout.setBackground(makeBackground(Color.rgb(13, 12, 16)));
+        layout.setBackground(makeBackground(Color.rgb(14, 23, 42)));
         layout.setElevation(12f);
 
         layout.addView(makeText("◈  DIABLO SCANNER  ◈", 16, Color.rgb(255, 35, 55)));
