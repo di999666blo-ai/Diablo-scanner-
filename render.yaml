@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: diablo-kronos-mini-api
+    runtime: docker
+    plan: free
+    rootDir: kronos-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: KRONOS_MODEL_ID
+        value: NeoQuasar/Kronos-mini
+      - key: KRONOS_TOKENIZER_ID
+        value: NeoQuasar/Kronos-Tokenizer-2k
