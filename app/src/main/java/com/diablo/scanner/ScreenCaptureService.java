@@ -509,11 +509,20 @@ public class ScreenCaptureService extends Service {
         try {
             aiExecutor.execute(() -> {
                 try {
-                    // Timed Signal uses the fast image-feature strategy; Scalping Setup
-                    // uses the bundled SmolVLM vision model.
-                    LocalVisionAI.Result result = scalpingMode
-                            ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
-                            : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                    // Fast hybrid chart analysis is always the primary Timed Signal engine.
+                    // SmolVLM is an optional secondary visual check, never a prerequisite.
+                    LocalVisionAI.Result result;
+                    if (scalpingMode) {
+                        result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                    } else {
+                        result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                        boolean optionalSmolAssist = scanPrefs.getBoolean("timed_smolvlm_enabled", false);
+                        if (optionalSmolAssist && result != null) {
+                            LocalVisionAI.Result visualResult =
+                                    LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                            result = combineTimedHybrid(result, visualResult);
+                        }
+                    }
                     if (result != null) saveAIResult(result);
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
@@ -530,6 +539,52 @@ public class ScreenCaptureService extends Service {
             if (!analysisBitmap.isRecycled()) analysisBitmap.recycle();
             aiRunning.set(false);
         }
+    }
+
+    /**
+     * Keeps the fast pixel/candle analyzer primary. Optional SmolVLM may
+     * corroborate it, but an inference error does not erase a valid fast read.
+     * Opposite directional outputs are downgraded to WAIT.
+     */
+    private LocalVisionAI.Result combineTimedHybrid(
+            LocalVisionAI.Result fast,
+            LocalVisionAI.Result visual) {
+        if (fast == null) return new LocalVisionAI.Result("WAIT", "Fast chart analysis returned no result.");
+        String fastSignal = normalizeDirection(fast.signal);
+        if (visual == null) {
+            return new LocalVisionAI.Result(fastSignal,
+                    fast.details + "\n\nOptional SmolVLM check returned no result; fast hybrid result retained.");
+        }
+        String visualSignal = normalizeDirection(visual.signal);
+        String visualDetails = visual.details == null ? "" : visual.details;
+        String lower = visualDetails.toLowerCase(Locale.ROOT);
+        boolean visualError = lower.contains("local ai error")
+                || lower.contains("engine failed")
+                || lower.contains("engine is missing")
+                || lower.contains("missing or incomplete")
+                || lower.contains("timed out")
+                || lower.contains("unsupported");
+        if (visualError) {
+            return new LocalVisionAI.Result(fastSignal,
+                    fast.details + "\n\nOPTIONAL SMOLVLM CHECK FAILED; fast hybrid result retained.\n"
+                            + visualDetails);
+        }
+        if (("UP".equals(fastSignal) && "DOWN".equals(visualSignal))
+                || ("DOWN".equals(fastSignal) && "UP".equals(visualSignal))) {
+            return new LocalVisionAI.Result("WAIT",
+                    fast.details + "\n\nHYBRID CHECK: fast analyzer and SmolVLM disagree ("
+                            + fastSignal + " vs " + visualSignal + "). Final result downgraded to WAIT.\n"
+                            + visualDetails);
+        }
+        return new LocalVisionAI.Result(fastSignal,
+                fast.details + "\n\nOPTIONAL SMOLVLM REVIEW: " + visualSignal
+                        + ". The fast hybrid engine remains primary.\n" + visualDetails);
+    }
+
+    private String normalizeDirection(String signal) {
+        if (signal == null) return "WAIT";
+        String value = signal.trim().toUpperCase(Locale.ROOT);
+        return ("UP".equals(value) || "DOWN".equals(value)) ? value : "WAIT";
     }
 
     // ================================================
