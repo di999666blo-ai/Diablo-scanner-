@@ -1832,7 +1832,7 @@ public class MainActivity extends Activity {
         input.setText(prefs.getString("kronos_service_url", ""));
         new AlertDialog.Builder(this)
                 .setTitle("Kronos API URL")
-                .setMessage("Enter the HTTPS base URL of a deployed Kronos-mini API. Mobile data connects to a server; it does not host the model. If you do not have a URL yet, leave it blank and configure it later.")
+                .setMessage("Important: this build fetches BiQuote candles directly on the phone, but genuine Kronos-mini inference still runs on a separate HTTPS API. Mobile data alone does not host the model. On-device Kronos inference is not implemented yet.")
                 .setView(input)
                 .setPositiveButton("SAVE & CHOOSE MARKET", (dialog, which) -> {
                     String url = input.getText().toString().trim().replaceAll("/+$", "");
@@ -1866,7 +1866,7 @@ public class MainActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Kronos market feed")
-                .setMessage("Kronos will fetch real OHLC candles automatically from the free public biquote.io feed through your Kronos API. Use a symbol actually listed by the provider. Supported intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d. No API key is required by biquote for read access.")
+                .setMessage("The phone fetches completed OHLC candles directly from the public biquote.io feed (no read API key currently required), then sends them to your configured Kronos inference API. This still needs a reachable HTTPS API URL; Kronos is not running locally in this build. Provider coverage may not include broker OTC prices. Supported intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d.")
                 .setView(form)
                 .setPositiveButton("SAVE MARKET SETTINGS", (dialog, which) -> {
                     String symbol = symbolInput.getText().toString().trim().toUpperCase(Locale.ROOT);
@@ -1884,8 +1884,8 @@ public class MainActivity extends Activity {
                             .putString("kronos_interval", interval)
                             .remove("kronos_candles_json")
                             .apply();
-                    Toast.makeText(this, "Kronos will request " + symbol + " " + interval
-                            + " candles automatically. The API and model host must be online.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Phone will fetch " + symbol + " " + interval
+                            + " candles directly; the Kronos inference API must still be online.", Toast.LENGTH_LONG).show();
                     refreshDashboardWebView();
                 })
                 .setNeutralButton("BROWSE SYMBOL CATALOGUE", (dialog, which) -> {
