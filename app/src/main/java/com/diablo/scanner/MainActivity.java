@@ -229,7 +229,7 @@ public class MainActivity extends Activity {
         return data;
     }
 
-    private final class DashboardBridge {
+    public final class DashboardBridge {
         @JavascriptInterface
         public String getDashboardData() {
             return dashboardData().toString();
