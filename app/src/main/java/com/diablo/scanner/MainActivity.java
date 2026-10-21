@@ -177,6 +177,14 @@ public class MainActivity extends Activity {
             case "candle_timing":
                 showSignalTimingSettings();
                 break;
+            case "timed_smolvlm":
+                boolean enabled = !prefs.getBoolean("timed_smolvlm_enabled", false);
+                prefs.edit().putBoolean("timed_smolvlm_enabled", enabled).apply();
+                Toast.makeText(this, enabled
+                        ? "Optional SmolVLM confirmation enabled for Timed Signal. Fast hybrid remains primary."
+                        : "Optional SmolVLM confirmation disabled. Timed Signal will use the fast hybrid analyzer only.",
+                        Toast.LENGTH_LONG).show();
+                break;
             case "all_settings":
                 showSettings();
                 break;
@@ -225,6 +233,8 @@ public class MainActivity extends Activity {
             data.put("scanWindow", formatDuration(prefs.getLong("timed_scan_duration_ms", 30000L)));
             data.put("timeframe", prefs.getString("chart_timeframe", "1m"));
             data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
+            data.put("timedSmolAssist", prefs.getBoolean("timed_smolvlm_enabled", false));
+            data.put("scalpingEngine", prefs.getString("scalping_engine", "SMOLVLM"));
             SharedPreferences tradePrefs = getSharedPreferences("diablo_trade_records", MODE_PRIVATE);
             JSONArray trades = new JSONArray(tradePrefs.getString("trades", "[]"));
             int wins = 0, losses = 0, unknownTrades = 0;
@@ -1261,11 +1271,17 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                // Keep saved-chart mode routing identical to live scanning:
-                // fast strategy for Timed Signal, SmolVLM for Scalping Setup.
-                result = scalpingMode
-                        ? LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)
-                        : ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                // Keep saved-chart routing identical to live scanning.
+                if (scalpingMode) {
+                    result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                } else {
+                    result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                    if (prefs.getBoolean("timed_smolvlm_enabled", false) && result != null) {
+                        LocalVisionAI.Result visualResult =
+                                LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                        result = combineTimedHybrid(result, visualResult);
+                    }
+                }
             } catch (Exception e) {
                 result = new LocalVisionAI.Result("WAIT", "Local chart analysis failed safely. Please try a clearer screenshot.");
             } finally {
@@ -1524,6 +1540,46 @@ public class MainActivity extends Activity {
                     ).show();
                 })
                 .show();
+    }
+
+    private LocalVisionAI.Result combineTimedHybrid(
+            LocalVisionAI.Result fast,
+            LocalVisionAI.Result visual) {
+        if (fast == null) return new LocalVisionAI.Result("WAIT", "Fast chart analysis returned no result.");
+        String fastSignal = normalizeDirection(fast.signal);
+        if (visual == null) {
+            return new LocalVisionAI.Result(fastSignal,
+                    fast.details + "\n\nOptional SmolVLM check returned no result; fast hybrid result retained.");
+        }
+        String visualSignal = normalizeDirection(visual.signal);
+        String visualDetails = visual.details == null ? "" : visual.details;
+        String lower = visualDetails.toLowerCase(Locale.ROOT);
+        boolean visualError = lower.contains("local ai error")
+                || lower.contains("engine failed")
+                || lower.contains("engine is missing")
+                || lower.contains("missing or incomplete")
+                || lower.contains("timed out")
+                || lower.contains("unsupported");
+        if (visualError) {
+            return new LocalVisionAI.Result(fastSignal,
+                    fast.details + "\n\nOPTIONAL SMOLVLM CHECK FAILED; fast hybrid result retained.\n" + visualDetails);
+        }
+        if (("UP".equals(fastSignal) && "DOWN".equals(visualSignal))
+                || ("DOWN".equals(fastSignal) && "UP".equals(visualSignal))) {
+            return new LocalVisionAI.Result("WAIT",
+                    fast.details + "\n\nHYBRID CHECK: fast analyzer and SmolVLM disagree ("
+                            + fastSignal + " vs " + visualSignal + "). Final result downgraded to WAIT.\n"
+                            + visualDetails);
+        }
+        return new LocalVisionAI.Result(fastSignal,
+                fast.details + "\n\nOPTIONAL SMOLVLM REVIEW: " + visualSignal
+                        + ". The fast hybrid engine remains primary.\n" + visualDetails);
+    }
+
+    private String normalizeDirection(String signal) {
+        if (signal == null) return "WAIT";
+        String value = signal.trim().toUpperCase(Locale.ROOT);
+        return ("UP".equals(value) || "DOWN".equals(value)) ? value : "WAIT";
     }
 
     // SETTINGS
