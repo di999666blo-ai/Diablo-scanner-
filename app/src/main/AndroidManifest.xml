@@ -21,8 +21,8 @@
     <application
     android:allowBackup="false"
     android:label="DIABLO SCANNER"
-    android:icon="@drawable/ic_diablo_launcher"
-    android:roundIcon="@drawable/ic_diablo_launcher"
+    android:icon="@drawable/ic_diablo_launcher_vector"
+    android:roundIcon="@drawable/ic_diablo_launcher_vector"
     android:theme="@android:style/Theme.Material.NoActionBar"
     android:hardwareAccelerated="true"
     android:supportsRtl="true">
