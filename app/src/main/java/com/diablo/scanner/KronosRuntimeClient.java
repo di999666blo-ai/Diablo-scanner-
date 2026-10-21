@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 public final class KronosRuntimeClient {
     private static final String PREFS = "diablo_scanner";
     private static final int CONNECT_TIMEOUT_MS = 12000;
-    private static final int READ_TIMEOUT_MS = 90000;
+    private static final int READ_TIMEOUT_MS = 180000;
 
     private KronosRuntimeClient() {}
 
