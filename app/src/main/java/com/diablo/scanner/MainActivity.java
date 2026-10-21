@@ -1743,7 +1743,7 @@ public class MainActivity extends Activity {
         final String[] labels = {
                 "SmolVLM — visual chart analysis (available)",
                 "Kronos — financial-candle forecast (not connected; returns WAIT)",
-                "Hybrid — fast candle analysis + SmolVLM visual check"
+                "Hybrid — standalone fast candle-analysis engine (independent)"
         };
         String selected = prefs.getString("scalping_engine", "SMOLVLM");
         int checked = "KRONOS".equalsIgnoreCase(selected) ? 1
@@ -1759,7 +1759,7 @@ public class MainActivity extends Activity {
                                 Toast.LENGTH_LONG).show();
                     } else if ("HYBRID".equals(engine)) {
                         Toast.makeText(this,
-                                "Hybrid selected: fast candle analyzer plus SmolVLM visual review. Conflicts return WAIT.",
+                                "Hybrid selected: standalone fast candle analyzer. It runs independently without SmolVLM or Kronos.",
                                 Toast.LENGTH_LONG).show();
                     } else {
                         Toast.makeText(this, "SmolVLM visual engine selected.", Toast.LENGTH_SHORT).show();
