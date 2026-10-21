@@ -25,6 +25,8 @@ def test_health_marks_inference_not_checked():
     assert response.status_code == 200
     assert response.json()["engine"] == "KRONOS"
     assert response.json()["inference"] == "model_not_loaded_yet"
+    assert response.json()["model"] == "NeoQuasar/Kronos-mini"
+    assert response.json()["tokenizer"] == "NeoQuasar/Kronos-Tokenizer-2k"
 
 
 def test_valid_candles_pass():
