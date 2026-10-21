@@ -1739,25 +1739,34 @@ public class MainActivity extends Activity {
     }
 
     private void showScalpingEngineSettings() {
+        final String[] engineValues = {"SMOLVLM", "KRONOS", "HYBRID"};
+        final String[] labels = {
+                "SmolVLM — visual chart analysis (available)",
+                "Kronos — financial-candle forecast (not connected; returns WAIT)",
+                "Hybrid — fast candle analysis + SmolVLM visual check"
+        };
+        String selected = prefs.getString("scalping_engine", "SMOLVLM");
+        int checked = "KRONOS".equalsIgnoreCase(selected) ? 1
+                : ("HYBRID".equalsIgnoreCase(selected) ? 2 : 0);
         new AlertDialog.Builder(this)
                 .setTitle("Scalping analysis engine")
-                .setSingleChoiceItems(new String[]{
-                        "SmolVLM — visual chart analysis",
-                        "Kronos — unavailable until model/runtime/data are connected"
-                }, "KRONOS".equalsIgnoreCase(prefs.getString("scalping_engine", "SMOLVLM")) ? 1 : 0,
-                        (dialog, which) -> {
-                            if (which == 0) {
-                                prefs.edit().putString("scalping_engine", "SMOLVLM").apply();
-                                Toast.makeText(this, "SmolVLM selected. Kronos remains unverified.", Toast.LENGTH_LONG).show();
-                            } else {
-                                prefs.edit().putString("scalping_engine", "SMOLVLM").apply();
-                                Toast.makeText(this,
-                                        "Kronos cannot be activated yet: model weights, matching tokenizer, a running inference runtime, and structured OHLC data are not connected. SmolVLM remains selected.",
-                                        Toast.LENGTH_LONG).show();
-                            }
-                            dialog.dismiss();
-                            refreshDashboardWebView();
-                        })
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    String engine = engineValues[which];
+                    prefs.edit().putString("scalping_engine", engine).apply();
+                    if ("KRONOS".equals(engine)) {
+                        Toast.makeText(this,
+                                "Kronos selected but NOT operational: the APK has no connected Kronos runtime or verified OHLC feed. Scans will return WAIT, never a fake Kronos signal.",
+                                Toast.LENGTH_LONG).show();
+                    } else if ("HYBRID".equals(engine)) {
+                        Toast.makeText(this,
+                                "Hybrid selected: fast candle analyzer plus SmolVLM visual review. Conflicts return WAIT.",
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(this, "SmolVLM visual engine selected.", Toast.LENGTH_SHORT).show();
+                    }
+                    dialog.dismiss();
+                    refreshDashboardWebView();
+                })
                 .setNegativeButton("CANCEL", null)
                 .show();
     }
