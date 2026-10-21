@@ -186,6 +186,9 @@ public class MainActivity extends Activity {
                         Toast.LENGTH_LONG).show();
                 break;
             }
+            case "scalping_engine":
+                showScalpingEngineSettings();
+                break;
             case "all_settings":
                 showSettings();
                 break;
@@ -1731,6 +1734,30 @@ public class MainActivity extends Activity {
                     refreshControlSummary();
                     Toast.makeText(this, "Candle timing saved: " + labels[which], Toast.LENGTH_LONG).show();
                 })
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private void showScalpingEngineSettings() {
+        new AlertDialog.Builder(this)
+                .setTitle("Scalping analysis engine")
+                .setSingleChoiceItems(new String[]{
+                        "SmolVLM — visual chart analysis",
+                        "Kronos — unavailable until model/runtime/data are connected"
+                }, "KRONOS".equalsIgnoreCase(prefs.getString("scalping_engine", "SMOLVLM")) ? 1 : 0,
+                        (dialog, which) -> {
+                            if (which == 0) {
+                                prefs.edit().putString("scalping_engine", "SMOLVLM").apply();
+                                Toast.makeText(this, "SmolVLM selected. Kronos remains unverified.", Toast.LENGTH_LONG).show();
+                            } else {
+                                prefs.edit().putString("scalping_engine", "SMOLVLM").apply();
+                                Toast.makeText(this,
+                                        "Kronos cannot be activated yet: model weights, matching tokenizer, a running inference runtime, and structured OHLC data are not connected. SmolVLM remains selected.",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                            dialog.dismiss();
+                            refreshDashboardWebView();
+                        })
                 .setNegativeButton("CANCEL", null)
                 .show();
     }
