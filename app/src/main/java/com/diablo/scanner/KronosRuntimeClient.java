@@ -38,20 +38,26 @@ public final class KronosRuntimeClient {
             return new LocalVisionAI.Result("WAIT",
                     "KRONOS SERVICE URL MUST USE HTTPS. Save the secure base URL of your deployed Kronos API.");
         }
-        if (payload.isEmpty()) {
-            return new LocalVisionAI.Result("WAIT",
-                    "KRONOS NEEDS REAL OHLCV INPUT. Paste a JSON request containing at least 32 completed candles in Scalping Engine Settings. Screenshot pixels are not reliable numeric candle data.");
-        }
-
         HttpURLConnection connection = null;
+        boolean marketAutoFetch = payload.isEmpty();
         try {
-            JSONObject request = new JSONObject(payload);
-            JSONArray candles = request.optJSONArray("candles");
-            if (candles == null || candles.length() < 32) {
-                return new LocalVisionAI.Result("WAIT",
-                        "KRONOS INPUT REJECTED: provide at least 32 completed candles with timestamps and valid open/high/low/close values.");
+            JSONObject request;
+            String endpoint;
+            if (marketAutoFetch) {
+                request = new JSONObject();
+                request.put("symbol", prefs.getString("kronos_symbol", "EURUSD"));
+                request.put("interval", prefs.getString("kronos_interval", "1m"));
+                request.put("prediction_bars", prefs.getInt("kronos_prediction_bars", 3));
+                endpoint = baseUrl.replaceAll("/+$", "") + "/v1/forecast/market";
+            } else {
+                request = new JSONObject(payload);
+                JSONArray candles = request.optJSONArray("candles");
+                if (candles == null || candles.length() < 32) {
+                    return new LocalVisionAI.Result("WAIT",
+                            "KRONOS INPUT REJECTED: provide at least 32 completed candles with timestamps and valid open/high/low/close values.");
+                }
+                endpoint = baseUrl.replaceAll("/+$", "") + "/v1/forecast";
             }
-            String endpoint = baseUrl.replaceAll("/+$", "") + "/v1/forecast";
             connection = (HttpURLConnection) new URL(endpoint).openConnection();
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -108,7 +114,19 @@ public final class KronosRuntimeClient {
             details.append("Model: ").append(response.optString("model", "NeoQuasar/Kronos-mini")).append("\n");
             details.append("Tokenizer: ").append(response.optString("tokenizer", "NeoQuasar/Kronos-Tokenizer-2k")).append("\n");
             details.append("Symbol: ").append(response.optString("symbol", "unspecified")).append("\n");
-            details.append("Timeframe: ").append(request.optInt("timeframe_seconds", 0)).append(" seconds\n");
+            int timeframeSeconds = request.optInt("timeframe_seconds", 0);
+            if (timeframeSeconds <= 0) {
+                String interval = request.optString("interval", "unknown");
+                timeframeSeconds = "1m".equals(interval) ? 60 : "5m".equals(interval) ? 300
+                        : "15m".equals(interval) ? 900 : "30m".equals(interval) ? 1800
+                        : "1h".equals(interval) ? 3600 : "4h".equals(interval) ? 14400
+                        : "1d".equals(interval) ? 86400 : 0;
+            }
+            details.append("Timeframe: ").append(timeframeSeconds).append(" seconds\n");
+            details.append("Market data: ").append(response.optString("data_provider", "manual OHLCV input")).append("\n");
+            if (response.has("completed_candles_used")) {
+                details.append("Completed candles used: ").append(response.optInt("completed_candles_used")).append("\n");
+            }
             details.append("Observed close: ").append(lastClose).append("\n");
             details.append("First forecast OHLC: O ").append(open).append(" / H ").append(high)
                     .append(" / L ").append(low).append(" / C ").append(close).append("\n");
@@ -125,7 +143,7 @@ public final class KronosRuntimeClient {
                     "KRONOS CONNECTION/INFERENCE ERROR: "
                             + error.getClass().getSimpleName()
                             + (message == null ? "" : " — " + message)
-                            + ". Check data connection, service URL, model availability, and candle JSON. No fallback engine was used.");
+                            + ". Check data connection, service URL, provider feed, model availability, and market settings. No fallback engine was used.");
         } finally {
             if (connection != null) connection.disconnect();
         }
