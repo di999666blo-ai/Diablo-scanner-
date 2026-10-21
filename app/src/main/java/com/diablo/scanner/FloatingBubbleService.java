@@ -170,7 +170,7 @@ public class FloatingBubbleService extends Service {
                 GradientDrawable.Orientation.TL_BR,
                 new int[]{Color.rgb(35, 18, 17), color, Color.rgb(10, 10, 15)});
         shape.setCornerRadius(24);
-        shape.setStroke(2, Color.rgb(255, 145, 48));
+        shape.setStroke(2, Color.rgb(255, 35, 55));
         return shape;
     }
 
@@ -365,8 +365,11 @@ public class FloatingBubbleService extends Service {
         layout.setBackground(makeBackground(Color.rgb(13, 12, 16)));
         layout.setElevation(12f);
 
-        layout.addView(makeText("◈  DIABLO SCANNER  ◈", 16, Color.rgb(255, 105, 55)));
-        layout.addView(makeText("LIVE TERMINAL  •  CHART → AI → SIGNAL", 10, Color.rgb(255, 165, 70)));
+        layout.addView(makeText("◈  DIABLO SCANNER  ◈", 16, Color.rgb(255, 35, 55)));
+        layout.addView(makeText("LIVE SCAN  •  CHART → AI → SIGNAL", 10, Color.rgb(255, 105, 120)));
+        TextView rayView = makeText("◢  BLACK RAY SCAN  ━━━━━━━━━  AI ANALYSIS", 11, Color.rgb(255, 35, 55));
+        rayView.setBackground(makeBackground(Color.rgb(5, 5, 8)));
+        layout.addView(rayView);
 
         signalView = makeText("WAIT", 27, Color.YELLOW);
         layout.addView(signalView);
@@ -485,8 +488,8 @@ public class FloatingBubbleService extends Service {
 
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int panelWidth = Math.min((int) (310 * getResources().getDisplayMetrics().density), screenWidth - 24);
-        int maxPanelHeight = Math.max(150, (int) (screenHeight * 0.30f));
+        int panelWidth = Math.min((int) (360 * getResources().getDisplayMetrics().density), screenWidth - 24);
+        int maxPanelHeight = Math.max(240, (int) (screenHeight * 0.62f));
 
         panelParams = makeParams(panelWidth, maxPanelHeight);
         panelParams.gravity = Gravity.TOP | Gravity.START;
