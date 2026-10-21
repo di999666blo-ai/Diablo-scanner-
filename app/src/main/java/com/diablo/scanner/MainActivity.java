@@ -85,78 +85,136 @@ public class MainActivity extends Activity {
     }
 
 
-    // DIABLO SCANNER DASHBOARD — nine reference-design sections.
-    // Preserve the existing scanner, preferences, and analysis methods.
+    // Dashboard redesign: dark navy/black surfaces, bright red accents, white text.
+    // Existing capture, AI, history, settings and overlay implementations are retained.
     private void buildDashboard() {
         createPageShell("DIABLO SCANNER", "Shazam for Trading Charts");
         addHeroBrandPanel();
         addInfoPanel("● SCREEN SCANNER READY");
 
         addSectionTitle("TRADING MODE");
-        addButton("AI SCALPING", v -> {
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button scalping = makeDashboardModeButton("AI SCALPING", true);
+        Button timed = makeDashboardModeButton("TIMED SIGNAL", false);
+        LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(0,
+                (int) (52 * getResources().getDisplayMetrics().density), 1f);
+        modeParams.setMargins(3, 4, 3, 4);
+        modeRow.addView(scalping, modeParams);
+        modeRow.addView(timed, modeParams);
+        root.addView(modeRow);
+        scalping.setOnClickListener(v -> {
             prefs.edit().putString("trading_mode", "SCALPING").apply();
             openPage("AI SCANNER");
         });
-        addButton("TIMED SIGNAL", v -> {
+        timed.setOnClickListener(v -> {
             prefs.edit().putString("trading_mode", "TIMED").apply();
             openPage("AI SCANNER");
         });
 
         addSectionTitle("TRADE DURATION");
-        addButton("⏱  TRADE DURATION: " + formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS)),
-                v -> showTradeDurationSettings());
+        addButton("◷  " + formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS))
+                + "  •  CHANGE", v -> showTradeDurationSettings());
 
-        addSectionTitle("SCAN NOW");
-        addButton("START SCREEN SCAN", v -> {
-            prefs.edit().putString("trading_mode",
-                    prefs.getString("trading_mode", "SCALPING")).apply();
-            openPage("AI SCANNER");
-        });
-        addButton("ANALYZE SAVED CHART", v -> chooseChart());
+        addSectionTitle("SCAN");
+        addReferenceCard("START SCREEN SCAN", "Analyze the currently visible broker chart", true,
+                v -> openPage("AI SCANNER"));
+        addReferenceCard("ANALYZE SAVED CHART", "Choose a chart image from your phone", false,
+                v -> chooseChart());
 
-        addSectionTitle("SCANNER STATUS");
+        addSectionTitle("LATEST SIGNAL");
         signalText = new TextView(this);
         signalText.setText("WAIT");
         signalText.setTextSize(30);
         signalText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         signalText.setTextColor(Color.rgb(255, 193, 7));
         signalText.setGravity(Gravity.CENTER);
-        signalText.setPadding(0, 14, 0, 6);
-        signalText.setBackground(makePanel(Color.rgb(0, 12, 19), red, 1, 18));
+        signalText.setPadding(0, 12, 0, 6);
+        signalText.setBackground(makePanel(Color.rgb(0, 12, 19), red, 1, 15));
         root.addView(signalText);
 
         statusText = new TextView(this);
-        statusText.setText("Ready for manual chart analysis.");
-        statusText.setTextSize(13);
+        statusText.setText("Scanner ready • manual trading only");
+        statusText.setTextSize(12);
         statusText.setTextColor(white);
         statusText.setGravity(Gravity.CENTER);
-        statusText.setPadding(8, 4, 8, 12);
+        statusText.setPadding(8, 5, 8, 8);
         root.addView(statusText);
 
         countText = new TextView(this);
         countText.setTextColor(Color.LTGRAY);
-        countText.setTextSize(12);
+        countText.setTextSize(11);
         countText.setGravity(Gravity.CENTER);
-        countText.setPadding(0, 0, 0, 10);
+        countText.setPadding(0, 0, 0, 8);
         root.addView(countText);
         refreshCount();
         refreshLatestResult();
 
-        addSectionTitle("QUICK ACTIONS • 9 MENUS");
-        addButton("1. HOME / DASHBOARD", v -> buildDashboard());
-        addButton("2. FLOATING BUBBLE / AI SCANNER", v -> openPage("AI SCANNER"));
-        addButton("3. EXPANDABLE SCAN PANEL", v -> {
+        addSectionTitle("QUICK ACTIONS");
+        addReferenceCard("⚙  SETTINGS", "Mode, timeframe and trade duration", false,
+                v -> openPage("CONFIGURATION"));
+        addReferenceCard("▤  SIGNAL HISTORY", "Review saved signals and outcomes", false,
+                v -> openPage("SIGNAL HISTORY"));
+        addReferenceCard("▧  GALLERY ANALYSIS", "Analyze a saved chart image", false,
+                v -> chooseChart());
+        addReferenceCard("◉  FLOATING D BUBBLE", "Start the overlay scanner", false, v -> {
             startFloatingBubble();
-            Toast.makeText(this, "Open the floating D bubble to expand the scan panel.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Open the floating D bubble over your broker chart.",
+                    Toast.LENGTH_LONG).show();
         });
-        addButton("4. SCANNING ANIMATION / STATUS", v -> openPage("AI ENGINE"));
-        addButton("5. SETTINGS", v -> openPage("CONFIGURATION"));
-        addButton("6. SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
-        addButton("7. GALLERY ANALYSIS", v -> chooseChart());
-        addButton("8. FULL RESULTS / LATEST SIGNAL", v -> refreshLatestResult());
-        addButton("9. AI ENGINE STATUS", v -> openPage("AI ENGINE"));
+        addReferenceCard("✦  AI ENGINE STATUS", "View engine status", false,
+                v -> openPage("AI ENGINE"));
 
-        addInfoPanel("Manual trading only • No broker orders are executed. Experimental confidence is not a guaranteed win probability.");
+        addSectionTitle("NINE MENU SHORTCUTS");
+        addButton("1  •  LAUNCHER / HOME", v -> buildDashboard());
+        addButton("2  •  MAIN DASHBOARD", v -> buildDashboard());
+        addButton("3  •  FLOATING BUBBLE OVERLAY", v -> startFloatingBubble());
+        addButton("4  •  EXPANDABLE SCAN PANEL", v -> openPage("AI SCANNER"));
+        addButton("5  •  SCANNING ANIMATION / STATUS", v -> openPage("AI ENGINE"));
+        addButton("6  •  SETTINGS", v -> openPage("CONFIGURATION"));
+        addButton("7  •  SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
+        addButton("8  •  GALLERY ANALYSIS", v -> chooseChart());
+        addButton("9  •  FULL RESULTS", v -> refreshLatestResult());
+
+        addInfoPanel("Dark navy/black surfaces • bright red accents • white text. Signals are experimental and for manual trading only.");
+    }
+
+    private Button makeDashboardModeButton(String label, boolean selected) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(12);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setAllCaps(false);
+        button.setBackground(makePanel(selected ? Color.rgb(238, 0, 35) : Color.rgb(17, 31, 43),
+                selected ? Color.rgb(255, 35, 55) : Color.rgb(45, 65, 82), 1, 12));
+        button.setBackgroundTintList(null);
+        return button;
+    }
+
+    private void addReferenceCard(String title, String subtitle, boolean primary,
+                                  View.OnClickListener listener) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(14, 10, 14, 10);
+        card.setBackground(makePanel(primary ? Color.rgb(16, 14, 19) : Color.rgb(9, 22, 32),
+                primary ? Color.rgb(255, 20, 45) : Color.rgb(37, 56, 70), primary ? 2 : 1, 13));
+        TextView heading = new TextView(this);
+        heading.setText(title);
+        heading.setTextColor(Color.WHITE);
+        heading.setTextSize(14);
+        heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView detail = new TextView(this);
+        detail.setText(subtitle);
+        detail.setTextColor(Color.rgb(160, 180, 194));
+        detail.setTextSize(11);
+        card.addView(heading);
+        card.addView(detail);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 4, 0, 4);
+        root.addView(card, params);
+        card.setOnClickListener(listener);
     }
 
     private void createPageShell(String title, String subtitle) {
