@@ -190,6 +190,14 @@ public class MainActivity extends Activity {
             case "scalping_engine":
                 showScalpingEngineSettings();
                 break;
+            case "kronos_config":
+                prefs.edit().putString("scalping_engine", "KRONOS").apply();
+                if (prefs.getString("kronos_service_url", "").trim().isEmpty()) showKronosServiceUrlSettings();
+                else showKronosCandleJsonSettings();
+                break;
+            case "kronos_run":
+                runKronosForecast();
+                break;
             case "all_settings":
                 showSettings();
                 break;
@@ -240,6 +248,13 @@ public class MainActivity extends Activity {
             data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
             data.put("timedSmolAssist", prefs.getBoolean("timed_smolvlm_enabled", false));
             data.put("scalpingEngine", prefs.getString("scalping_engine", "SMOLVLM"));
+            data.put("kronosSymbol", prefs.getString("kronos_symbol", "EURUSD"));
+            data.put("kronosInterval", prefs.getString("kronos_interval", "1m"));
+            data.put("kronosServiceConfigured", !prefs.getString("kronos_service_url", "").trim().isEmpty());
+            data.put("kronosSignal", prefs.getString("kronos_latest_signal", "WAIT"));
+            data.put("kronosStatus", prefs.getString("kronos_status", "NOT RUN"));
+            data.put("kronosDetails", prefs.getString("kronos_latest_details", "No Kronos forecast has run yet."));
+            data.put("kronosFeedNote", prefs.getString("kronos_feed_note", "Configure a reachable HTTPS Kronos API to fetch provider candles and run the model."));
             SharedPreferences tradePrefs = getSharedPreferences("diablo_trade_records", MODE_PRIVATE);
             JSONArray trades = new JSONArray(tradePrefs.getString("trades", "[]"));
             int wins = 0, losses = 0, unknownTrades = 0;
