@@ -112,6 +112,14 @@ public final class ChartAnalyzer {
         double required=Math.max(0.10, Math.min(0.42, threshold/100.0 + expiryAdjustment + profileAdjustment));
         int confirmationGap = duration <= 60000L ? 3 : 2;
         String signal="WAIT";
+        String patternSummary = detectTimedPatterns(candles, h);
+        boolean bullishPattern = patternSummary.contains("bullish confirmation");
+        boolean bearishPattern = patternSummary.contains("bearish confirmation");
+        double patternAdjustment = bullishPattern && !bearishPattern ? 0.04
+                : bearishPattern && !bullishPattern ? -0.04 : 0.0;
+        score = Math.max(-1.0, Math.min(1.0, score + patternAdjustment));
+        strength = Math.abs(score);
+        // Pattern evidence is a small tie-breaker, never a standalone trigger.
         if(score>required && recentUp>=recentDown+confirmationGap) signal="UP";
         else if(score < -required && recentDown>=recentUp+confirmationGap) signal="DOWN";
 
@@ -126,6 +134,7 @@ public final class ChartAnalyzer {
         details.append("Timed strategy: ").append(duration <= 60000L ? "1-minute fast confirmation" : duration <= 180000L ? "3-minute balanced confirmation" : "5-minute broader-lookback confirmation").append("\n");
         details.append("Timing: ").append(timingText).append("\n");
         details.append("Visual candle columns: ").append(columnsWithColour).append("\n");
+        details.append("Timed pattern library: ").append(patternSummary).append("\n");
         details.append("Recent coloured columns: ").append(recentUp).append(" bullish, ").append(recentDown).append(" bearish, ").append(recentFlat).append(" mixed\n");
         details.append("Read: ").append(directionText).append(".\n");
         details.append("CONFIDENCE: ").append(confidence).append("%\n");
@@ -138,6 +147,83 @@ public final class ChartAnalyzer {
         }
         if("CLOSE".equalsIgnoreCase(timing)) details.append("\nNote: a screenshot cannot prove the candle has closed; capture again after the candle closes.");
         return new LocalVisionAI.Result(signal,details.toString());
+    }
+
+    /**
+     * Candidate pattern library for the lightweight TIMED SIGNAL engine.
+     * The screen extractor sees coloured columns, not broker OHLC values, so
+     * these are visual candidates and not guaranteed or fully confirmed patterns.
+     */
+    private static String detectTimedPatterns(List<Candle> candles, int imageHeight) {
+        if (candles == null || candles.size() < 6) return "insufficient candles; WAIT";
+        int n = candles.size();
+        int d1 = candles.get(n - 1).direction();
+        int d2 = candles.get(n - 2).direction();
+        int d3 = candles.get(n - 3).direction();
+        int y1 = candles.get(n - 1).y;
+        int y2 = candles.get(n - 2).y;
+        int y3 = candles.get(n - 3).y;
+        java.util.ArrayList<String> found = new java.util.ArrayList<>();
+
+        if (d2 < 0 && d1 > 0 && y1 < y2) found.add("bullish engulfing-like reversal candidate (bullish confirmation)");
+        if (d2 > 0 && d1 < 0 && y1 > y2) found.add("bearish engulfing-like reversal candidate (bearish confirmation)");
+        if (d3 < 0 && d2 == 0 && d1 > 0 && y1 < y3) found.add("morning-star-like reversal candidate (bullish confirmation)");
+        if (d3 > 0 && d2 == 0 && d1 < 0 && y1 > y3) found.add("evening-star-like reversal candidate (bearish confirmation)");
+        if (d3 > 0 && d2 > 0 && d1 > 0 && y1 < y2 && y2 < y3) found.add("three-candle bullish continuation");
+        if (d3 < 0 && d2 < 0 && d1 < 0 && y1 > y2 && y2 > y3) found.add("three-candle bearish continuation");
+        if (d1 == 0) found.add("doji/indecision-like column");
+
+        int window = Math.min(12, n);
+        int half = Math.max(3, window / 2);
+        int oldMin = Integer.MAX_VALUE, oldMax = Integer.MIN_VALUE;
+        int newMin = Integer.MAX_VALUE, newMax = Integer.MIN_VALUE;
+        double oldMean = 0, newMean = 0;
+        int split = n - half;
+        for (int i = n - window; i < split; i++) {
+            int y = candles.get(i).y;
+            oldMin = Math.min(oldMin, y); oldMax = Math.max(oldMax, y); oldMean += y;
+        }
+        int oldCount = Math.max(1, split - (n - window));
+        oldMean /= oldCount;
+        for (int i = split; i < n; i++) {
+            int y = candles.get(i).y;
+            newMin = Math.min(newMin, y); newMax = Math.max(newMax, y); newMean += y;
+        }
+        newMean /= half;
+        int rangeTolerance = Math.max(4, (int)(imageHeight * 0.025));
+        if (Math.abs(oldMean - newMean) > imageHeight * 0.025) {
+            found.add(newMean < oldMean ? "short-term upward price drift" : "short-term downward price drift");
+        }
+        if (newMax - newMin < oldMax - oldMin && Math.abs(newMean - oldMean) < imageHeight * 0.06) {
+            found.add("triangle/wedge compression candidate");
+        }
+        int first = Math.max(0, n - window);
+        int topA = -1, topB = -1, bottomA = -1, bottomB = -1;
+        for (int i = first + 1; i < n - 1; i++) {
+            int prev = candles.get(i - 1).y, cur = candles.get(i).y, next = candles.get(i + 1).y;
+            if (cur < prev && cur < next) { topB = topA; topA = i; }
+            if (cur > prev && cur > next) { bottomB = bottomA; bottomA = i; }
+        }
+        if (topA >= 0 && topB >= 0 && Math.abs(candles.get(topA).y - candles.get(topB).y) <= rangeTolerance)
+            found.add("double-top/resistance candidate");
+        if (bottomA >= 0 && bottomB >= 0 && Math.abs(candles.get(bottomA).y - candles.get(bottomB).y) <= rangeTolerance)
+            found.add("double-bottom/support candidate");
+
+        int previousMin = Integer.MAX_VALUE, previousMax = Integer.MIN_VALUE;
+        for (int i = first; i < n - 1; i++) {
+            previousMin = Math.min(previousMin, candles.get(i).y);
+            previousMax = Math.max(previousMax, candles.get(i).y);
+        }
+        if (y1 < previousMin - rangeTolerance) found.add("upward range-break candidate (bullish confirmation)");
+        if (y1 > previousMax + rangeTolerance) found.add("downward range-break candidate (bearish confirmation)");
+        if (found.isEmpty()) return "no clear pattern candidate; WAIT if other evidence conflicts";
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < found.size(); i++) {
+            if (i > 0) result.append("; ");
+            result.append(found.get(i));
+        }
+        result.append(". Library also tracks trend structure and candidate continuation/reversal context. Head-and-shoulders, flags, exact channels/wedges, wick-ratio patterns (hammer, shooting star, pin bar), liquidity sweeps and FVGs need reliable OHLC/wick extraction and are not claimed as confirmed by this pixel-only pass.");
+        return result.toString();
     }
 
     private static String formatDuration(long ms) {

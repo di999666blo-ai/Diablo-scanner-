@@ -59,6 +59,9 @@ public class ScreenCaptureService extends Service {
 
     // The scanner analyses only after the user explicitly taps the D bubble.
     private volatile boolean analysisRequested = false;
+    private volatile boolean timedScanActive = false;
+    private volatile long timedScanStartedAt = 0L;
+    private volatile long timedScanDurationMs = 30000L;
 
     /*
      * AI runs separately from screen capture.
@@ -69,6 +72,32 @@ public class ScreenCaptureService extends Service {
 
     private final AtomicBoolean aiRunning =
             new AtomicBoolean(false);
+
+    private final Runnable timedScanRunnable = new Runnable() {
+        @Override public void run() {
+            if (!timedScanActive || workerHandler == null || !captureStarted) return;
+            SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+            long elapsed = Math.max(0L, System.currentTimeMillis() - timedScanStartedAt);
+            long remaining = Math.max(0L, timedScanDurationMs - elapsed);
+            if (remaining <= 0L) {
+                if (aiRunning.get()) {
+                    workerHandler.postDelayed(this, 1000L);
+                    return;
+                }
+                finishTimedScan();
+                return;
+            }
+            if (!aiRunning.get()) {
+                analysisRequested = true;
+                state.edit().putString("scan_status", "SCANNING")
+                        .putString("scan_message", "TIMED SIGNAL • observing live chart: "
+                                + (elapsed / 1000L) + "/" + (timedScanDurationMs / 1000L)
+                                + " seconds • sampling about every 5 seconds.")
+                        .apply();
+            }
+            workerHandler.postDelayed(this, 5000L);
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -144,12 +173,34 @@ public class ScreenCaptureService extends Service {
 
         if (ACTION_ANALYZE_ONCE.equals(intent.getAction())) {
             if (captureStarted) {
-                analysisRequested = true;
-                getSharedPreferences("diablo_scanner", MODE_PRIVATE)
-                        .edit()
-                        .putString("scan_status", "SCANNING")
-                        .putString("scan_message", "Capturing the current chart for one analysis...")
-                        .apply();
+                SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                boolean timedMode = "TIMED".equalsIgnoreCase(state.getString("trading_mode", "TIMED"));
+                if (timedMode && timedScanActive) return START_NOT_STICKY;
+                if (timedMode && workerHandler != null) {
+                    timedScanDurationMs = Math.max(5000L, Math.min(300000L,
+                            state.getLong("timed_scan_duration_ms", 30000L)));
+                    timedScanStartedAt = System.currentTimeMillis();
+                    timedScanActive = true;
+                    workerHandler.removeCallbacks(timedScanRunnable);
+                    state.edit().putBoolean("timed_scan_active", true)
+                            .putLong("timed_scan_started_at", timedScanStartedAt)
+                            .putLong("timed_scan_duration_ms", timedScanDurationMs)
+                            .putInt("timed_samples", 0).putInt("timed_up_votes", 0)
+                            .putInt("timed_down_votes", 0).putInt("timed_wait_votes", 0)
+                            .putString("timed_last_details", "")
+                            .putString("scan_status", "SCANNING")
+                            .putString("scan_message", "TIMED SIGNAL • starting live observation for "
+                                    + (timedScanDurationMs / 1000L) + " seconds...")
+                            .apply();
+                    analysisRequested = true;
+                    workerHandler.postDelayed(timedScanRunnable, 5000L);
+                } else {
+                    analysisRequested = true;
+                    state.edit().putBoolean("timed_scan_active", false)
+                            .putString("scan_status", "SCANNING")
+                            .putString("scan_message", "Capturing the current chart for one analysis...")
+                            .apply();
+                }
             }
             return START_NOT_STICKY;
         }
@@ -533,6 +584,33 @@ public class ScreenCaptureService extends Service {
                 MODE_PRIVATE
         );
 
+        if (!"SCALPING".equalsIgnoreCase(mode) && prefs.getBoolean("timed_scan_active", false)) {
+            int samples = prefs.getInt("timed_samples", 0) + 1;
+            int ups = prefs.getInt("timed_up_votes", 0) + ("UP".equals(aiSignal) ? 1 : 0);
+            int downs = prefs.getInt("timed_down_votes", 0) + ("DOWN".equals(aiSignal) ? 1 : 0);
+            int waits = prefs.getInt("timed_wait_votes", 0) + ("WAIT".equals(aiSignal) ? 1 : 0);
+            long elapsed = Math.max(0L, System.currentTimeMillis() - prefs.getLong("timed_scan_started_at", System.currentTimeMillis()));
+            long duration = prefs.getLong("timed_scan_duration_ms", 30000L);
+            prefs.edit().putInt("timed_samples", samples).putInt("timed_up_votes", ups)
+                    .putInt("timed_down_votes", downs).putInt("timed_wait_votes", waits)
+                    .putString("timed_last_details", details).apply();
+            if (elapsed < duration) {
+                prefs.edit().putString("scan_status", "SCANNING")
+                        .putString("scan_message", "TIMED SIGNAL • live observation "
+                                + (elapsed / 1000L) + "/" + (duration / 1000L) + " sec • samples: " + samples
+                                + " • UP " + ups + " / DOWN " + downs + " / WAIT " + waits
+                                + "\n" + details).apply();
+                return;
+            }
+            timedScanActive = false;
+            prefs.edit().putBoolean("timed_scan_active", false).apply();
+            aiSignal = chooseTimedVote(samples, ups, downs, duration);
+            displaySignal = "UP".equals(aiSignal) ? "UP BIAS" : "DOWN".equals(aiSignal) ? "DOWN BIAS" : "WAIT";
+            details = details + "\n\nTIMED OBSERVATION SUMMARY: " + samples + " live samples; UP " + ups
+                    + ", DOWN " + downs + ", WAIT " + waits + ". Final result uses the vote balance and agreement; this is not a verified win probability.";
+            score = extractConfidence(details);
+        }
+
         try {
             JSONArray old = new JSONArray(
                     prefs.getString("history", "[]")
@@ -593,6 +671,40 @@ public class ScreenCaptureService extends Service {
         } catch (Exception ignored) {
             // A history error must not stop the scanner.
         }
+    }
+
+    private String chooseTimedVote(int samples, int ups, int downs, long duration) {
+        int minimumSamples = duration <= 10000L ? 1 : 2;
+        if (samples < minimumSamples || ups == downs) return "WAIT";
+        int threshold = Math.max(1, (int)Math.ceil(samples * 0.40));
+        if (ups > downs && ups >= threshold) return "UP";
+        if (downs > ups && downs >= threshold) return "DOWN";
+        return "WAIT";
+    }
+
+    private void finishTimedScan() {
+        SharedPreferences prefs = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+        int samples = prefs.getInt("timed_samples", 0);
+        int ups = prefs.getInt("timed_up_votes", 0);
+        int downs = prefs.getInt("timed_down_votes", 0);
+        int waits = prefs.getInt("timed_wait_votes", 0);
+        long duration = prefs.getLong("timed_scan_duration_ms", 30000L);
+        String lastDetails = prefs.getString("timed_last_details", "No readable chart sample was returned.");
+        timedScanActive = false;
+        prefs.edit().putBoolean("timed_scan_active", false).apply();
+        if (samples <= 0) {
+            prefs.edit().putString("scan_status", "ANALYSIS_COMPLETE_WAIT")
+                    .putString("scan_message", "TIMED SIGNAL • WAIT • no readable live samples were collected. Keep the chart visible and try again.")
+                    .apply();
+            return;
+        }
+        String signal = chooseTimedVote(samples, ups, downs, duration);
+        String summary = lastDetails + "\n\nTIMED OBSERVATION SUMMARY: " + samples
+                + " live samples across " + (duration / 1000L) + " seconds; UP " + ups
+                + ", DOWN " + downs + ", WAIT " + waits
+                + ". " + ("WAIT".equals(signal) ? "Evidence did not agree strongly enough; final signal is WAIT." : "Final direction is the majority supported direction.")
+                + " This is experimental screen-image analysis, not a verified win probability.";
+        saveAIResult(new LocalVisionAI.Result(signal, summary));
     }
 
     private int extractConfidence(String details) {
@@ -700,9 +812,12 @@ public class ScreenCaptureService extends Service {
         stopping = true;
         captureStarted = false;
         analysisRequested = false;
+        timedScanActive = false;
+        if (workerHandler != null) workerHandler.removeCallbacks(timedScanRunnable);
         getSharedPreferences("diablo_scanner", MODE_PRIVATE)
                 .edit()
                 .putBoolean("screen_capture_active", false)
+                .putBoolean("timed_scan_active", false)
                 .putString("scan_status", "WAIT")
                 .putString("scan_message", "Screen capture stopped. Start it again to scan.")
                 .apply();

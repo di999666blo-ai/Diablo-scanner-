@@ -213,7 +213,7 @@ public class FloatingBubbleService extends Service {
     // MOVABLE D BUBBLE
 
     private void showBubble() {
-        TextView icon = makeText("D", 25, Color.rgb(255, 105, 55));
+        TextView icon = makeText("D", 29, Color.rgb(255, 105, 55));
         icon.setBackground(makeBackground(Color.rgb(15, 12, 15)));
         icon.setElevation(10f);
         icon.setScaleX(0.94f);
@@ -222,7 +222,8 @@ public class FloatingBubbleService extends Service {
 
         bubble = icon;
 
-        bubbleParams = makeParams(58, 58);
+        int bubbleSize = (int) (70 * getResources().getDisplayMetrics().density);
+        bubbleParams = makeParams(bubbleSize, bubbleSize);
         bubbleParams.gravity = Gravity.TOP | Gravity.START;
         bubbleParams.x = 12;
         bubbleParams.y = 180;
@@ -485,7 +486,7 @@ public class FloatingBubbleService extends Service {
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         int panelWidth = Math.min((int) (310 * getResources().getDisplayMetrics().density), screenWidth - 24);
-        int maxPanelHeight = Math.max(280, (int) (screenHeight * 0.72f));
+        int maxPanelHeight = Math.max(150, (int) (screenHeight * 0.30f));
 
         panelParams = makeParams(panelWidth, maxPanelHeight);
         panelParams.gravity = Gravity.TOP | Gravity.START;

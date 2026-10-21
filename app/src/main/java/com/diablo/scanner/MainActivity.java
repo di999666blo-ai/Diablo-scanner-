@@ -354,6 +354,7 @@ public class MainActivity extends Activity {
             addInfoPanel("Change settings here. Each control opens its own selection screen.");
             addSectionTitle("SCAN CONFIGURATION");
             addButton("TRADE DURATION: " + formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS)), v -> showTradeDurationSettings());
+            addButton("TIMED SCAN WINDOW: " + formatDuration(prefs.getLong("timed_scan_duration_ms", 30000L)), v -> showTimedScanDurationSettings());
             addButton("CHART TIMEFRAME", v -> showChartTimeframeSettings());
             addButton("TRADING MODE", v -> showTradingModeSettings());
             addButton("TIMED SIGNAL SPEED / PRECISION", v -> showTimedAnalysisProfileSettings());
@@ -562,6 +563,7 @@ public class MainActivity extends Activity {
 
         String timeframe = prefs.getString("chart_timeframe", "1m");
         long duration = prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS);
+        long scanWindow = prefs.getLong("timed_scan_duration_ms", 30000L);
         String profile = prefs.getString("timed_analysis_profile", "BALANCED");
         String profileLabel = "FAST".equals(profile) ? "FAST SCAN"
                 : "PRECISION".equals(profile) ? "PRECISION CHECK" : "BALANCED";
@@ -571,6 +573,7 @@ public class MainActivity extends Activity {
                 modeLabel +
                 "\nChart timeframe: " + timeframe +
                 "\nTrade duration: " + formatDuration(duration) +
+                "\nTimed scan window: " + formatDuration(scanWindow) +
                 "\nTimed engine: " + profileLabel
         );
     }
@@ -1156,6 +1159,7 @@ public class MainActivity extends Activity {
     private void showSettings() {
         String[] options = {
                 "Trade duration",
+                "Timed Signal scan window",
                 "Chart timeframe",
                 "Trading mode",
                 "Timed analysis speed / precision",
@@ -1169,18 +1173,46 @@ public class MainActivity extends Activity {
                     if (which == 0) {
                         showTradeDurationSettings();
                     } else if (which == 1) {
-                        showChartTimeframeSettings();
+                        showTimedScanDurationSettings();
                     } else if (which == 2) {
-                        showTradingModeSettings();
+                        showChartTimeframeSettings();
                     } else if (which == 3) {
-                        showTimedAnalysisProfileSettings();
+                        showTradingModeSettings();
                     } else if (which == 4) {
+                        showTimedAnalysisProfileSettings();
+                    } else if (which == 5) {
                         showSensitivitySettings();
                     } else {
                         showSignalTimingSettings();
                     }
                 })
                 .setNegativeButton("CLOSE", null)
+                .show();
+    }
+
+    private void showTimedScanDurationSettings() {
+        String[] labels = {
+                "5 seconds — very fast / experimental",
+                "15 seconds — fast",
+                "30 seconds — recommended starting point",
+                "60 seconds — more confirmation",
+                "2 minutes — extended observation",
+                "5 minutes — long observation"
+        };
+        long[] values = {5000L, 15000L, 30000L, 60000L, 120000L, 300000L};
+        long current = prefs.getLong("timed_scan_duration_ms", 30000L);
+        int selected = 2;
+        for (int i = 0; i < values.length; i++) if (values[i] == current) selected = i;
+        new AlertDialog.Builder(this)
+                .setTitle("Timed Signal scan window")
+                .setMessage("This is how long Timed Signal observes the moving screen before combining its chart reads. It is separate from trade duration. Very short scans may have too few samples to support a directional result.")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    prefs.edit().putLong("timed_scan_duration_ms", values[which]).apply();
+                    dialog.dismiss();
+                    refreshControlSummary();
+                    Toast.makeText(this, "Timed scan window saved: " + labels[which], Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("CANCEL", null)
                 .show();
     }
 
@@ -1208,16 +1240,17 @@ public class MainActivity extends Activity {
 
     private void showChartTimeframeSettings() {
         String[] options = {
+                "3 seconds (if broker supports it)", "5 seconds (if broker supports it)",
                 "15 seconds", "30 seconds", "1 minute", "2 minutes", "3 minutes",
                 "5 minutes", "10 minutes", "15 minutes", "30 minutes",
                 "1 hour", "4 hours", "1 day"
         };
         String[] values = {
-                "15s", "30s", "1m", "2m", "3m", "5m", "10m", "15m",
-                "30m", "1h", "4h", "1d"
+                "3s", "5s", "15s", "30s", "1m", "2m", "3m", "5m", "10m",
+                "15m", "30m", "1h", "4h", "1d"
         };
         String current = prefs.getString("chart_timeframe", "1m");
-        int selected = 2;
+        int selected = 4;
         for (int i = 0; i < values.length; i++) {
             if (values[i].equals(current)) selected = i;
         }
