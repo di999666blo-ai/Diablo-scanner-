@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.view.Gravity;
+import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -213,7 +214,8 @@ public class FloatingBubbleService extends Service {
     // MOVABLE D BUBBLE
 
     private void showBubble() {
-        TextView icon = makeText("D", 29, Color.rgb(255, 105, 55));
+        TextView icon = makeText("D", 30, Color.WHITE);
+        icon.setShadowLayer(8f, 0f, 0f, Color.rgb(255, 10, 31));
         icon.setBackground(makeBackground(Color.rgb(15, 12, 15)));
         icon.setElevation(10f);
         icon.setScaleX(0.94f);
@@ -222,7 +224,7 @@ public class FloatingBubbleService extends Service {
 
         bubble = icon;
 
-        int bubbleSize = (int) (70 * getResources().getDisplayMetrics().density);
+        int bubbleSize = (int) (74 * getResources().getDisplayMetrics().density);
         bubbleParams = makeParams(bubbleSize, bubbleSize);
         bubbleParams.gravity = Gravity.TOP | Gravity.START;
         bubbleParams.x = 12;
@@ -367,8 +369,13 @@ public class FloatingBubbleService extends Service {
 
         layout.addView(makeText("◈  DIABLO SCANNER  ◈", 16, Color.rgb(255, 35, 55)));
         layout.addView(makeText("LIVE SCAN  •  CHART → AI → SIGNAL", 10, Color.rgb(255, 105, 120)));
-        TextView rayView = makeText("◢  BLACK RAY SCAN  ━━━━━━━━━  AI ANALYSIS", 11, Color.rgb(255, 35, 55));
+        TextView rayView = makeText("◢ BLACK RAY SCAN ━━━━━━━━━ CHART LOCK ━━━━━━━━━ AI ANALYSIS ━━━━━━━━━ SIGNAL", 11, Color.rgb(255, 10, 31));
         rayView.setBackground(makeBackground(Color.rgb(5, 5, 8)));
+        rayView.setSingleLine(true);
+        rayView.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        rayView.setMarqueeRepeatLimit(-1);
+        rayView.setHorizontallyScrolling(true);
+        rayView.setSelected(true);
         layout.addView(rayView);
 
         signalView = makeText("WAIT", 27, Color.YELLOW);
@@ -489,7 +496,7 @@ public class FloatingBubbleService extends Service {
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         int panelWidth = Math.min((int) (360 * getResources().getDisplayMetrics().density), screenWidth - 24);
-        int maxPanelHeight = Math.max(240, (int) (screenHeight * 0.62f));
+        int maxPanelHeight = Math.max(180, (int) (screenHeight * 0.30f));
 
         panelParams = makeParams(panelWidth, maxPanelHeight);
         panelParams.gravity = Gravity.TOP | Gravity.START;
