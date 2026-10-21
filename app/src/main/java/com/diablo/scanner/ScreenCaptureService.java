@@ -535,11 +535,11 @@ public class ScreenCaptureService extends Service {
                                     + "or verified structured OHLC feed. No Kronos forecast was generated. "
                                     + "Select SmolVLM or Hybrid in Settings, or connect and verify the Kronos service first.");
                         } else if ("HYBRID".equalsIgnoreCase(selectedEngine)) {
-                            LocalVisionAI.Result fastResult =
-                                    ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
-                            LocalVisionAI.Result visualResult =
-                                    LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
-                            result = combineTimedHybrid(fastResult, visualResult);
+                            // HYBRID_STANDALONE: this engine owns its fast chart-image
+                            // feature extraction and decision logic. It must never call
+                            // SmolVLM or Kronos as a hidden dependency.
+                            result = ChartAnalyzer.analyze(
+                                    getApplicationContext(), analysisBitmap);
                         } else {
                             result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                         }
