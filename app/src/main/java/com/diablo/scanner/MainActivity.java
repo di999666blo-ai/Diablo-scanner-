@@ -177,7 +177,7 @@ public class MainActivity extends Activity {
             case "candle_timing":
                 showSignalTimingSettings();
                 break;
-            case "timed_smolvlm":
+            case "timed_smolvlm": {
                 boolean enabled = !prefs.getBoolean("timed_smolvlm_enabled", false);
                 prefs.edit().putBoolean("timed_smolvlm_enabled", enabled).apply();
                 Toast.makeText(this, enabled
@@ -185,6 +185,7 @@ public class MainActivity extends Activity {
                         : "Optional SmolVLM confirmation disabled. Timed Signal will use the fast hybrid analyzer only.",
                         Toast.LENGTH_LONG).show();
                 break;
+            }
             case "all_settings":
                 showSettings();
                 break;
