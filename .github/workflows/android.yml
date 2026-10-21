@@ -167,7 +167,9 @@ jobs:
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
-          grep -q 'KronosRuntimeClient.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'KronosLocalRuntime.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'fetchLocalCandleInput' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
+          grep -q 'onnxruntime-android' app/build.gradle
           test -s app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'kronos_service_url' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'kronos_candles_json' app/src/main/java/com/diablo/scanner/MainActivity.java
@@ -176,7 +178,7 @@ jobs:
           grep -q 'fetchBiQuoteForecastRequest' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'biquote.io/api/' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'bar.optBoolean("isOpen", false)' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
-          grep -q 'On-device Kronos inference is not implemented yet' app/src/main/java/com/diablo/scanner/MainActivity.java
+          grep -q 'genuine on-device inference port is still incomplete' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'HYBRID_STANDALONE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           python - <<'PY'
