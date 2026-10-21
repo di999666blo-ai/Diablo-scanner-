@@ -150,7 +150,12 @@ jobs:
           grep -q 'timedSmolButton' app/src/main/assets/dashboard.html
           grep -q 'ic_diablo_launcher_vector' app/src/main/AndroidManifest.xml
           test -s app/src/main/res/drawable/ic_diablo_launcher_vector.xml
-          grep -q 'KRONOS BLOCKED' app/src/main/assets/dashboard.html
+          grep -q 'KRONOS SELECTED BUT BLOCKED' app/src/main/assets/dashboard.html
+          grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
+          grep -q 'KRONOS'.* app/src/main/java/com/diablo/scanner/MainActivity.java || true
+          grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
+          grep -q 'KRONOS SELECTED BUT UNAVAILABLE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           test -s docs/KRONOS_ANDROID_INTEGRATION.md
           echo "Hybrid controls and launcher icon resource are present."
           echo "Kronos is explicitly marked unavailable until its real runtime and OHLC path are integrated."
