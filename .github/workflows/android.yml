@@ -139,7 +139,9 @@ jobs:
           grep -q 'combineTimedHybrid' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'timed_smolvlm' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'timedSmolButton' app/src/main/assets/dashboard.html
-          echo "Timed Signal fast-primary and optional SmolVLM controls are present."
+          grep -q 'ic_diablo_launcher_vector' app/src/main/AndroidManifest.xml
+          test -s app/src/main/res/drawable/ic_diablo_launcher_vector.xml
+          echo "Hybrid controls and launcher icon resource are present."
 
       - name: Run Android unit tests
         run: |
