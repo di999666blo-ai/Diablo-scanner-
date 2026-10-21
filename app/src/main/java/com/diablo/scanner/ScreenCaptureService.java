@@ -503,6 +503,7 @@ public class ScreenCaptureService extends Service {
         boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
         final boolean timedObservation = scanPrefs.getBoolean("timed_scan_active", false);
         final boolean optionalSmolAssist = scanPrefs.getBoolean("timed_smolvlm_enabled", false);
+        final String selectedScalpingEngine = scanPrefs.getString("scalping_engine", "SMOLVLM");
         if (!scalpingMode && timedObservation && optionalSmolAssist) {
             Bitmap cached = analysisBitmap.copy(Bitmap.Config.ARGB_8888, false);
             Bitmap previous = latestTimedChart;
@@ -512,7 +513,11 @@ public class ScreenCaptureService extends Service {
         scanPrefs.edit()
                 .putString("scan_status", "AI_PROCESSING")
                 .putString("scan_message", scalpingMode
-                        ? "Preparing SmolVLM AI for Scalping Setup..."
+                        ? ("KRONOS".equalsIgnoreCase(selectedScalpingEngine)
+                            ? "Kronos selected; checking availability. If not connected, result will be WAIT."
+                            : ("HYBRID".equalsIgnoreCase(selectedScalpingEngine)
+                                ? "Running fast candle analysis + SmolVLM visual review..."
+                                : "Preparing SmolVLM AI for Scalping Setup..."))
                         : "Running fast Timed Signal chart strategy...")
                 .apply();
         try {
@@ -522,7 +527,7 @@ public class ScreenCaptureService extends Service {
                     // is a secondary visual check. Scalping engine selection is explicit.
                     LocalVisionAI.Result result;
                     if (scalpingMode) {
-                        String selectedEngine = scanPrefs.getString("scalping_engine", "SMOLVLM");
+                        String selectedEngine = selectedScalpingEngine;
                         if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
                             // Never silently fall back to SmolVLM while claiming Kronos ran.
                             result = new LocalVisionAI.Result("WAIT",
