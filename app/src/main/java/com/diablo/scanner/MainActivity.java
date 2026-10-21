@@ -1792,34 +1792,121 @@ public class MainActivity extends Activity {
     }
 
     private void showKronosCandleJsonSettings() {
-        EditText input = new EditText(this);
-        input.setSingleLine(false);
-        input.setMinLines(8);
-        input.setMaxLines(12);
-        input.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        input.setHint("{ \"symbol\": \"EURUSD\", \"timeframe_seconds\": 60, \"prediction_bars\": 3, \"candles\": [at least 32 timestamped OHLCV candles] }");
-        input.setText(prefs.getString("kronos_candles_json", ""));
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(32, 8, 32, 8);
+
+        EditText symbolInput = new EditText(this);
+        symbolInput.setSingleLine(true);
+        symbolInput.setHint("Instrument symbol, e.g. EURUSD or XAUUSD");
+        symbolInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        symbolInput.setText(prefs.getString("kronos_symbol", "EURUSD"));
+        form.addView(symbolInput, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        EditText intervalInput = new EditText(this);
+        intervalInput.setSingleLine(true);
+        intervalInput.setHint("Interval: 1m, 5m, 15m, 30m, 1h, 4h, 1d");
+        intervalInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        intervalInput.setText(prefs.getString("kronos_interval", "1m"));
+        form.addView(intervalInput, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
         new AlertDialog.Builder(this)
-                .setTitle("Kronos candle input JSON")
-                .setMessage("Paste a complete JSON request containing at least 32 completed candles with timestamp, open, high, low, close and optional volume/amount. Use real candle data from a source you trust; the screenshot analyzer cannot recover exact OHLC values. Saving this does not execute trades.")
-                .setView(input)
-                .setPositiveButton("SAVE CANDLE DATA", (dialog, which) -> {
-                    String json = input.getText().toString().trim();
-                    prefs.edit().putString("kronos_candles_json", json).apply();
-                    Toast.makeText(this, json.isEmpty()
-                            ? "Kronos candle data not saved. Kronos will return WAIT until valid data is added."
-                            : "Kronos candle JSON saved. It will be validated when you scan.", Toast.LENGTH_LONG).show();
+                .setTitle("Kronos market feed")
+                .setMessage("Kronos will fetch real OHLC candles automatically from the free public biquote.io feed through your Kronos API. Use a symbol actually listed by the provider. Supported intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d. No API key is required by biquote for read access.")
+                .setView(form)
+                .setPositiveButton("SAVE MARKET SETTINGS", (dialog, which) -> {
+                    String symbol = symbolInput.getText().toString().trim().toUpperCase(Locale.ROOT);
+                    String interval = intervalInput.getText().toString().trim().toLowerCase(Locale.ROOT);
+                    if (symbol.isEmpty()) symbol = "EURUSD";
+                    if (!("1m".equals(interval) || "5m".equals(interval) || "15m".equals(interval)
+                            || "30m".equals(interval) || "1h".equals(interval) || "4h".equals(interval)
+                            || "1d".equals(interval))) {
+                        Toast.makeText(this, "Invalid interval. Use 1m, 5m, 15m, 30m, 1h, 4h or 1d.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    prefs.edit()
+                            .putString("kronos_symbol", symbol)
+                            .putString("kronos_interval", interval)
+                            .remove("kronos_candles_json")
+                            .apply();
+                    Toast.makeText(this, "Kronos will request " + symbol + " " + interval
+                            + " candles automatically. The API and model host must be online.", Toast.LENGTH_LONG).show();
                     refreshDashboardWebView();
                 })
-                .setNeutralButton("CLEAR DATA", (dialog, which) -> {
-                    prefs.edit().remove("kronos_candles_json").apply();
-                    Toast.makeText(this, "Saved Kronos candle data cleared.", Toast.LENGTH_SHORT).show();
+                .setNeutralButton("BROWSE SYMBOL CATALOGUE", (dialog, which) -> {
+                    String baseUrl = prefs.getString("kronos_service_url", "").trim().replaceAll("/+$", "");
+                    if (baseUrl.isEmpty()) {
+                        Toast.makeText(this, "Save the Kronos API URL first.", Toast.LENGTH_LONG).show();
+                    } else {
+                        browseKronosSymbols(baseUrl);
+                    }
                 })
                 .setNegativeButton("CANCEL", (dialog, which) -> refreshDashboardWebView())
                 .show();
+    }
+
+    private void browseKronosSymbols(String baseUrl) {
+        Toast.makeText(this, "Loading biquote instrument catalogue…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new java.net.URL(baseUrl + "/v1/market/symbols").openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(12000);
+                connection.setReadTimeout(20000);
+                connection.setRequestProperty("Accept", "application/json");
+                int status = connection.getResponseCode();
+                InputStream stream = status >= 200 && status < 300
+                        ? connection.getInputStream() : connection.getErrorStream();
+                String body;
+                try (InputStream in = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while (in != null && (count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                    body = out.toString("UTF-8");
+                }
+                if (status < 200 || status >= 300) throw new IllegalStateException("HTTP " + status);
+                JSONObject json = new JSONObject(body);
+                JSONArray symbols = json.optJSONArray("symbols");
+                if (symbols == null || symbols.length() == 0) throw new IllegalStateException("No symbols returned");
+                java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+                java.util.ArrayList<String> names = new java.util.ArrayList<>();
+                for (int i = 0; i < symbols.length(); i++) {
+                    JSONObject item = symbols.optJSONObject(i);
+                    if (item == null) continue;
+                    String name = item.optString("name", item.optString("symbol", ""));
+                    if (name.isEmpty()) continue;
+                    String description = item.optString("description", item.optString("type", ""));
+                    names.add(name);
+                    labels.add(description.isEmpty() ? name : name + " — " + description);
+                }
+                runOnUiThread(() -> {
+                    if (labels.isEmpty()) {
+                        Toast.makeText(this, "Provider returned no instrument names.", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    String[] choices = labels.toArray(new String[0]);
+                    new AlertDialog.Builder(this)
+                            .setTitle("biquote instruments (" + choices.length + ")")
+                            .setItems(choices, (d, which) -> {
+                                prefs.edit().putString("kronos_symbol", names.get(which)).remove("kronos_candles_json").apply();
+                                Toast.makeText(this, "Selected " + names.get(which) + ". Save market settings to choose the interval.", Toast.LENGTH_LONG).show();
+                                showKronosCandleJsonSettings();
+                            })
+                            .setNegativeButton("CLOSE", null)
+                            .show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Could not load provider symbols: " + error.getMessage()
+                                + ". Confirm the Kronos service is deployed and reachable.", Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
     }
 
     private void showTradeDurationSettings() {
