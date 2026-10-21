@@ -173,6 +173,10 @@ jobs:
           grep -q 'kronos_candles_json' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
           grep -q 'KRONOS-MINI ONLINE FORECAST' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
+          grep -q 'fetchBiQuoteForecastRequest' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
+          grep -q 'biquote.io/api/' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
+          grep -q 'bar.optBoolean("isOpen", false)' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
+          grep -q 'On-device Kronos inference is not implemented yet' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'HYBRID_STANDALONE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           python - <<'PY'
