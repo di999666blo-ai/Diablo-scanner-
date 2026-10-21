@@ -165,16 +165,12 @@ public class MainActivity extends Activity {
         addReferenceCard("✦  AI ENGINE STATUS", "View engine status", false,
                 v -> openPage("AI ENGINE"));
 
-        addSectionTitle("NINE MENU SHORTCUTS");
-        addButton("1  •  LAUNCHER / HOME", v -> buildDashboard());
-        addButton("2  •  MAIN DASHBOARD", v -> buildDashboard());
-        addButton("3  •  FLOATING BUBBLE OVERLAY", v -> openPage("FLOATING BUBBLE OVERLAY"));
-        addButton("4  •  EXPANDABLE SCAN PANEL", v -> openPage("EXPANDABLE SCAN PANEL"));
-        addButton("5  •  SCANNING ANIMATION / STATUS", v -> openPage("SCANNING ANIMATION"));
-        addButton("6  •  SETTINGS", v -> openPage("CONFIGURATION"));
-        addButton("7  •  SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
-        addButton("8  •  GALLERY ANALYSIS", v -> chooseChart());
-        addButton("9  •  FULL RESULTS", v -> openPage("FULL RESULTS"));
+        addTransmissionPanel();
+        addSectionTitle("QUICK ACCESS");
+        addReferenceCard("LATEST SIGNAL", "Open the most recent chart read", false,
+                v -> openPage("LATEST SIGNAL"));
+        addReferenceCard("RESULTS & STATS", "Review recorded scans and outcomes", false,
+                v -> openPage("RESULTS & STATS"));
 
         addInfoPanel("Dark navy/black surfaces • bright red accents • white text. Signals are experimental and for manual trading only.");
     }
@@ -245,9 +241,9 @@ public class MainActivity extends Activity {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER_VERTICAL);
-        String[] icons = {"⌂", "◎", "↗", "▤", "▧", "⚙", "✦", "◉", "▥"};
-        String[] labels = {"HOME", "SCAN", "SIGNAL", "HISTORY", "CHARTS", "SETTINGS", "AI", "BUBBLE", "RESULTS"};
-        String[] pages = {"HOME", "AI SCANNER", "FULL RESULTS", "SIGNAL HISTORY", "SAVED CHARTS", "CONFIGURATION", "AI ENGINE", "FLOATING BUBBLE OVERLAY", "FULL RESULTS"};
+        String[] icons = {"⌂", "↗", "▤", "⚙", "✦", "◉", "▥", "ⓘ", "?"};
+        String[] labels = {"HOME", "SIGNAL", "HISTORY", "SETTINGS", "AI MODEL", "BUBBLE", "STATS", "ABOUT", "HELP"};
+        String[] pages = {"HOME", "LATEST SIGNAL", "SIGNAL HISTORY", "CONFIGURATION", "AI MODEL", "FLOATING BUBBLE OVERLAY", "RESULTS & STATS", "ABOUT", "HELP & FAQ"};
         for (int i = 0; i < labels.length; i++) {
             final String destination = pages[i];
             LinearLayout item = new LinearLayout(this);
@@ -517,16 +513,53 @@ public class MainActivity extends Activity {
             addButton("OPEN SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
             addButton("OPEN SETTINGS", v -> openPage("CONFIGURATION"));
             addButton("RUN ANOTHER SCAN", v -> openPage("AI SCANNER"));
-        } else if ("AI ENGINE".equals(page)) {
+        } else if ("AI ENGINE".equals(page) || "AI MODEL".equals(page)) {
             SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
-            String lastSignal = ai.getString("latest_ai_signal", "No AI result recorded yet");
-            String lastDetails = ai.getString("latest_ai_details", "No AI explanation recorded yet.");
             boolean modelFilesReady = LocalVisionAI.modelsReady(this);
-            addInfoPanel("MODEL FILE CHECK: " + (modelFilesReady ? "PACKAGED MODEL FILES DETECTED" : "MODEL FILES NOT DETECTED") + "\nNative runtime execution still needs a real on-device test.");
-            addSectionTitle("LATEST ENGINE OUTPUT");
-            addInfoPanel("Last AI result: " + lastSignal + "\n\n" + lastDetails);
+            addInfoPanel("VISION MODEL STATUS: " + (modelFilesReady ? "MODEL FILES DETECTED" : "MODEL FILES NOT DETECTED"));
+            addSectionTitle("MODEL DETAILS");
+            addInfoPanel("SmolVLM vision model / local inference target\nModel files must be packaged with the APK and the native runtime must successfully load them before this can be called a working AI engine.");
+            addSectionTitle("LATEST MODEL OUTPUT");
+            addInfoPanel(ai.getString("latest_ai_signal", "No AI result recorded yet") + "\n\n" + ai.getString("latest_ai_details", "Run a scan to see the latest output."));
             addButton("RUN LIVE SCAN", v -> openPage("AI SCANNER"));
-            addButton("OPEN CONFIGURATION", v -> openPage("CONFIGURATION"));
+            addButton("CHECK MODEL STATUS", v -> openPage("AI MODEL"));
+        } else if ("LATEST SIGNAL".equals(page)) {
+            SharedPreferences ai = getSharedPreferences("diablo_scanner_ai", MODE_PRIVATE);
+            addSectionTitle("CURRENT SIGNAL");
+            addInfoPanel(ai.getString("latest_ai_signal", "🟡 WAIT — no signal recorded yet"));
+            addSectionTitle("ANALYSIS");
+            addInfoPanel(ai.getString("latest_ai_details", "Run a live scan or analyze a saved chart to populate this screen."));
+            addButton("SCAN CURRENT BROKER CHART", v -> openPage("AI SCANNER"));
+            addButton("ANALYZE SAVED CHART", v -> chooseChart());
+            addButton("VIEW HISTORY", v -> openPage("SIGNAL HISTORY"));
+        } else if ("RESULTS & STATS".equals(page)) {
+            addSectionTitle("SCAN PERFORMANCE");
+            try {
+                JSONArray history = new JSONArray(prefs.getString(HISTORY, "[]"));
+                int up=0, down=0, wait=0;
+                for (int i=0;i<history.length();i++) {
+                    String sig=history.getJSONObject(i).optString("signal","WAIT").toUpperCase(Locale.ROOT);
+                    if (sig.contains("UP")) up++; else if (sig.contains("DOWN")) down++; else wait++;
+                }
+                addInfoPanel("TOTAL SCANS  " + history.length() + "\nUP SIGNALS  " + up + "\nDOWN SIGNALS  " + down + "\nWAIT SIGNALS  " + wait + "\n\nWin rate is not available until outcomes are explicitly tracked; signal direction alone is not a win/loss.");
+            } catch (Exception e) {
+                addInfoPanel("No scan statistics available yet.");
+            }
+            addButton("OPEN SCAN HISTORY", v -> openPage("SIGNAL HISTORY"));
+            addButton("RUN NEW SCAN", v -> openPage("AI SCANNER"));
+        } else if ("ABOUT".equals(page)) {
+            addSectionTitle("ABOUT DIABLO SCANNER");
+            addInfoPanel("SHAZAM FOR TRADING CHARTS\n\nA chart-vision assistant designed to inspect the visible trading chart and present an experimental UP / DOWN / WAIT reading. It does not place trades.");
+            addSectionTitle("IMPORTANT");
+            addInfoPanel("Signals are experimental, may be wrong, and are not financial advice. Confirm every result yourself and trade manually.");
+            addButton("OPEN AI MODEL STATUS", v -> openPage("AI MODEL"));
+        } else if ("HELP & FAQ".equals(page)) {
+            addSectionTitle("HOW TO SCAN");
+            addInfoPanel("1. Open your broker chart.\n2. Start the floating D bubble or open Live Scanner.\n3. Grant screen-capture permission when Android asks.\n4. Keep the chart visible while scanning.\n5. Review the result and decide manually.");
+            addSectionTitle("COMMON QUESTIONS");
+            addInfoPanel("Why WAIT? The chart may not provide enough visual confirmation.\n\nDoes it place trades? No.\n\nDoes animation prove AI is running? No; model/runtime status must be tested separately.");
+            addButton("OPEN LIVE SCANNER", v -> openPage("AI SCANNER"));
+            addButton("OPEN SETTINGS", v -> openPage("CONFIGURATION"));
         }
     }
 
