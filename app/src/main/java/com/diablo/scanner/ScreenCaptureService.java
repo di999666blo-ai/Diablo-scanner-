@@ -62,6 +62,7 @@ public class ScreenCaptureService extends Service {
     private volatile boolean timedScanActive = false;
     private volatile long timedScanStartedAt = 0L;
     private volatile long timedScanDurationMs = 30000L;
+    private volatile Bitmap latestTimedChart;
 
     /*
      * AI runs separately from screen capture.
@@ -500,6 +501,14 @@ public class ScreenCaptureService extends Service {
         SharedPreferences scanPrefs = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
         String selectedMode = scanPrefs.getString("trading_mode", "TIMED");
         boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
+        final boolean timedObservation = scanPrefs.getBoolean("timed_scan_active", false);
+        final boolean optionalSmolAssist = scanPrefs.getBoolean("timed_smolvlm_enabled", false);
+        if (!scalpingMode && timedObservation && optionalSmolAssist) {
+            Bitmap cached = analysisBitmap.copy(Bitmap.Config.ARGB_8888, false);
+            Bitmap previous = latestTimedChart;
+            latestTimedChart = cached;
+            if (previous != null && !previous.isRecycled()) previous.recycle();
+        }
         scanPrefs.edit()
                 .putString("scan_status", "AI_PROCESSING")
                 .putString("scan_message", scalpingMode
@@ -516,8 +525,9 @@ public class ScreenCaptureService extends Service {
                         result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     } else {
                         result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
-                        boolean optionalSmolAssist = scanPrefs.getBoolean("timed_smolvlm_enabled", false);
-                        if (optionalSmolAssist && result != null) {
+                        // During multi-sample observation, defer the slow optional model
+                        // until the window ends so it cannot block the 5-second fast samples.
+                        if (optionalSmolAssist && !timedObservation && result != null) {
                             LocalVisionAI.Result visualResult =
                                     LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                             result = combineTimedHybrid(result, visualResult);
@@ -748,6 +758,7 @@ public class ScreenCaptureService extends Service {
         timedScanActive = false;
         prefs.edit().putBoolean("timed_scan_active", false).apply();
         if (samples <= 0) {
+            releaseLatestTimedChart();
             prefs.edit().putString("scan_status", "ANALYSIS_COMPLETE_WAIT")
                     .putString("scan_message", "TIMED SIGNAL • WAIT • no readable live samples were collected. Keep the chart visible and try again.")
                     .apply();
@@ -759,7 +770,46 @@ public class ScreenCaptureService extends Service {
                 + ", DOWN " + downs + ", WAIT " + waits
                 + ". " + ("WAIT".equals(signal) ? "Evidence did not agree strongly enough; final signal is WAIT." : "Final direction is the majority supported direction.")
                 + " This is experimental screen-image analysis, not a verified win probability.";
+
+        Bitmap assistBitmap = latestTimedChart;
+        latestTimedChart = null;
+        boolean optionalAssist = prefs.getBoolean("timed_smolvlm_enabled", false);
+        if (optionalAssist && assistBitmap != null && !assistBitmap.isRecycled()
+                && aiRunning.compareAndSet(false, true)) {
+            prefs.edit().putString("scan_status", "AI_PROCESSING")
+                    .putString("scan_message", "Timed observation finished. Running optional SmolVLM review once; fast sampling is complete.")
+                    .apply();
+            try {
+                aiExecutor.execute(() -> {
+                    try {
+                        LocalVisionAI.Result fastResult = new LocalVisionAI.Result(signal, summary);
+                        LocalVisionAI.Result visualResult =
+                                LocalVisionAI.analyze(getApplicationContext(), assistBitmap);
+                        saveAIResult(combineTimedHybrid(fastResult, visualResult));
+                    } catch (Exception error) {
+                        saveAIResult(new LocalVisionAI.Result(signal,
+                                summary + "\n\nOptional SmolVLM review failed; fast hybrid result retained."));
+                    } finally {
+                        if (!assistBitmap.isRecycled()) assistBitmap.recycle();
+                        aiRunning.set(false);
+                    }
+                });
+            } catch (Exception error) {
+                if (!assistBitmap.isRecycled()) assistBitmap.recycle();
+                aiRunning.set(false);
+                saveAIResult(new LocalVisionAI.Result(signal,
+                        summary + "\n\nOptional SmolVLM review could not start; fast hybrid result retained."));
+            }
+            return;
+        }
+        if (assistBitmap != null && !assistBitmap.isRecycled()) assistBitmap.recycle();
         saveAIResult(new LocalVisionAI.Result(signal, summary));
+    }
+
+    private void releaseLatestTimedChart() {
+        Bitmap previous = latestTimedChart;
+        latestTimedChart = null;
+        if (previous != null && !previous.isRecycled()) previous.recycle();
     }
 
     private int extractConfidence(String details) {
@@ -868,6 +918,7 @@ public class ScreenCaptureService extends Service {
         captureStarted = false;
         analysisRequested = false;
         timedScanActive = false;
+        releaseLatestTimedChart();
         if (workerHandler != null) workerHandler.removeCallbacks(timedScanRunnable);
         getSharedPreferences("diablo_scanner", MODE_PRIVATE)
                 .edit()
