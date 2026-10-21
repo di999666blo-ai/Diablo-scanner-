@@ -1294,7 +1294,15 @@ public class MainActivity extends Activity {
                 if (scalpingMode) {
                     String selectedEngine = prefs.getString("scalping_engine", "SMOLVLM");
                     if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                        result = KronosRuntimeClient.forecast(getApplicationContext());
+                        try {
+                            JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                            result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                        } catch (Exception feedError) {
+                            result = new LocalVisionAI.Result("WAIT", "KRONOS LOCAL MARKET FEED ERROR: "
+                                    + feedError.getClass().getSimpleName() + " — "
+                                    + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
+                                    + ". No hosted service or substitute model was used.");
+                        }
                     } else {
                         result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     }
