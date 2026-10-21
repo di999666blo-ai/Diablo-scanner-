@@ -518,11 +518,26 @@ public class ScreenCaptureService extends Service {
         try {
             aiExecutor.execute(() -> {
                 try {
-                    // Fast hybrid chart analysis is always the primary Timed Signal engine.
-                    // SmolVLM is an optional secondary visual check, never a prerequisite.
+                    // Timed Signal always uses the fast chart analyzer; optional SmolVLM
+                    // is a secondary visual check. Scalping engine selection is explicit.
                     LocalVisionAI.Result result;
                     if (scalpingMode) {
-                        result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                        String selectedEngine = scanPrefs.getString("scalping_engine", "SMOLVLM");
+                        if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
+                            // Never silently fall back to SmolVLM while claiming Kronos ran.
+                            result = new LocalVisionAI.Result("WAIT",
+                                    "KRONOS SELECTED BUT UNAVAILABLE: this APK has no connected Kronos inference runtime "
+                                    + "or verified structured OHLC feed. No Kronos forecast was generated. "
+                                    + "Select SmolVLM or Hybrid in Settings, or connect and verify the Kronos service first.");
+                        } else if ("HYBRID".equalsIgnoreCase(selectedEngine)) {
+                            LocalVisionAI.Result fastResult =
+                                    ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
+                            LocalVisionAI.Result visualResult =
+                                    LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                            result = combineTimedHybrid(fastResult, visualResult);
+                        } else {
+                            result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
+                        }
                     } else {
                         result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
                         // During multi-sample observation, defer the slow optional model
