@@ -1,6 +1,6 @@
 # Diablo Scanner — optional Kronos service
 
-This service is the first real integration component for upstream Kronos. It accepts **structured OHLCV candle data** and invokes the official Kronos-small model with its matching tokenizer. It is separate from the Android APK because the existing APK's llama.cpp binary is for SmolVLM GGUF, not the Kronos PyTorch architecture.
+This optional service accepts **structured OHLCV candle data** and is designed to invoke the official Kronos-small model with its matching tokenizer. It is not yet deployed or connected to the Android APK. It is separate from the Android APK because the existing APK's llama.cpp binary is for SmolVLM GGUF, not the Kronos PyTorch architecture.
 
 ## Run locally / container
 
@@ -10,8 +10,8 @@ Build and run the container, then call `GET /health` and `POST /v1/forecast`. Th
 
 - This API is **not deployed** by a GitHub commit. It needs a reachable host and a configured URL before the Android app can call it.
 - The current screenshot-only chart path does not supply exact OHLCV. A separate reliable candle feed or validated candle extraction adapter is required; the API deliberately does not fabricate candles from pixels.
-- The Android app still needs an engine endpoint setting, network client, response mapping, timeout handling, and user-visible failure fallback before Kronos can be selected in-app.
-- A successful HTTP health response only proves the service starts. A successful `/v1/forecast` request is required to verify model loading and inference.
+- The Android app has a saved SmolVLM / Kronos / Hybrid choice. Kronos is deliberately not treated as operational: the Android endpoint setting, network client, response mapping, and verified OHLC adapter are still missing. Selecting Kronos makes scans return WAIT instead of silently falling back.
+- The container installs the upstream Kronos runtime requirements. A successful HTTP health response only proves the service starts; a successful `/v1/forecast` request is required to verify model loading and inference.
 - Do not treat a forecast as a guaranteed UP/DOWN signal or automatically infer entry/SL/TP from it.
 
 ## Request contract
