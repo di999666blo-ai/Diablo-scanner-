@@ -1741,9 +1741,9 @@ public class MainActivity extends Activity {
     private void showScalpingEngineSettings() {
         final String[] engineValues = {"SMOLVLM", "KRONOS", "HYBRID"};
         final String[] labels = {
-                "SmolVLM — visual chart analysis (available)",
-                "Kronos — financial-candle forecast (not connected; returns WAIT)",
-                "Hybrid — standalone fast candle-analysis engine (independent)"
+                "SmolVLM — visual chart analysis (on-device)",
+                "Kronos-mini — online OHLCV forecast (needs hosted API + candle data)",
+                "Hybrid — standalone fast chart-image analysis (independent)"
         };
         String selected = prefs.getString("scalping_engine", "SMOLVLM");
         int checked = "KRONOS".equalsIgnoreCase(selected) ? 1
@@ -1753,21 +1753,72 @@ public class MainActivity extends Activity {
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     String engine = engineValues[which];
                     prefs.edit().putString("scalping_engine", engine).apply();
+                    dialog.dismiss();
                     if ("KRONOS".equals(engine)) {
                         Toast.makeText(this,
-                                "Kronos selected but NOT operational: the APK has no connected Kronos runtime or verified OHLC feed. Scans will return WAIT, never a fake Kronos signal.",
+                                "Kronos online runtime selected. Internet alone is not enough: configure a deployed HTTPS API and valid OHLCV candle data.",
                                 Toast.LENGTH_LONG).show();
+                        showKronosServiceUrlSettings();
                     } else if ("HYBRID".equals(engine)) {
                         Toast.makeText(this,
-                                "Hybrid selected: standalone fast candle analyzer. It runs independently without SmolVLM or Kronos.",
+                                "Hybrid selected: standalone fast chart-image analyzer. No SmolVLM or Kronos dependency.",
                                 Toast.LENGTH_LONG).show();
+                        refreshDashboardWebView();
                     } else {
                         Toast.makeText(this, "SmolVLM visual engine selected.", Toast.LENGTH_SHORT).show();
+                        refreshDashboardWebView();
                     }
-                    dialog.dismiss();
-                    refreshDashboardWebView();
                 })
                 .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private void showKronosServiceUrlSettings() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("https://your-deployed-kronos-api.example");
+        input.setText(prefs.getString("kronos_service_url", ""));
+        new AlertDialog.Builder(this)
+                .setTitle("Kronos API URL")
+                .setMessage("Enter the HTTPS base URL of a deployed Kronos-mini API. Mobile data connects to a server; it does not host the model. If you do not have a URL yet, leave it blank and configure it later.")
+                .setView(input)
+                .setPositiveButton("SAVE & ENTER CANDLES", (dialog, which) -> {
+                    String url = input.getText().toString().trim().replaceAll("/+$", "");
+                    prefs.edit().putString("kronos_service_url", url).apply();
+                    showKronosCandleJsonSettings();
+                })
+                .setNegativeButton("CANCEL", (dialog, which) -> refreshDashboardWebView())
+                .show();
+    }
+
+    private void showKronosCandleJsonSettings() {
+        EditText input = new EditText(this);
+        input.setSingleLine(false);
+        input.setMinLines(8);
+        input.setMaxLines(12);
+        input.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        input.setHint("{ \"symbol\": \"EURUSD\", \"timeframe_seconds\": 60, \"prediction_bars\": 3, \"candles\": [at least 32 timestamped OHLCV candles] }");
+        input.setText(prefs.getString("kronos_candles_json", ""));
+        new AlertDialog.Builder(this)
+                .setTitle("Kronos candle input JSON")
+                .setMessage("Paste a complete JSON request containing at least 32 completed candles with timestamp, open, high, low, close and optional volume/amount. Use real candle data from a source you trust; the screenshot analyzer cannot recover exact OHLC values. Saving this does not execute trades.")
+                .setView(input)
+                .setPositiveButton("SAVE CANDLE DATA", (dialog, which) -> {
+                    String json = input.getText().toString().trim();
+                    prefs.edit().putString("kronos_candles_json", json).apply();
+                    Toast.makeText(this, json.isEmpty()
+                            ? "Kronos candle data not saved. Kronos will return WAIT until valid data is added."
+                            : "Kronos candle JSON saved. It will be validated when you scan.", Toast.LENGTH_LONG).show();
+                    refreshDashboardWebView();
+                })
+                .setNeutralButton("CLEAR DATA", (dialog, which) -> {
+                    prefs.edit().remove("kronos_candles_json").apply();
+                    Toast.makeText(this, "Saved Kronos candle data cleared.", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("CANCEL", (dialog, which) -> refreshDashboardWebView())
                 .show();
     }
 
