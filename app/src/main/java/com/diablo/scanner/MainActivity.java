@@ -85,25 +85,48 @@ public class MainActivity extends Activity {
     }
 
 
-    // FUTURISTIC RUSTIC BLACK-AND-RED HOME DASHBOARD
+    // DIABLO SCANNER DASHBOARD — nine reference-design sections.
+    // Preserve the existing scanner, preferences, and analysis methods.
     private void buildDashboard() {
-        createPageShell("DIABLO SCANNER", "CHART INTELLIGENCE SYSTEM");
-        addInfoPanel("● SCREEN SCANNER  •  READY TO CONFIGURE");
+        createPageShell("DIABLO SCANNER", "Shazam for Trading Charts");
         addHeroBrandPanel();
-        addTransmissionPanel();
-        addSectionTitle("LATEST RESULT");
+        addInfoPanel("● SCREEN SCANNER READY");
+
+        addSectionTitle("TRADING MODE");
+        addButton("AI SCALPING", v -> {
+            prefs.edit().putString("trading_mode", "SCALPING").apply();
+            openPage("AI SCANNER");
+        });
+        addButton("TIMED SIGNAL", v -> {
+            prefs.edit().putString("trading_mode", "TIMED").apply();
+            openPage("AI SCANNER");
+        });
+
+        addSectionTitle("TRADE DURATION");
+        addButton("⏱  TRADE DURATION: " + formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS)),
+                v -> showTradeDurationSettings());
+
+        addSectionTitle("SCAN NOW");
+        addButton("START SCREEN SCAN", v -> {
+            prefs.edit().putString("trading_mode",
+                    prefs.getString("trading_mode", "SCALPING")).apply();
+            openPage("AI SCANNER");
+        });
+        addButton("ANALYZE SAVED CHART", v -> chooseChart());
+
+        addSectionTitle("SCANNER STATUS");
         signalText = new TextView(this);
         signalText.setText("WAIT");
-        signalText.setTextSize(34);
+        signalText.setTextSize(30);
         signalText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        signalText.setTextColor(Color.YELLOW);
+        signalText.setTextColor(Color.rgb(255, 193, 7));
         signalText.setGravity(Gravity.CENTER);
-        signalText.setPadding(0, 14, 0, 4);
-        signalText.setBackground(makePanel(Color.rgb(23, 13, 15), red, 1, 18));
+        signalText.setPadding(0, 14, 0, 6);
+        signalText.setBackground(makePanel(Color.rgb(0, 12, 19), red, 1, 18));
         root.addView(signalText);
 
         statusText = new TextView(this);
-        statusText.setText("Open AI Scanner to capture a live chart or analyse a saved chart.");
+        statusText.setText("Ready for manual chart analysis.");
         statusText.setTextSize(13);
         statusText.setTextColor(white);
         statusText.setGravity(Gravity.CENTER);
@@ -116,38 +139,24 @@ public class MainActivity extends Activity {
         countText.setGravity(Gravity.CENTER);
         countText.setPadding(0, 0, 0, 10);
         root.addView(countText);
-
-        TextView controlSummary = new TextView(this);
-        controlSummary.setTag("control_summary");
-        controlSummary.setTextColor(Color.rgb(255, 150, 160));
-        controlSummary.setTextSize(12);
-        controlSummary.setGravity(Gravity.CENTER);
-        controlSummary.setPadding(12, 12, 12, 12);
-        controlSummary.setBackground(makePanel(Color.rgb(27, 16, 19), red, 1, 16));
-        root.addView(controlSummary);
-        refreshControlSummary();
-
-        addSectionTitle("SELECT YOUR SCAN MODE");
-        addButton("MODE 1  •  TIMED SIGNAL", v -> {
-            prefs.edit().putString("trading_mode", "TIMED").apply();
-            openPage("AI SCANNER");
-        });
-        addButton("MODE 2  •  AI SCALPING WORKFLOW", v -> {
-            prefs.edit().putString("trading_mode", "SCALPING").apply();
-            openPage("AI SCANNER");
-        });
-        addInfoPanel("SCALPING WORKFLOW: open the floating D panel, tap START GUIDED SCALPING, then manually change the broker chart through 4H → 15M → 1M. Confirm and scan each stage; the app cannot change the broker timeframe itself.");
-
-        addSectionTitle("COMMAND DECK");
-        addButton("◈  AI SCANNER", v -> openPage("AI SCANNER"));
-        addButton("⚙  CONFIGURATION", v -> openPage("CONFIGURATION"));
-        addButton("▤  SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
-        addButton("▧  SAVED CHARTS", v -> openPage("SAVED CHARTS"));
-        addButton("◎  AI ENGINE STATUS", v -> openPage("AI ENGINE"));
-
-        addInfoPanel("BLACK + RED INDUSTRIAL THEME  •  SCROLLABLE SCREENS  •  MANUAL TRADING ONLY");
         refreshCount();
         refreshLatestResult();
+
+        addSectionTitle("QUICK ACTIONS • 9 MENUS");
+        addButton("1. HOME / DASHBOARD", v -> buildDashboard());
+        addButton("2. FLOATING BUBBLE / AI SCANNER", v -> openPage("AI SCANNER"));
+        addButton("3. EXPANDABLE SCAN PANEL", v -> {
+            startFloatingBubble();
+            Toast.makeText(this, "Open the floating D bubble to expand the scan panel.", Toast.LENGTH_LONG).show();
+        });
+        addButton("4. SCANNING ANIMATION / STATUS", v -> openPage("AI ENGINE"));
+        addButton("5. SETTINGS", v -> openPage("CONFIGURATION"));
+        addButton("6. SIGNAL HISTORY", v -> openPage("SIGNAL HISTORY"));
+        addButton("7. GALLERY ANALYSIS", v -> chooseChart());
+        addButton("8. FULL RESULTS / LATEST SIGNAL", v -> refreshLatestResult());
+        addButton("9. AI ENGINE STATUS", v -> openPage("AI ENGINE"));
+
+        addInfoPanel("Manual trading only • No broker orders are executed. Experimental confidence is not a guaranteed win probability.");
     }
 
     private void createPageShell(String title, String subtitle) {
