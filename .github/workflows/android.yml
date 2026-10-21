@@ -168,6 +168,9 @@ jobs:
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'KronosLocalRuntime.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'KronosRuntimeClient.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'if (!serviceUrl.isEmpty())' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'if (!configuredService.isEmpty())' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'fetchLocalCandleInput' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'onnxruntime-android' app/build.gradle
           test -s app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
