@@ -152,7 +152,7 @@ jobs:
           test -s app/src/main/res/drawable/ic_diablo_launcher_vector.xml
           grep -q 'KRONOS SELECTED BUT BLOCKED' app/src/main/assets/dashboard.html
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
-          grep -q 'KRONOS'.* app/src/main/java/com/diablo/scanner/MainActivity.java || true
+          grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'KRONOS SELECTED BUT UNAVAILABLE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
