@@ -163,6 +163,15 @@ public final class KronosRuntimeClient {
         }
     }
 
+    /** Fetch completed public-market candles on this phone for the isolated local Kronos runtime. */
+    public static JSONObject fetchLocalCandleInput(Context context) throws Exception {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String symbol = prefs.getString("kronos_symbol", "EURUSD");
+        String interval = prefs.getString("kronos_interval", "1m");
+        int predictionBars = prefs.getInt("kronos_prediction_bars", 3);
+        return fetchBiQuoteForecastRequest(symbol, interval, predictionBars);
+    }
+
     private static JSONObject fetchBiQuoteForecastRequest(String symbol, String interval, int predictionBars) throws Exception {
         String cleanSymbol = symbol == null ? "" : symbol.trim().toUpperCase(java.util.Locale.ROOT);
         if (!cleanSymbol.matches("[A-Z0-9._-]{1,40}")) {
