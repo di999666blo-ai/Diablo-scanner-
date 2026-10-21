@@ -195,56 +195,86 @@ public class MainActivity extends Activity {
         root.addView(sub);
     }
 
-    // Industrial hero card inspired by the approved Diablo Scanner concept.
+    // Animated red-bull hero identity, matching the approved black/red concept.
     private void addHeroBrandPanel() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
         card.setPadding(16, 18, 16, 18);
-        card.setBackground(makePanel(Color.rgb(18, 14, 15), amber, 2, 22));
+        card.setBackground(makePanel(Color.rgb(12, 7, 10), red, 2, 22));
+
+        TextView top = new TextView(this);
+        top.setText("D I A B L O  / /  V I S I O N  E N G I N E");
+        top.setTextColor(Color.rgb(255, 100, 115));
+        top.setTextSize(10);
+        top.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        top.setGravity(Gravity.CENTER);
+        card.addView(top);
+
+        TextView bull = new TextView(this);
+        bull.setText("🐂");
+        bull.setTextSize(54);
+        bull.setGravity(Gravity.CENTER);
+        bull.setShadowLayer(18f, 0f, 0f, red);
+        LinearLayout.LayoutParams bullParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (int) (82 * getResources().getDisplayMetrics().density));
+        bullParams.topMargin = 5;
+        bullParams.bottomMargin = 2;
+        card.addView(bull, bullParams);
 
         TextView logo = new TextView(this);
         logo.setText("D");
-        logo.setTextSize(44);
+        logo.setTextSize(34);
         logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD_ITALIC);
-        logo.setTextColor(Color.rgb(255, 95, 50));
+        logo.setTextColor(Color.WHITE);
         logo.setGravity(Gravity.CENTER);
         GradientDrawable orb = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(70, 27, 16), Color.rgb(12, 10, 12), Color.rgb(48, 16, 18)});
+                new int[]{Color.rgb(120, 8, 24), Color.rgb(12, 8, 12), Color.rgb(60, 4, 15)});
         orb.setShape(GradientDrawable.OVAL);
-        orb.setStroke((int) (3 * getResources().getDisplayMetrics().density), amber);
+        orb.setStroke((int) (2 * getResources().getDisplayMetrics().density), red);
         logo.setBackground(orb);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
-                (int) (94 * getResources().getDisplayMetrics().density),
-                (int) (94 * getResources().getDisplayMetrics().density));
-        logoParams.bottomMargin = 10;
+        int logoSize = (int) (68 * getResources().getDisplayMetrics().density);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(logoSize, logoSize);
+        logoParams.bottomMargin = 9;
         card.addView(logo, logoParams);
 
         TextView tagline = new TextView(this);
         tagline.setText("SHAZAM FOR TRADING CHARTS");
-        tagline.setTextColor(white);
-        tagline.setTextSize(12);
+        tagline.setTextColor(Color.WHITE);
+        tagline.setTextSize(13);
         tagline.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        tagline.setLetterSpacing(0.12f);
+        tagline.setLetterSpacing(0.10f);
         tagline.setGravity(Gravity.CENTER);
         card.addView(tagline);
 
         TextView status = new TextView(this);
-        status.setText("LIVE VISION  •  LOCAL AI  •  MANUAL TRADING");
-        status.setTextColor(amber);
+        status.setText("LIVE SCREEN VISION  •  LOCAL AI  •  MANUAL TRADING");
+        status.setTextColor(Color.rgb(255, 95, 110));
         status.setTextSize(10);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(0, 7, 0, 0);
+        status.setPadding(0, 8, 0, 0);
         card.addView(status);
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 5, 0, 10);
         root.addView(card, params);
-        logo.setScaleX(0.97f);
-        logo.setScaleY(0.97f);
-        logo.animate().scaleX(1f).scaleY(1f).setDuration(900).start();
+
+        final Runnable pulse = new Runnable() {
+            @Override public void run() {
+                if (!bull.isAttachedToWindow()) return;
+                bull.animate().scaleX(1.06f).scaleY(1.06f).setDuration(650)
+                        .withEndAction(() -> bull.animate().scaleX(0.94f).scaleY(0.94f)
+                                .setDuration(650).withEndAction(this).start()).start();
+            }
+        };
+        bull.setScaleX(0.94f);
+        bull.setScaleY(0.94f);
+        bull.post(pulse);
+        logo.setAlpha(0.82f);
+        logo.animate().alpha(1f).setDuration(1000).start();
     }
 
     // Diablo black-and-red scanning ray. Keep the dashboard visual language consistent
