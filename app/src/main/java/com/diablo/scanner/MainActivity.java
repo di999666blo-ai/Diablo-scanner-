@@ -192,8 +192,7 @@ public class MainActivity extends Activity {
                 break;
             case "kronos_config":
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
-                if (prefs.getString("kronos_service_url", "").trim().isEmpty()) showKronosServiceUrlSettings();
-                else showKronosCandleJsonSettings();
+                showKronosCandleJsonSettings();
                 break;
             case "kronos_run":
                 runKronosForecast();
@@ -1766,7 +1765,16 @@ public class MainActivity extends Activity {
                 .apply();
         refreshDashboardWebView();
         new Thread(() -> {
-            LocalVisionAI.Result result = KronosRuntimeClient.forecast(getApplicationContext());
+            LocalVisionAI.Result result;
+            try {
+                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+            } catch (Exception feedError) {
+                result = new LocalVisionAI.Result("WAIT", "KRONOS LOCAL MARKET FEED ERROR: "
+                        + feedError.getClass().getSimpleName() + " — "
+                        + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
+                        + ". No hosted service or substitute model was used.");
+            }
             String signal = result == null || result.signal == null ? "WAIT" : result.signal.trim().toUpperCase(Locale.ROOT);
             if (!("UP".equals(signal) || "DOWN".equals(signal))) signal = "WAIT";
             String details = result == null || result.details == null ? "No Kronos result returned." : result.details;
@@ -1794,7 +1802,7 @@ public class MainActivity extends Activity {
         final String[] engineValues = {"SMOLVLM", "KRONOS", "HYBRID"};
         final String[] labels = {
                 "SmolVLM — visual chart analysis (on-device)",
-                "Kronos-mini — online OHLCV forecast (needs hosted API + candle data)",
+                "Kronos-mini — phone-fetches market candles; local model port still required",
                 "Hybrid — standalone fast chart-image analysis (independent)"
         };
         String selected = prefs.getString("scalping_engine", "SMOLVLM");
@@ -1808,9 +1816,9 @@ public class MainActivity extends Activity {
                     dialog.dismiss();
                     if ("KRONOS".equals(engine)) {
                         Toast.makeText(this,
-                                "Kronos online runtime selected. Internet alone is not enough: configure a deployed HTTPS API; biquote OHLCV candles can then be fetched automatically.",
+                                "Kronos phone-only mode selected. The phone fetches BiQuote candles; real local inference stays WAIT until the dedicated Kronos model/tokenizer port is bundled and validated.",
                                 Toast.LENGTH_LONG).show();
-                        showKronosServiceUrlSettings();
+                        showKronosCandleJsonSettings();
                     } else if ("HYBRID".equals(engine)) {
                         Toast.makeText(this,
                                 "Hybrid selected: standalone fast chart-image analyzer. No SmolVLM or Kronos dependency.",
@@ -1866,7 +1874,7 @@ public class MainActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Kronos market feed")
-                .setMessage("The phone fetches completed OHLC candles directly from the public biquote.io feed (no read API key currently required), then sends them to your configured Kronos inference API. This still needs a reachable HTTPS API URL; Kronos is not running locally in this build. Provider coverage may not include broker OTC prices. Supported intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d.")
+                .setMessage("Phone-only Kronos market settings. The phone fetches completed candles directly from the public BiQuote feed; no host/API URL is used. Important: the genuine Kronos on-device tokenizer/model inference port is still incomplete, so this build must return WAIT rather than invent a forecast. Public market candles do not represent broker OTC prices. Supported intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d.")
                 .setView(form)
                 .setPositiveButton("SAVE MARKET SETTINGS", (dialog, which) -> {
                     String symbol = symbolInput.getText().toString().trim().toUpperCase(Locale.ROOT);
@@ -1885,7 +1893,7 @@ public class MainActivity extends Activity {
                             .remove("kronos_candles_json")
                             .apply();
                     Toast.makeText(this, "Phone will fetch " + symbol + " " + interval
-                            + " candles directly; the Kronos inference API must still be online.", Toast.LENGTH_LONG).show();
+                            + " candles directly. Kronos returns WAIT until genuine on-device inference is implemented.", Toast.LENGTH_LONG).show();
                     refreshDashboardWebView();
                 })
                 .setNeutralButton("BROWSE SYMBOL CATALOGUE", (dialog, which) -> {
