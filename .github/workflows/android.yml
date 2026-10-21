@@ -156,6 +156,18 @@ jobs:
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'KRONOS SELECTED BUT UNAVAILABLE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'HYBRID_STANDALONE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("app/src/main/java/com/diablo/scanner/ScreenCaptureService.java").read_text()
+          start = source.index('} else if ("HYBRID".equalsIgnoreCase(selectedEngine))')
+          end = source.index('} else {', start + 10)
+          hybrid_branch = source[start:end]
+          assert "ChartAnalyzer.analyze" in hybrid_branch, "Hybrid must run its own analyzer"
+          assert "LocalVisionAI.analyze" not in hybrid_branch, "Hybrid must not depend on SmolVLM"
+          assert '"KRONOS"' not in hybrid_branch, "Hybrid must not invoke Kronos"
+          print("Hybrid independence routing test passed.")
+          PY
           test -s docs/KRONOS_ANDROID_INTEGRATION.md
           echo "Hybrid controls and launcher icon resource are present."
           echo "Kronos is explicitly marked unavailable until its real runtime and OHLC path are integrated."
