@@ -86,3 +86,79 @@ def test_forecast_rejects_bad_timeframe_spacing():
     response = client.post("/v1/forecast", json=payload)
     assert response.status_code == 422
     assert "timestamp spacing must align" in response.json()["detail"]
+
+
+
+def test_market_symbols_uses_dynamic_provider_catalogue(monkeypatch):
+    import main
+
+    monkeypatch.setattr(main, "_biquote_get", lambda path, params=None: [
+        {"name": "EURUSD", "type": "Forex"}, {"name": "XAUUSD", "type": "Commodity"}
+    ])
+    response = client.get("/v1/market/symbols")
+    assert response.status_code == 200
+    assert response.json()["provider"] == "biquote.io"
+    assert response.json()["count"] == 2
+    assert response.json()["symbols"][1]["name"] == "XAUUSD"
+
+
+def test_market_candles_excludes_open_bar_and_sorts_completed_bars(monkeypatch):
+    import main
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    bars = [{
+        "openTime": (start + timedelta(minutes=i)).isoformat(),
+        "open": 100 + i, "high": 102 + i, "low": 99 + i,
+        "close": 101 + i, "volume": 0, "tickVolume": 10, "isOpen": False,
+    } for i in range(40)]
+    bars.reverse()
+    bars.insert(0, {
+        "openTime": (start + timedelta(minutes=40)).isoformat(),
+        "open": 140, "high": 142, "low": 139, "close": 141,
+        "volume": 0, "tickVolume": 10, "isOpen": True,
+    })
+    monkeypatch.setattr(main, "_biquote_get", lambda path, params=None: {"symbol": "EURUSD", "bars": bars})
+    response = client.get("/v1/market/candles?symbol=EURUSD&interval=1m&limit=100")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider"] == "biquote.io"
+    assert body["count"] == 40
+    assert body["candles"][0]["open"] == 100
+    assert body["candles"][-1]["close"] == 140
+
+
+def test_market_forecast_fetches_real_provider_candles_then_calls_kronos(monkeypatch):
+    import main
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    bars = [{
+        "openTime": (start + timedelta(minutes=i)).isoformat(),
+        "open": 100 + i, "high": 102 + i, "low": 99 + i,
+        "close": 101 + i, "volume": 0, "tickVolume": 10, "isOpen": False,
+    } for i in range(40)]
+    bars.reverse()
+    monkeypatch.setattr(main, "_biquote_get", lambda path, params=None: {"symbol": "EURUSD", "bars": bars})
+    captured = {}
+    def fake_forecast(request):
+        captured["request"] = request
+        return {
+            "engine": "KRONOS", "model": "test", "tokenizer": "test",
+            "symbol": request.symbol, "timeframe_seconds": request.timeframe_seconds,
+            "prediction_bars": [{"open": 140, "high": 142, "low": 139, "close": 141}],
+            "last_observed_close": request.candles[-1].close, "status": "FORECAST_ONLY",
+        }
+    monkeypatch.setattr(main, "build_forecast", fake_forecast)
+    response = client.post("/v1/forecast/market", json={
+        "symbol": "EURUSD", "interval": "1m", "prediction_bars": 1
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data_provider"] == "biquote.io"
+    assert body["completed_candles_used"] == 40
+    assert captured["request"].timeframe_seconds == 60
+    assert len(captured["request"].candles) == 40
+
+
+def test_market_forecast_rejects_invalid_symbol():
+    response = client.post("/v1/forecast/market", json={
+        "symbol": "../EURUSD", "interval": "1m", "prediction_bars": 1
+    })
+    assert response.status_code == 422
