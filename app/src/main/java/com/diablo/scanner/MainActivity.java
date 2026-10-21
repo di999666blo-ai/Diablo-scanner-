@@ -37,6 +37,7 @@ import org.json.JSONObject;
 
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
+import java.net.HttpURLConnection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -1756,7 +1757,7 @@ public class MainActivity extends Activity {
                     dialog.dismiss();
                     if ("KRONOS".equals(engine)) {
                         Toast.makeText(this,
-                                "Kronos online runtime selected. Internet alone is not enough: configure a deployed HTTPS API and valid OHLCV candle data.",
+                                "Kronos online runtime selected. Internet alone is not enough: configure a deployed HTTPS API; biquote OHLCV candles can then be fetched automatically.",
                                 Toast.LENGTH_LONG).show();
                         showKronosServiceUrlSettings();
                     } else if ("HYBRID".equals(engine)) {
@@ -1782,7 +1783,7 @@ public class MainActivity extends Activity {
                 .setTitle("Kronos API URL")
                 .setMessage("Enter the HTTPS base URL of a deployed Kronos-mini API. Mobile data connects to a server; it does not host the model. If you do not have a URL yet, leave it blank and configure it later.")
                 .setView(input)
-                .setPositiveButton("SAVE & ENTER CANDLES", (dialog, which) -> {
+                .setPositiveButton("SAVE & CHOOSE MARKET", (dialog, which) -> {
                     String url = input.getText().toString().trim().replaceAll("/+$", "");
                     prefs.edit().putString("kronos_service_url", url).apply();
                     showKronosCandleJsonSettings();
