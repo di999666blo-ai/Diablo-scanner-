@@ -516,7 +516,7 @@ public class ScreenCaptureService extends Service {
                         ? ("KRONOS".equalsIgnoreCase(selectedScalpingEngine)
                             ? "Kronos selected; checking availability. If not connected, result will be WAIT."
                             : ("HYBRID".equalsIgnoreCase(selectedScalpingEngine)
-                                ? "Running fast candle analysis + SmolVLM visual review..."
+                                ? "Running standalone Hybrid fast candle analysis (no SmolVLM or Kronos dependency)..."
                                 : "Preparing SmolVLM AI for Scalping Setup..."))
                         : "Running fast Timed Signal chart strategy...")
                 .apply();
