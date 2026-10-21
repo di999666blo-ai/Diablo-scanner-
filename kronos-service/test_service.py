@@ -24,7 +24,7 @@ def test_health_marks_inference_not_checked():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["engine"] == "KRONOS"
-    assert response.json()["inference"] == "not_checked_until_forecast_request"
+    assert response.json()["inference"] == "model_not_loaded_yet"
 
 
 def test_valid_candles_pass():
