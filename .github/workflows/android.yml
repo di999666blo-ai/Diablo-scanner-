@@ -239,3 +239,38 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      # Keep the universal APK for broad device compatibility, and create a
+      # smaller arm64-only package for phones such as the user's Huawei.
+      - name: Build Huawei arm64-only APK
+        run: |
+          set -e
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          cp "$APK" /tmp/diablo-scanner-universal.apk
+
+          rm -rf app/src/main/jniLibs/armeabi-v7a
+          gradle --no-daemon clean assembleDebug
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK"
+          unzip -l "$APK" > arm64-apk-contents.txt
+          grep -q "lib/arm64-v8a/libdiablo_llama.so" arm64-apk-contents.txt
+          if grep -q "lib/armeabi-v7a/libdiablo_llama.so" arm64-apk-contents.txt; then
+            echo "ERROR: arm64-only APK unexpectedly contains armeabi-v7a engine"
+            exit 1
+          fi
+          grep -q "assets/models/diablo-text-model.gguf" arm64-apk-contents.txt
+          grep -q "assets/models/diablo-image-projector.gguf" arm64-apk-contents.txt
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.diablo.scanner'"
+          ls -lh "$APK"
+          echo "Arm64-only APK verified; both SmolVLM model files remain bundled."
+
+      - name: Upload Huawei arm64-only APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: diablo-scanner-huawei-arm64-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
