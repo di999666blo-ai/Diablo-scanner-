@@ -415,9 +415,9 @@ public class FloatingBubbleService extends Service {
         signalView.setPadding(dp(4), dp(4), dp(4), dp(2));
         content.addView(signalView);
 
-        detailsView = makeText("Waiting for chart analysis…", 9, Color.rgb(180,195,218));
+        detailsView = makeText("Tap D to scan.", 9, Color.rgb(180,195,218));
         detailsView.setGravity(Gravity.CENTER);
-        detailsView.setMaxLines(4);
+        detailsView.setMaxLines(3);
         detailsView.setEllipsize(TextUtils.TruncateAt.END);
         content.addView(detailsView);
 
@@ -792,9 +792,9 @@ public class FloatingBubbleService extends Service {
             signalView.setText("WAIT");
             signalView.setTextColor(Color.YELLOW);
             if (activityView != null) {
-                activityView.setText((processingAI ? "◉ AI BUSY / PROCESSING" : currentRay + " SCANNING CHART") +
-                        "\\nProgress: " + Math.min(99L, elapsedSeconds * 10L) + "% (time-based estimate)" +
-                        "\\n" + (elapsedSeconds >= 90L ? "SLOW / TIMEOUT WARNING" : "Please wait • one scan only"));
+                activityView.setText((processingAI ? "◉ AI BUSY" : currentRay + " SCANNING") +
+                        " • " + Math.min(99L, elapsedSeconds * 10L) + "% est." +
+                        (elapsedSeconds >= 90L ? " • SLOW" : ""));
                 activityView.setTextColor(Color.CYAN);
             }
             String progress = elapsedSeconds < 10L
@@ -816,25 +816,23 @@ public class FloatingBubbleService extends Service {
 
         if ("AI_ERROR".equals(scanStatus)) {
             if (activityView != null) {
-                activityView.setText("✕ AI ERROR • ANALYSIS FAILED\\n" +
-                        statusPrefs.getString("scan_message", "The AI could not complete this scan."));
+                activityView.setText("✕ AI ERROR");
                 activityView.setTextColor(Color.RED);
             }
-            signalView.setText("AI ERROR");
+            signalView.setText("ERROR");
             signalView.setTextColor(Color.RED);
-            detailsView.setText("AI ERROR • Analysis failed\n" +
-                    statusPrefs.getString("scan_message", "The AI could not complete this scan.") +
-                    "\nCheck AI model/engine and storage, then tap D to retry.");
+            detailsView.setText(statusPrefs.getString("scan_message", "Analysis failed. Check model/engine and retry."));
             return;
         }
 
         if ("NEEDS_CAPTURE".equals(scanStatus)) {
             signalView.setText("WAIT");
             signalView.setTextColor(Color.YELLOW);
-            detailsView.setText(statusPrefs.getString(
-                    "scan_message",
-                    "Start live screen capture from the dashboard first."
-            ));
+            if (activityView != null) {
+                activityView.setText("● NEEDS SCREEN CAPTURE");
+                activityView.setTextColor(Color.YELLOW);
+            }
+            detailsView.setText(statusPrefs.getString("scan_message", "Start screen capture first."));
             return;
         }
 
@@ -921,9 +919,11 @@ public class FloatingBubbleService extends Service {
 
         signal = normaliseSignal(signal);
         if (activityView != null) {
-            String confidenceLabel = usingAI ? (" • " + Math.max(0, Math.min(100, score)) + "% confidence estimate") : "";
-            String stateLabel = "WAIT".equals(signal) ? "RESULT READY • WAIT" : "RESULT READY • " + signal;
-            activityView.setText("✓ " + stateLabel + confidenceLabel + "\\n" + source);
+            String confidenceLabel = " • " + Math.max(0, Math.min(100, score)) + "%";
+            String stateLabel = "WAIT".equals(signal) ? "WAIT" :
+                    (("BUY".equals(signal) || "UP".equals(signal)) ? "BUY" :
+                    (("SELL".equals(signal) || "DOWN".equals(signal)) ? "SELL" : "WAIT"));
+            activityView.setText("✓ RESULT • " + stateLabel + confidenceLabel);
             activityView.setTextColor("BUY".equals(signal) || "UP".equals(signal)
                     ? Color.rgb(0, 255, 122)
                     : ("SELL".equals(signal) || "DOWN".equals(signal) ? Color.RED : Color.YELLOW));
@@ -1004,7 +1004,14 @@ public class FloatingBubbleService extends Service {
                 "\n\nNo signal guarantees a winning trade. DIABLO does not place trades."
         );
 
-        detailsView.setText(message.toString());
+        // Keep the floating bubble concise; full explanation remains available in history/dashboard.
+        String shortSignal = ("BUY".equals(signal) || "UP".equals(signal)) ? "BUY" :
+                (("SELL".equals(signal) || "DOWN".equals(signal)) ? "SELL" : "WAIT");
+        detailsView.setMaxLines(2);
+        detailsView.setEllipsize(TextUtils.TruncateAt.END);
+        detailsView.setText(shortSignal + " • " + Math.max(0, Math.min(100, score)) + "%" +
+                (usingAI ? " • AI" : " • FAST") +
+                (time == null || time.isEmpty() ? "" : "\\n" + time));
     }
 
     private boolean isFreshAIResult(String signal, String time) {
