@@ -766,6 +766,14 @@ public class MainActivity extends Activity {
         }
     }
 
+    private String modelFromHistorySource(String source) {
+        if ("KRONOS_MARKET_FORECAST".equals(source)) return "Kronos";
+        if ("SAVED_AI".equals(source)) return "SmolVLM";
+        if ("SAVED_TIMED".equals(source) || "LIVE_TIMED".equals(source)) return "Hybrid Fast";
+        if ("LIVE_AI".equals(source)) return "SmolVLM";
+        return "Legacy / unknown";
+    }
+
     private void renderHistoryPage() {
         addSectionTitle("SAVED SIGNAL RECORDS");
         try {
@@ -780,8 +788,13 @@ public class MainActivity extends Activity {
                 JSONObject item = history.getJSONObject(i);
                 text.append(i + 1).append(". ")
                     .append(item.optString("signal", "WAIT"))
+                    .append("  •  MODEL: ")
+                    .append(item.optString("model", modelFromHistorySource(item.optString("source", ""))))
                     .append("  •  ")
                     .append(item.optString("time", "Unknown time"))
+                    .append("\n")
+                    .append("Mode: ").append(item.optString("mode", "Unknown"))
+                    .append("  •  Timeframe: ").append(item.optString("timeframe", "Unknown"))
                     .append("\n")
                     .append(item.optString("details", "No details saved"))
                     .append("\n\n------------------------------\n\n");
@@ -1403,6 +1416,16 @@ public class MainActivity extends Activity {
             );
 
             item.put("signal", signal);
+            String modelUsed = "KRONOS_MARKET_FORECAST".equals(source) ? "Kronos"
+                    : "SAVED_AI".equals(source) ? "SmolVLM"
+                    : "SAVED_TIMED".equals(source) ? "Hybrid Fast"
+                    : "SMOLVLM".equalsIgnoreCase(prefs.getString("scalping_engine", "SMOLVLM")) ? "SmolVLM"
+                    : prefs.getString("scalping_engine", "Hybrid Fast");
+            item.put("model", modelUsed);
+            item.put("engine", prefs.getString("scalping_engine", "SMOLVLM"));
+            item.put("mode", prefs.getString("trading_mode", "TIMED"));
+            item.put("timeframe", prefs.getString("chart_timeframe", "1m"));
+            item.put("tradeDuration", prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS));
             item.put("score", score);
             item.put("green", green);
             item.put("red", redPixels);
