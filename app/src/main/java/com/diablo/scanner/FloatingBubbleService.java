@@ -363,182 +363,209 @@ public class FloatingBubbleService extends Service {
     // EXPANDED BUBBLE PANEL
 
     private void expandPanel() {
-        if (expanded || bubble == null) {
-            return;
-        }
-
+        if (expanded || bubble == null) return;
         expanded = true;
-
         int oldX = bubbleParams.x;
         int oldY = bubbleParams.y;
-
-        try {
-            windowManager.removeView(bubble);
-        } catch (Exception ignored) {
-        }
-
+        try { windowManager.removeView(bubble); } catch (Exception ignored) { }
         bubble = null;
 
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(12, 10, 12, 10);
-        layout.setClipToOutline(true);
-        layout.setBackground(makePanelBackground());
-        layout.setElevation(12f);
+        final float density = getResources().getDisplayMetrics().density;
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setPadding(dp(10), dp(9), dp(10), dp(8));
+        shell.setBackground(makePanelBackground());
+        shell.setElevation(dp(12));
 
-        layout.addView(makeText("● DIABLO SCANNER", 14, Color.rgb(255, 10, 31)));
-        layout.addView(makeText("SHAZAM FOR TRADING CHARTS • LIVE VISION", 9, Color.rgb(138, 155, 184)));
-        TextView rayView = makeText("◢ BLACK RAY SCAN ━━━━━━━━━ CHART LOCK ━━━━━━━━━ AI ANALYSIS ━━━━━━━━━ SIGNAL", 11, Color.rgb(255, 10, 31));
-        rayView.setBackground(makeBackground(Color.rgb(5, 5, 8)));
-        rayView.setSingleLine(true);
-        rayView.setEllipsize(TextUtils.TruncateAt.MARQUEE);
-        rayView.setMarqueeRepeatLimit(-1);
-        rayView.setHorizontallyScrolling(true);
-        rayView.setSelected(true);
-        layout.addView(rayView);
+        TextView title = makeText("● DIABLO SCANNER", 13, Color.rgb(255,10,31));
+        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        title.setPadding(dp(4), dp(3), dp(4), dp(3));
+        shell.addView(title);
 
-        signalView = makeText("WAIT", 27, Color.YELLOW);
-        layout.addView(signalView);
+        TextView subtitle = makeText("SHAZAM FOR TRADING CHARTS • BOARD 02 • LIVE VISION • LOCAL APP", 8, Color.rgb(138,155,184));
+        subtitle.setGravity(Gravity.START);
+        subtitle.setPadding(dp(4), 0, dp(4), dp(4));
+        shell.addView(subtitle);
 
-        detailsView = makeText(
-                "Waiting for a chart analysis...",
-                12,
-                Color.LTGRAY
-        );
-        layout.addView(detailsView);
+        TextView modeSummary = makeText("Total trades • marked WIN/LOSS only • " + currentModeLabel(), 8, Color.rgb(109,128,160));
+        modeSummary.setGravity(Gravity.START);
+        modeSummary.setPadding(dp(4), 0, dp(4), dp(5));
+        shell.addView(modeSummary);
 
-        tradeStatusView = makeText(
-                "Trade tracker ready.",
-                13,
-                Color.WHITE
-        );
-        layout.addView(tradeStatusView);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setVerticalScrollBarEnabled(true);
+        scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
 
-        statsView = makeText("", 12, Color.LTGRAY);
-        layout.addView(statsView);
+        signalView = makeText("WAIT", 23, Color.YELLOW);
+        signalView.setPadding(dp(4), dp(4), dp(4), dp(2));
+        content.addView(signalView);
 
-        modeButton = addButton(
-                layout,
-                currentModeLabel(),
-                Color.rgb(45, 45, 65),
-                v -> toggleTradingMode()
-        );
+        detailsView = makeText("Waiting for chart analysis…", 9, Color.rgb(180,195,218));
+        detailsView.setGravity(Gravity.CENTER);
+        detailsView.setMaxLines(4);
+        detailsView.setEllipsize(TextUtils.TruncateAt.END);
+        content.addView(detailsView);
 
-        addButton(
-                layout,
-                "◢ SCAN CURRENT CHART ONCE",
-                Color.rgb(255, 10, 31),
-                v -> requestOneScan()
-        );
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        String[][] labels = {
+            {"🔍", "SCAN CURRENT CHART ONCE"},
+            {"🧭", "START GUIDED SCALPING 4H → 15M → 1M"},
+            {"✅", "CONFIRM TIMEFRAME & SCAN"},
+            {"➡", "NEXT TIMEFRAME"},
+            {"🎯", "END GUIDED SCALPING"},
+            {"◷", autoScanButtonLabel()},
+            {"⏱", durationButtonLabel()},
+            {"✓", "MARK WIN"},
+            {"✕", "MARK LOSS"},
+            {"?", "MARK UNKNOWN"},
+            {"↻", "REFRESH NOW"},
+            {"↓", "MINIMIZE / CLOSE BUBBLE"}
+        };
+        for (int row = 0; row < labels.length; row += 2) {
+            LinearLayout rowLayout = new LinearLayout(this);
+            rowLayout.setOrientation(LinearLayout.HORIZONTAL);
+            rowLayout.setGravity(Gravity.CENTER_VERTICAL);
+            addGridButton(rowLayout, labels[row][0], labels[row][1], row);
+            addGridButton(rowLayout, labels[row + 1][0], labels[row + 1][1], row + 1);
+            grid.addView(rowLayout, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
+        content.addView(grid);
 
-        addButton(layout, "START GUIDED SCALPING • 4H → 15M → 1M",
-                Color.rgb(18, 31, 54), v -> startGuidedScalping());
-        addButton(layout, "CONFIRM TIMEFRAME & SCAN",
-                Color.rgb(18, 31, 54), v -> confirmGuidedTimeframeAndScan());
-        addButton(layout, "NEXT TIMEFRAME",
-                Color.rgb(18, 31, 54), v -> advanceGuidedTimeframe());
-        addButton(layout, "END GUIDED SCALPING",
-                Color.rgb(45, 35, 35), v -> endGuidedScalping());
+        tradeStatusView = makeText("Trade tracker ready.", 9, Color.WHITE);
+        content.addView(tradeStatusView);
+        statsView = makeText("", 8, Color.rgb(109,128,160));
+        content.addView(statsView);
 
-        addButton(
-                layout,
-                autoScanButtonLabel(),
-                Color.rgb(18, 31, 54),
-                v -> toggleAutoScan()
-        );
+        TextView patternFooter = makeText("Pattern Library 148 • Timed pattern library • chart patterns track trend structure and candlestick combinations • confidence is an estimate, not a verified win probability.", 8, Color.rgb(109,128,160));
+        patternFooter.setGravity(Gravity.START);
+        patternFooter.setPadding(dp(5), dp(5), dp(5), dp(3));
+        content.addView(patternFooter);
 
-        addButton(
-                layout,
-                "I TOOK TRADE",
-                Color.rgb(0, 90, 56),
-                v -> startTrade()
-        );
+        scroll.addView(content, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        shell.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        addButton(
-                layout,
-                "MARK WIN",
-                Color.rgb(0, 90, 56),
-                v -> saveTradeResult("WIN")
-        );
-
-        addButton(
-                layout,
-                "MARK LOSS",
-                Color.rgb(120, 10, 24),
-                v -> saveTradeResult("LOSS")
-        );
-
-        addButton(
-                layout,
-                "MARK UNKNOWN",
-                Color.rgb(18, 31, 54),
-                v -> saveTradeResult("UNKNOWN")
-        );
-
-        addButton(
-                layout,
-                "REFRESH NOW",
-                Color.rgb(18, 31, 54),
-                v -> refreshLatestResult()
-        );
-
-        addButton(
-                layout,
-                "MINIMISE",
-                Color.rgb(35, 35, 45),
-                v -> collapsePanel()
-        );
-
-        addButton(
-                layout,
-                "CLOSE BUBBLE",
-                Color.rgb(120, 10, 24),
-                v -> stopSelf()
-        );
-
-        // Keep the expanded panel within the visible screen. Its contents
-        // scroll vertically so every control remains reachable on small phones.
-        ScrollView scrollContainer = new ScrollView(this);
-        scrollContainer.setFillViewport(false);
-        scrollContainer.setVerticalScrollBarEnabled(true);
-        scrollContainer.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        scrollContainer.addView(
-                layout,
-                new ScrollView.LayoutParams(
-                        ScrollView.LayoutParams.MATCH_PARENT,
-                        ScrollView.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        panel = scrollContainer;
-
+        panel = shell;
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int panelWidth = Math.min((int) (360 * getResources().getDisplayMetrics().density), screenWidth - 24);
-        int maxPanelHeight = Math.max(180, (int) (screenHeight * 0.30f));
-
+        int panelWidth = Math.min(dp(360), screenWidth - dp(16));
+        int maxPanelHeight = Math.max(dp(180), (int)(screenHeight * 0.30f));
         panelParams = makeParams(panelWidth, maxPanelHeight);
         panelParams.gravity = Gravity.TOP | Gravity.START;
-        panelParams.x = Math.max(8, Math.min(oldX, screenWidth - panelWidth - 8));
-        panelParams.y = Math.max(8, Math.min(oldY, screenHeight - maxPanelHeight - 8));
-
+        panelParams.x = Math.max(dp(8), Math.min(oldX, screenWidth - panelWidth - dp(8)));
+        panelParams.y = Math.max(dp(8), Math.min(oldY, screenHeight - maxPanelHeight - dp(8)));
         try {
             windowManager.addView(panel, panelParams);
         } catch (Exception error) {
-            panel = null;
-            expanded = false;
-            signalView = null;
-            detailsView = null;
-            tradeStatusView = null;
-            statsView = null;
-            modeButton = null;
-            showBubble();
-            return;
+            panel = null; expanded = false;
+            signalView = null; detailsView = null; tradeStatusView = null; statsView = null;
+            showBubble(); return;
         }
-
         refreshLatestResult();
         updateTradeStatus();
         updateStats();
+    }
+
+    private int dp(float value) {
+        return (int)(value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private String durationButtonLabel() {
+        long duration = getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getLong("trade_duration_ms", DEFAULT_TRADE_DURATION_MS);
+        return duration >= 300000L ? "TRADE DURATION: 5 MIN" : "TRADE DURATION: 1 MIN";
+    }
+
+    private void cycleTradeDuration() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        long current = prefs.getLong("trade_duration_ms", DEFAULT_TRADE_DURATION_MS);
+        long next = current >= 300000L ? 60000L : 300000L;
+        prefs.edit().putLong("trade_duration_ms", next).apply();
+        tradeDurationMs = next;
+        if (detailsView != null) detailsView.setText("Trade duration set to " + (next / 60000L) + " minute(s).");
+        showActionToast((next / 60000L) + " MIN TRADE ACTIVATED");
+        refreshGridDurationLabel();
+    }
+
+    private void refreshGridDurationLabel() {
+        // Rebuild the expanded panel so the duration button label reflects the saved setting.
+        if (expanded) {
+            int x = panelParams != null ? panelParams.x : dp(8);
+            int y = panelParams != null ? panelParams.y : dp(180);
+            collapsePanel();
+            if (bubbleParams != null) { bubbleParams.x = x; bubbleParams.y = y; }
+            expandPanel();
+        }
+    }
+
+    private void addGridButton(LinearLayout row, String iconText, String label, int actionIndex) {
+        LinearLayout button = new LinearLayout(this);
+        button.setOrientation(LinearLayout.HORIZONTAL);
+        button.setGravity(Gravity.CENTER_VERTICAL);
+        button.setPadding(dp(6), dp(5), dp(5), dp(5));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.rgb(18,31,54));
+        bg.setCornerRadius(dp(12));
+        bg.setStroke(dp(1), Color.rgb(30,51,86));
+        button.setBackground(bg);
+
+        TextView icon = makeText(iconText, 16, actionIndex == 7 ? Color.rgb(0,255,122) :
+                (actionIndex == 4 || actionIndex == 8 ? Color.rgb(255,10,31) : Color.rgb(56,189,248)));
+        icon.setBackground(makeIconBackground(actionIndex));
+        icon.setMinWidth(dp(32));
+        icon.setMinHeight(dp(32));
+        icon.setPadding(dp(2), dp(2), dp(2), dp(2));
+        TextView text = makeText(label, 8, Color.WHITE);
+        text.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        text.setMaxLines(3);
+        text.setEllipsize(TextUtils.TruncateAt.END);
+        button.addView(icon, new LinearLayout.LayoutParams(dp(34), dp(34)));
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        textParams.leftMargin = dp(5);
+        button.addView(text, textParams);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        params.setMargins(dp(2), dp(3), dp(2), dp(3));
+        row.addView(button, params);
+
+        button.setOnClickListener(v -> {
+            switch (actionIndex) {
+                case 0: showActionToast("SCAN CURRENT CHART"); requestOneScan(); break;
+                case 1: showActionToast("GUIDED SCALPING STARTED 4H → 15M → 1M"); startGuidedScalping(); break;
+                case 2: showActionToast("TIMEFRAME CONFIRMED & SCANNED"); confirmGuidedTimeframeAndScan(); break;
+                case 3: showActionToast("NEXT TIMEFRAME"); advanceGuidedTimeframe(); break;
+                case 4: endGuidedScalping(); showActionToast("GUIDED SCALPING ENDED"); break;
+                case 5: toggleAutoScan(); showActionToast(autoScanButtonLabel()); break;
+                case 6: cycleTradeDuration(); break;
+                case 7: if (!tradeActive && !awaitingResult) startTrade(); saveTradeResult("WIN"); showActionToast("MARKED WIN"); break;
+                case 8: if (!tradeActive && !awaitingResult) startTrade(); saveTradeResult("LOSS"); showActionToast("MARKED LOSS"); break;
+                case 9: if (!tradeActive && !awaitingResult) startTrade(); saveTradeResult("UNKNOWN"); showActionToast("MARKED UNKNOWN"); break;
+                case 10: refreshLatestResult(); updateTradeStatus(); updateStats(); showActionToast("REFRESHED NOW"); break;
+                case 11: showActionToast("MINIMIZED"); collapsePanel(); break;
+                default: break;
+            }
+        });
+    }
+
+    private GradientDrawable makeIconBackground(int actionIndex) {
+        int fill = (actionIndex == 7) ? Color.argb(30,0,255,122) :
+                ((actionIndex == 4 || actionIndex == 8) ? Color.argb(30,255,10,31) : Color.argb(30,56,189,248));
+        int stroke = (actionIndex == 7) ? Color.argb(80,0,255,122) :
+                ((actionIndex == 4 || actionIndex == 8) ? Color.argb(80,255,10,31) : Color.argb(80,56,189,248));
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(fill); shape.setCornerRadius(dp(10)); shape.setStroke(dp(1), stroke);
+        return shape;
+    }
+
+    private void showActionToast(String message) {
+        Toast toast = Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT);
+        toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, dp(28));
+        toast.show();
     }
 
     // Guided workflow: user must manually change the broker timeframe.
