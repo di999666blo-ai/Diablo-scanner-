@@ -47,6 +47,7 @@ public class FloatingBubbleService extends Service {
     private View bubble;
     private View panel;
 
+    private TextView activityView;
     private TextView signalView;
     private TextView detailsView;
     private TextView tradeStatusView;
@@ -347,8 +348,7 @@ public class FloatingBubbleService extends Service {
 
     private void toggleTradingMode() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String current = prefs.getString("trading_mode", "TIMED");
-        String next = "SCALPING".equalsIgnoreCase(current) ? "TIMED" : "SCALPING";
+        String current = prefs.getString("trading_mode", "TIMED");        String next = "SCALPING".equalsIgnoreCase(current) ? "TIMED" : "SCALPING";
         prefs.edit()
                 .putString("trading_mode", next)
                 .putString("scan_message", "Mode selected: " + ("SCALPING".equals(next) ? "AI Scalping" : "Timed Signal") + ". Tap SCAN to analyse.")
@@ -398,6 +398,18 @@ public class FloatingBubbleService extends Service {
         scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
+
+        // Dedicated live activity/result area: separates AI progress/errors from the final trade signal.
+        TextView activityHeading = makeText("LIVE AI ACTIVITY / RESULT", 9, Color.rgb(255, 10, 31));
+        activityHeading.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        activityHeading.setPadding(dp(5), dp(7), dp(5), dp(2));
+        content.addView(activityHeading);
+
+        activityView = makeText("● READY • Waiting for scan", 10, Color.rgb(0, 255, 122));
+        activityView.setGravity(Gravity.CENTER);
+        activityView.setBackground(makeBackground(Color.rgb(7, 16, 28)));
+        activityView.setPadding(dp(7), dp(8), dp(7), dp(8));
+        content.addView(activityView);
 
         signalView = makeText("WAIT", 23, Color.YELLOW);
         signalView.setPadding(dp(4), dp(4), dp(4), dp(2));
@@ -697,8 +709,7 @@ public class FloatingBubbleService extends Service {
 
         prefs.edit()
                 .putString("scan_status", "SCANNING")
-                .putLong("scan_started_at", System.currentTimeMillis())
-                .putString("scan_message", "Capturing the visible chart for one analysis...")
+                .putLong("scan_started_at", System.currentTimeMillis())                .putString("scan_message", "Capturing the visible chart for one analysis...")
                 .apply();
 
         try {
@@ -778,8 +789,14 @@ public class FloatingBubbleService extends Service {
             String[] ray = {"◢", "◣", "◤", "◥"};
             String currentRay = ray[scanRayFrame++ % ray.length];
             boolean processingAI = "AI_PROCESSING".equals(scanStatus);
-            signalView.setText(currentRay + (processingAI ? " AI BUSY" : " SCANNING"));
-            signalView.setTextColor(Color.CYAN);
+            signalView.setText("WAIT");
+            signalView.setTextColor(Color.YELLOW);
+            if (activityView != null) {
+                activityView.setText((processingAI ? "◉ AI BUSY / PROCESSING" : currentRay + " SCANNING CHART") +
+                        "\\nProgress: " + Math.min(99L, elapsedSeconds * 10L) + "% (time-based estimate)" +
+                        "\\n" + (elapsedSeconds >= 90L ? "SLOW / TIMEOUT WARNING" : "Please wait • one scan only"));
+                activityView.setTextColor(Color.CYAN);
+            }
             String progress = elapsedSeconds < 10L
                     ? "Elapsed: " + elapsedSeconds + "s / 10s target"
                     : "DELAYED: " + elapsedSeconds + "s elapsed (10s target exceeded)";
@@ -798,6 +815,11 @@ public class FloatingBubbleService extends Service {
         }
 
         if ("AI_ERROR".equals(scanStatus)) {
+            if (activityView != null) {
+                activityView.setText("✕ AI ERROR • ANALYSIS FAILED\\n" +
+                        statusPrefs.getString("scan_message", "The AI could not complete this scan."));
+                activityView.setTextColor(Color.RED);
+            }
             signalView.setText("AI ERROR");
             signalView.setTextColor(Color.RED);
             detailsView.setText("AI ERROR • Analysis failed\n" +
@@ -898,6 +920,14 @@ public class FloatingBubbleService extends Service {
         }
 
         signal = normaliseSignal(signal);
+        if (activityView != null) {
+            String confidenceLabel = usingAI ? (" • " + Math.max(0, Math.min(100, score)) + "% confidence estimate") : "";
+            String stateLabel = "WAIT".equals(signal) ? "RESULT READY • WAIT" : "RESULT READY • " + signal;
+            activityView.setText("✓ " + stateLabel + confidenceLabel + "\\n" + source);
+            activityView.setTextColor("BUY".equals(signal) || "UP".equals(signal)
+                    ? Color.rgb(0, 255, 122)
+                    : ("SELL".equals(signal) || "DOWN".equals(signal) ? Color.RED : Color.YELLOW));
+        }
         signalView.setText(signal);
 
         if ("UP".equals(signal) || "BUY".equals(signal)) {
@@ -1047,8 +1077,7 @@ public class FloatingBubbleService extends Service {
     private void startTrade() {
         if (tradeActive || awaitingResult) {
             if (tradeStatusView != null) {
-                tradeStatusView.setText(
-                        "Finish the current trade record first."
+                tradeStatusView.setText(                        "Finish the current trade record first."
                 );
             }
             return;
@@ -1280,6 +1309,7 @@ public class FloatingBubbleService extends Service {
             panel = null;
         }
 
+        activityView = null;
         signalView = null;
         detailsView = null;
         tradeStatusView = null;
