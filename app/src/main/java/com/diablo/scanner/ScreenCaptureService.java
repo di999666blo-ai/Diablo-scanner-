@@ -727,7 +727,22 @@ public class ScreenCaptureService extends Service {
                     ).format(new Date())
             );
 
+            String selectedEngine = prefs.getString("scalping_engine", "SMOLVLM");
+            String modelUsed;
+            if ("SCALPING".equalsIgnoreCase(mode)) {
+                modelUsed = "KRONOS".equalsIgnoreCase(selectedEngine) ? "Kronos"
+                        : "HYBRID".equalsIgnoreCase(selectedEngine) ? "Hybrid Fast"
+                        : "SmolVLM";
+            } else {
+                modelUsed = prefs.getBoolean("timed_smolvlm_enabled", false)
+                        ? "Hybrid Fast + SmolVLM assist" : "Hybrid Fast";
+            }
             item.put("signal", displaySignal);
+            item.put("model", modelUsed);
+            item.put("engine", selectedEngine);
+            item.put("mode", mode);
+            item.put("timeframe", prefs.getString("chart_timeframe", "1m"));
+            item.put("tradeDuration", prefs.getLong("trade_duration_ms", 60000L));
             item.put("score", score);
             item.put("green", 0);
             item.put("red", 0);
