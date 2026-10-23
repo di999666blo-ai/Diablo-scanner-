@@ -232,6 +232,12 @@ public class MainActivity extends Activity {
             }
             data.put("signal", ai.getString("latest_ai_signal", "WAIT"));
             data.put("details", ai.getString("latest_ai_details", "No analysis recorded yet. Start a live scan or analyze a saved chart."));
+            String latestDetails = ai.getString("latest_ai_details", "");
+            String latestSignal = ai.getString("latest_ai_signal", "WAIT");
+            data.put("direction", dashboardDirection(latestSignal));
+            data.put("entry", extractTradeValue(latestDetails, "ENTRY"));
+            data.put("stopLoss", extractTradeValue(latestDetails, "STOP[_ ]?LOSS|SL"));
+            data.put("takeProfit", extractTradeValue(latestDetails, "TAKE[_ ]?PROFIT|TP"));
             data.put("savedChartPreview", ai.getString("saved_chart_preview_data", ""));
             data.put("history", history);
             data.put("total", history.length());
@@ -277,6 +283,30 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
         }
         return data;
+    }
+
+    private String dashboardDirection(String signal) {
+        if (signal == null) return "WAIT";
+        String s = signal.trim().toUpperCase(Locale.ROOT);
+        if (s.contains("UP") || s.equals("BUY")) return "UP";
+        if (s.contains("DOWN") || s.equals("SELL")) return "DOWN";
+        return "WAIT";
+    }
+
+    private String extractTradeValue(String details, String labelPattern) {
+        if (details == null || details.trim().isEmpty()) return "N/A";
+        try {
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                    "(?im)\\b(?:" + labelPattern + ")\\b\\s*[:=\\-]?\\s*([^\\r\\n;|]+)");
+            java.util.regex.Matcher m = p.matcher(details);
+            if (m.find()) {
+                String value = m.group(1).trim();
+                value = value.replaceAll("(?i)\\s+(REASON|CONFIDENCE|DIRECTION|SIGNAL|TREND)\\s*:.*$", "").trim();
+                if (!value.isEmpty() && !value.equalsIgnoreCase("N/A")
+                        && !value.equalsIgnoreCase("not available")) return value;
+            }
+        } catch (Exception ignored) { }
+        return "N/A";
     }
 
     public final class DashboardBridge {
