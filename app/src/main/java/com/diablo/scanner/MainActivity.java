@@ -769,7 +769,8 @@ public class MainActivity extends Activity {
     private String modelFromHistorySource(String source) {
         if ("KRONOS_MARKET_FORECAST".equals(source)) return "Kronos";
         if ("SAVED_AI".equals(source)) return "SmolVLM";
-        if ("SAVED_TIMED".equals(source) || "LIVE_TIMED".equals(source)) return "Hybrid Fast";
+        if ("SAVED_TIMED".equals(source)) return "SmolVLM";
+        if ("LIVE_TIMED".equals(source)) return "Hybrid Fast";
         if ("LIVE_AI".equals(source)) return "SmolVLM";
         return "Legacy / unknown";
     }
@@ -1418,7 +1419,7 @@ public class MainActivity extends Activity {
             item.put("signal", signal);
             String modelUsed = "KRONOS_MARKET_FORECAST".equals(source) ? "Kronos"
                     : "SAVED_AI".equals(source) ? "SmolVLM"
-                    : "SAVED_TIMED".equals(source) ? "Hybrid Fast"
+                    : "SAVED_TIMED".equals(source) ? "SmolVLM"
                     : "SMOLVLM".equalsIgnoreCase(prefs.getString("scalping_engine", "SMOLVLM")) ? "SmolVLM"
                     : prefs.getString("scalping_engine", "Hybrid Fast");
             item.put("model", modelUsed);
