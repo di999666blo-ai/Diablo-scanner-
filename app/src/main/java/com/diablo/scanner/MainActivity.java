@@ -254,6 +254,8 @@ public class MainActivity extends Activity {
             data.put("kronosStatus", prefs.getString("kronos_status", "NOT RUN"));
             data.put("kronosDetails", prefs.getString("kronos_latest_details", "No Kronos forecast has run yet."));
             data.put("kronosFeedNote", prefs.getString("kronos_feed_note", "Configure a reachable HTTPS Kronos API to fetch provider candles and run the model."));
+            try { data.put("kronosCandles", new JSONObject(prefs.getString("kronos_chart_candles", "{}")).optJSONArray("candles") == null ? new JSONArray() : new JSONObject(prefs.getString("kronos_chart_candles", "{}")).optJSONArray("candles")); } catch (Exception ignored) { data.put("kronosCandles", new JSONArray()); }
+            data.put("kronosLastFeedAt", prefs.getString("kronos_chart_updated_at", "Not fetched yet"));
             SharedPreferences tradePrefs = getSharedPreferences("diablo_trade_records", MODE_PRIVATE);
             JSONArray trades = new JSONArray(tradePrefs.getString("trades", "[]"));
             int wins = 0, losses = 0, unknownTrades = 0;
@@ -1778,10 +1780,15 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
+                // Fetch genuine BigQuote candles first so the dashboard can render the actual
+                // market data even when the independent Kronos inference runtime returns WAIT.
+                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                prefs.edit().putString("kronos_chart_candles", candleInput.toString())
+                        .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
+                        .putString("kronos_candles_json", candleInput.toString()).apply();
                 if (!configuredService.isEmpty()) {
                     result = KronosRuntimeClient.forecast(getApplicationContext());
                 } else {
-                    JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
                     result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
                 }
             } catch (Exception feedError) {
