@@ -75,10 +75,11 @@ public final class ChartAnalyzer {
         }
 
         long total=totalGreen+totalRed;
-        if(candles.size()<5 || total<35) {
+        // Fail closed when the captured screen does not contain a plausible chart.
+        // A few red/green UI buttons or indicator labels are not sufficient evidence.
+        if(candles.size()<8 || total<70 || !hasPlausibleChartStructure(candles, totalGreen, totalRed, w, h)) {
             return new LocalVisionAI.Result("WAIT",
-                    "CHART READABILITY: LOW\nFound too few clear candle-colour regions. Zoom in on the candles and hide menus/indicators covering the chart.\nTimeframe setting: "+timeframe+
-                    "\nCONFIDENCE: 0%\nThis is image-based analysis, not a direct broker data feed.");
+                    "NO VISIBLE CHART\\nNo readable trading chart/candles were detected on the screen. Open the broker chart so the candles are visible, close menus or pop-ups, then tap D to scan again.\\nNo UP/DOWN signal was generated.");
         }
 
         int lookback = "PRECISION".equals(profile) ? (duration <= 60000L ? 8 : duration <= 180000L ? 12 : 16)
@@ -103,9 +104,18 @@ public final class ChartAnalyzer {
         int firstY=candles.get(Math.max(0,candles.size()-Math.min(lookback,candles.size()))).y;
         int lastY=candles.get(candles.size()-1).y;
         double visualSlope=(firstY-lastY)/(double)h; // positive means later regions trend visually upward
-        // Prioritize the most recent columns for short-expiry signals, while
-        // retaining the broader visual direction and candle-position slope.
-        double score=(0.25*overall)+(0.55*recentBalance)+(0.20*Math.max(-1,Math.min(1,visualSlope*3.0)));
+        int slopeStart = Math.max(0, candles.size() - Math.min(lookback, candles.size()));
+        double slopeSum = 0.0;
+        int slopePairs = 0;
+        for (int i = slopeStart + 1; i < candles.size(); i++) {
+            slopeSum += candles.get(i - 1).y - candles.get(i).y;
+            slopePairs++;
+        }
+        double recentPriceSlope = slopePairs == 0 ? 0.0 : slopeSum / (slopePairs * (double) h);
+        double normalizedSlope = Math.max(-1.0, Math.min(1.0, visualSlope * 3.0));
+        double normalizedRecentSlope = Math.max(-1.0, Math.min(1.0, recentPriceSlope * 8.0));
+        // Recent price path gets substantial weight; colour-count bias alone cannot force UP.
+        double score=(0.15*overall)+(0.35*recentBalance)+(0.20*normalizedSlope)+(0.30*normalizedRecentSlope);
         double strength=Math.abs(score);
         double expiryAdjustment = duration <= 60000L ? 0.06 : duration <= 180000L ? 0.03 : 0.0;
         double profileAdjustment = "PRECISION".equals(profile) ? 0.06 : "FAST".equals(profile) ? 0.02 : 0.0;
@@ -119,9 +129,14 @@ public final class ChartAnalyzer {
                 : bearishPattern && !bullishPattern ? -0.04 : 0.0;
         score = Math.max(-1.0, Math.min(1.0, score + patternAdjustment));
         strength = Math.abs(score);
+        // Require agreement between recent candle colours and the price path.
+        boolean fallingStructure = normalizedRecentSlope < -0.10 && normalizedSlope < -0.04;
+        boolean risingStructure = normalizedRecentSlope > 0.10 && normalizedSlope > 0.04;
         // Pattern evidence is a small tie-breaker, never a standalone trigger.
-        if(score>required && recentUp>=recentDown+confirmationGap) signal="UP";
-        else if(score < -required && recentDown>=recentUp+confirmationGap) signal="DOWN";
+        if (fallingStructure && score < 0 && recentDown >= recentUp) signal = "DOWN";
+        else if (risingStructure && score > 0 && recentUp >= recentDown) signal = "UP";
+        else if(score>required && recentUp>=recentDown+confirmationGap && normalizedRecentSlope >= -0.08) signal="UP";
+        else if(score < -required && recentDown>=recentUp+confirmationGap && normalizedRecentSlope <= 0.08) signal="DOWN";
 
         int confidence=(int)Math.round(Math.max(0,Math.min(79, 42+strength*48)));
         if("WAIT".equals(signal)) confidence=Math.min(confidence,49);
@@ -147,6 +162,31 @@ public final class ChartAnalyzer {
         }
         if("CLOSE".equalsIgnoreCase(timing)) details.append("\nNote: a screenshot cannot prove the candle has closed; capture again after the candle closes.");
         return new LocalVisionAI.Result(signal,details.toString());
+    }
+
+    /**
+     * Reject screens with scattered coloured UI pixels but no plausible candle chart.
+     * Conservative by design: uncertain screens return WAIT, never a direction.
+     */
+    private static boolean hasPlausibleChartStructure(List<Candle> candles,
+            long totalGreen, long totalRed, int width, int height) {
+        if (candles == null || candles.size() < 8) return false;
+        long total = totalGreen + totalRed;
+        if (total < 70 || totalGreen < 12 || totalRed < 12) return false;
+        int n = candles.size();
+        if (candles.get(n - 1).x - candles.get(0).x < width * 0.18) return false;
+        int distinctRows = 0, minY = height, maxY = 0, activeRecent = 0;
+        int recentStart = Math.max(0, n - Math.min(12, n));
+        for (int i = 0; i < n; i++) {
+            Candle candle = candles.get(i);
+            minY = Math.min(minY, candle.y);
+            maxY = Math.max(maxY, candle.y);
+            if (i >= recentStart && candle.green + candle.red >= 2) activeRecent++;
+            if (i > 0 && Math.abs(candle.y - candles.get(i - 1).y) >= Math.max(2, height / 100))
+                distinctRows++;
+        }
+        return activeRecent >= 5 && distinctRows >= Math.max(2, n / 12)
+                && maxY - minY >= height * 0.015;
     }
 
     /**
