@@ -232,6 +232,7 @@ public class MainActivity extends Activity {
             }
             data.put("signal", ai.getString("latest_ai_signal", "WAIT"));
             data.put("details", ai.getString("latest_ai_details", "No analysis recorded yet. Start a live scan or analyze a saved chart."));
+            data.put("savedChartPreview", ai.getString("saved_chart_preview_data", ""));
             data.put("history", history);
             data.put("total", history.length());
             data.put("up", up);
@@ -1230,6 +1231,11 @@ public class MainActivity extends Activity {
             }
 
             try {
+                saveSavedChartPreview(bitmap);
+                prefs.edit().putString("scan_status", "SAVED_IMAGE_LOADED")
+                        .putString("scan_message", "Saved chart image loaded. Preparing visual analysis…")
+                        .apply();
+                refreshDashboardWebView();
                 analyseBitmap(bitmap);
             } finally {
                 bitmap.recycle();
@@ -1237,6 +1243,34 @@ public class MainActivity extends Activity {
 
         } catch (Exception e) {
             showImageError();
+        }
+    }
+
+    private void saveSavedChartPreview(Bitmap source) {
+        if (source == null || source.isRecycled()) return;
+        Bitmap preview = null;
+        try {
+            int maxWidth = 720;
+            float scale = Math.min(1f, maxWidth / (float) source.getWidth());
+            int width = Math.max(1, Math.round(source.getWidth() * scale));
+            int height = Math.max(1, Math.round(source.getHeight() * scale));
+            preview = Bitmap.createScaledBitmap(source, width, height, true);
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            preview.compress(Bitmap.CompressFormat.JPEG, 68, bytes);
+            byte[] imageBytes = bytes.toByteArray();
+            // Keep the preview small because dashboard data is polled on a low-memory phone.
+            if (imageBytes.length > 220 * 1024) {
+                bytes.reset();
+                preview.compress(Bitmap.CompressFormat.JPEG, 48, bytes);
+                imageBytes = bytes.toByteArray();
+            }
+            String dataUrl = "data:image/jpeg;base64,"
+                    + android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP);
+            prefs.edit().putString("saved_chart_preview_data", dataUrl).apply();
+        } catch (Exception ignored) {
+            prefs.edit().remove("saved_chart_preview_data").apply();
+        } finally {
+            if (preview != null && preview != source && !preview.isRecycled()) preview.recycle();
         }
     }
 
