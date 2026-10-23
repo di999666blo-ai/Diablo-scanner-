@@ -166,6 +166,15 @@ public class FloatingBubbleService extends Service {
         return START_STICKY;
     }
 
+    private GradientDrawable makePanelBackground() {
+        GradientDrawable shape = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.rgb(17, 29, 51), Color.rgb(8, 14, 30)});
+        shape.setCornerRadius(24);
+        shape.setStroke(2, Color.rgb(255, 10, 31));
+        return shape;
+    }
+
     private GradientDrawable makeBackground(int color) {
         GradientDrawable shape = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
@@ -373,11 +382,12 @@ public class FloatingBubbleService extends Service {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(12, 10, 12, 10);
-        layout.setBackground(makeBackground(Color.rgb(14, 23, 42)));
+        layout.setClipToOutline(true);
+        layout.setBackground(makePanelBackground());
         layout.setElevation(12f);
 
-        layout.addView(makeText("◈  DIABLO SCANNER  ◈", 16, Color.rgb(255, 35, 55)));
-        layout.addView(makeText("LIVE SCAN  •  CHART → AI → SIGNAL", 10, Color.rgb(255, 105, 120)));
+        layout.addView(makeText("● DIABLO SCANNER", 14, Color.rgb(255, 10, 31)));
+        layout.addView(makeText("SHAZAM FOR TRADING CHARTS • LIVE VISION", 9, Color.rgb(138, 155, 184)));
         TextView rayView = makeText("◢ BLACK RAY SCAN ━━━━━━━━━ CHART LOCK ━━━━━━━━━ AI ANALYSIS ━━━━━━━━━ SIGNAL", 11, Color.rgb(255, 10, 31));
         rayView.setBackground(makeBackground(Color.rgb(5, 5, 8)));
         rayView.setSingleLine(true);
@@ -417,58 +427,58 @@ public class FloatingBubbleService extends Service {
         addButton(
                 layout,
                 "◢ SCAN CURRENT CHART ONCE",
-                Color.rgb(120, 48, 30),
+                Color.rgb(255, 10, 31),
                 v -> requestOneScan()
         );
 
         addButton(layout, "START GUIDED SCALPING • 4H → 15M → 1M",
-                Color.rgb(100, 25, 35), v -> startGuidedScalping());
+                Color.rgb(18, 31, 54), v -> startGuidedScalping());
         addButton(layout, "CONFIRM TIMEFRAME & SCAN",
-                Color.rgb(75, 40, 30), v -> confirmGuidedTimeframeAndScan());
+                Color.rgb(18, 31, 54), v -> confirmGuidedTimeframeAndScan());
         addButton(layout, "NEXT TIMEFRAME",
-                Color.rgb(45, 35, 65), v -> advanceGuidedTimeframe());
+                Color.rgb(18, 31, 54), v -> advanceGuidedTimeframe());
         addButton(layout, "END GUIDED SCALPING",
                 Color.rgb(45, 35, 35), v -> endGuidedScalping());
 
         addButton(
                 layout,
                 autoScanButtonLabel(),
-                Color.rgb(55, 55, 90),
+                Color.rgb(18, 31, 54),
                 v -> toggleAutoScan()
         );
 
         addButton(
                 layout,
                 "I TOOK TRADE",
-                Color.rgb(30, 100, 55),
+                Color.rgb(0, 90, 56),
                 v -> startTrade()
         );
 
         addButton(
                 layout,
                 "MARK WIN",
-                Color.rgb(20, 120, 65),
+                Color.rgb(0, 90, 56),
                 v -> saveTradeResult("WIN")
         );
 
         addButton(
                 layout,
                 "MARK LOSS",
-                Color.rgb(150, 35, 45),
+                Color.rgb(120, 10, 24),
                 v -> saveTradeResult("LOSS")
         );
 
         addButton(
                 layout,
                 "MARK UNKNOWN",
-                Color.rgb(65, 65, 75),
+                Color.rgb(18, 31, 54),
                 v -> saveTradeResult("UNKNOWN")
         );
 
         addButton(
                 layout,
                 "REFRESH NOW",
-                Color.rgb(35, 35, 45),
+                Color.rgb(18, 31, 54),
                 v -> refreshLatestResult()
         );
 
@@ -482,7 +492,7 @@ public class FloatingBubbleService extends Service {
         addButton(
                 layout,
                 "CLOSE BUBBLE",
-                Color.rgb(60, 25, 30),
+                Color.rgb(120, 10, 24),
                 v -> stopSelf()
         );
 
