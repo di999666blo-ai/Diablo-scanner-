@@ -1867,120 +1867,124 @@ public class MainActivity extends Activity {
     }
 
     private void showKronosCandleJsonSettings() {
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(32, 8, 32, 8);
-
-        EditText symbolInput = new EditText(this);
-        symbolInput.setSingleLine(true);
-        symbolInput.setHint("Instrument symbol, e.g. EURUSD or XAUUSD");
-        symbolInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-        symbolInput.setText(prefs.getString("kronos_symbol", "EURUSD"));
-        form.addView(symbolInput, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        EditText intervalInput = new EditText(this);
-        intervalInput.setSingleLine(true);
-        intervalInput.setHint("Interval: 1m, 5m, 15m, 30m, 1h, 4h, 1d");
-        intervalInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        intervalInput.setText(prefs.getString("kronos_interval", "1m"));
-        form.addView(intervalInput, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(this)
-                .setTitle("Kronos market feed")
-                .setMessage("Phone-only Kronos market settings. The phone fetches completed candles directly from the public BiQuote feed; no host/API URL is used. Important: the genuine Kronos on-device tokenizer/model inference port is still incomplete, so this build must return WAIT rather than invent a forecast. Public market candles do not represent broker OTC prices. Supported intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d.")
-                .setView(form)
-                .setPositiveButton("SAVE MARKET SETTINGS", (dialog, which) -> {
-                    String symbol = symbolInput.getText().toString().trim().toUpperCase(Locale.ROOT);
-                    String interval = intervalInput.getText().toString().trim().toLowerCase(Locale.ROOT);
-                    if (symbol.isEmpty()) symbol = "EURUSD";
-                    if (!("1m".equals(interval) || "5m".equals(interval) || "15m".equals(interval)
-                            || "30m".equals(interval) || "1h".equals(interval) || "4h".equals(interval)
-                            || "1d".equals(interval))) {
-                        Toast.makeText(this, "Invalid interval. Use 1m, 5m, 15m, 30m, 1h, 4h or 1d.",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    prefs.edit()
-                            .putString("kronos_symbol", symbol)
-                            .putString("kronos_interval", interval)
-                            .remove("kronos_candles_json")
-                            .apply();
-                    Toast.makeText(this, "Phone will fetch " + symbol + " " + interval
-                            + " candles directly. Kronos returns WAIT until genuine on-device inference is implemented.", Toast.LENGTH_LONG).show();
-                    refreshDashboardWebView();
-                })
-                .setNeutralButton("BROWSE SYMBOL CATALOGUE", (dialog, which) -> {
-                    String baseUrl = prefs.getString("kronos_service_url", "").trim().replaceAll("/+$", "");
-                    if (baseUrl.isEmpty()) {
-                        Toast.makeText(this, "Save the Kronos API URL first.", Toast.LENGTH_LONG).show();
-                    } else {
-                        browseKronosSymbols(baseUrl);
-                    }
-                })
-                .setNegativeButton("CANCEL", (dialog, which) -> refreshDashboardWebView())
-                .show();
+        String[] intervals = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"};
+        String symbol = prefs.getString("kronos_symbol", "EURUSD");
+        String interval = prefs.getString("kronos_interval", "1m");
+        String[] choices = {"Select BigQuote instrument • " + symbol, "Select timeframe • " + interval,
+                "Custom instrument…", "Custom timeframe…", "Test BigQuote API"};
+        new AlertDialog.Builder(this).setTitle("KRONOS • BIGQUOTE SETTINGS")
+                .setItems(choices, (dialog, which) -> {
+                    if (which == 0) browseKronosSymbols();
+                    else if (which == 1) new AlertDialog.Builder(this).setTitle("Choose timeframe")
+                            .setItems(intervals, (d, selected) -> {
+                                prefs.edit().putString("kronos_interval", intervals[selected]).remove("kronos_candles_json").apply();
+                                refreshDashboardWebView();
+                            }).show();
+                    else if (which == 2 || which == 3) {
+                        EditText input = new EditText(this); input.setSingleLine(true);
+                        if (which == 2) {
+                            input.setHint("e.g. EURUSD or XAUUSD");
+                            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+                            input.setText(symbol);
+                        } else {
+                            input.setHint("e.g. 5m or 1h"); input.setText(interval);
+                            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                        }
+                        final boolean isSymbol = which == 2;
+                        new AlertDialog.Builder(this).setTitle(isSymbol ? "Custom BigQuote instrument" : "Custom timeframe")
+                                .setMessage(isSymbol ? "Enter a BigQuote symbol." : "Documented intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d. Other intervals may be rejected.")
+                                .setView(input).setPositiveButton("SAVE", (d, w) -> {
+                                    String value = input.getText().toString().trim();
+                                    if (isSymbol) value = value.toUpperCase(Locale.ROOT);
+                                    else value = value.toLowerCase(Locale.ROOT);
+                                    if (isSymbol && !value.matches("[A-Z0-9._-]{1,40}")) {
+                                        Toast.makeText(this, "Invalid instrument symbol.", Toast.LENGTH_LONG).show(); return;
+                                    }
+                                    if (!isSymbol && !value.matches("[0-9]+[mhd]")) {
+                                        Toast.makeText(this, "Enter a timeframe like 5m or 1h.", Toast.LENGTH_LONG).show(); return;
+                                    }
+                                    prefs.edit().putString(isSymbol ? "kronos_symbol" : "kronos_interval", value)
+                                            .remove("kronos_candles_json").apply();
+                                    refreshDashboardWebView();
+                                }).setNegativeButton("CANCEL", null).show();
+                    } else checkBigQuoteConnection();
+                }).setNegativeButton("CLOSE", null).show();
     }
 
-    private void browseKronosSymbols(String baseUrl) {
-        Toast.makeText(this, "Loading biquote instrument catalogue…", Toast.LENGTH_SHORT).show();
+    private void browseKronosSymbols() {
+        Toast.makeText(this, "Loading BigQuote instruments…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             HttpURLConnection connection = null;
             try {
-                connection = (HttpURLConnection) new java.net.URL(baseUrl + "/v1/market/symbols").openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(12000);
-                connection.setReadTimeout(20000);
+                connection = (HttpURLConnection) new java.net.URL("https://biquote.io/api/symbols?quotedWithinDays=7").openConnection();
+                connection.setRequestMethod("GET"); connection.setConnectTimeout(12000); connection.setReadTimeout(20000);
                 connection.setRequestProperty("Accept", "application/json");
                 int status = connection.getResponseCode();
-                InputStream stream = status >= 200 && status < 300
-                        ? connection.getInputStream() : connection.getErrorStream();
+                InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
                 String body;
                 try (InputStream in = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                    byte[] buffer = new byte[4096];
-                    int count;
+                    byte[] buffer = new byte[4096]; int count;
+                    while (in != null && (count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                    body = out.toString("UTF-8");
+                }
+                if (status < 200 || status >= 300) throw new IllegalStateException("BigQuote HTTP " + status);
+                JSONArray symbols;
+                try { symbols = new JSONArray(body); }
+                catch (Exception ignored) {
+                    JSONObject json = new JSONObject(body); symbols = json.optJSONArray("symbols");
+                    if (symbols == null) symbols = json.optJSONArray("items");
+                }
+                if (symbols == null || symbols.length() == 0) throw new IllegalStateException("No instruments returned");
+                java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+                java.util.ArrayList<String> names = new java.util.ArrayList<>();
+                for (int i = 0; i < symbols.length(); i++) {
+                    JSONObject item = symbols.optJSONObject(i); if (item == null) continue;
+                    String name = item.optString("name", item.optString("symbol", "")).trim();
+                    if (name.isEmpty()) continue;
+                    String desc = item.optString("description", item.optString("type", "")).trim();
+                    names.add(name); labels.add(desc.isEmpty() ? name : name + " — " + desc);
+                }
+                runOnUiThread(() -> {
+                    if (labels.isEmpty()) { Toast.makeText(this, "BigQuote returned no readable instruments.", Toast.LENGTH_LONG).show(); return; }
+                    new AlertDialog.Builder(this).setTitle("BigQuote instruments (" + labels.size() + ")")
+                            .setItems(labels.toArray(new String[0]), (dialog, selected) -> {
+                                prefs.edit().putString("kronos_symbol", names.get(selected)).remove("kronos_candles_json").apply();
+                                refreshDashboardWebView(); showKronosCandleJsonSettings();
+                            }).setNegativeButton("CLOSE", null).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> new AlertDialog.Builder(this).setTitle("BigQuote list unavailable")
+                        .setMessage("Could not load BigQuote's public catalogue.\n" + error.getMessage()
+                                + "\nNo BigQuote API key is required; check your internet connection.")
+                        .setPositiveButton("RETRY", (dialog, w) -> browseKronosSymbols())
+                        .setNegativeButton("CLOSE", null).show());
+            } finally { if (connection != null) connection.disconnect(); }
+        }).start();
+    }
+
+    private void checkBigQuoteConnection() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new java.net.URL("https://biquote.io/api/EURUSD").openConnection();
+                connection.setConnectTimeout(10000); connection.setReadTimeout(12000);
+                int status = connection.getResponseCode();
+                InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+                String body;
+                try (InputStream in = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[2048]; int count;
                     while (in != null && (count = in.read(buffer)) != -1) out.write(buffer, 0, count);
                     body = out.toString("UTF-8");
                 }
                 if (status < 200 || status >= 300) throw new IllegalStateException("HTTP " + status);
-                JSONObject json = new JSONObject(body);
-                JSONArray symbols = json.optJSONArray("symbols");
-                if (symbols == null || symbols.length() == 0) throw new IllegalStateException("No symbols returned");
-                java.util.ArrayList<String> labels = new java.util.ArrayList<>();
-                java.util.ArrayList<String> names = new java.util.ArrayList<>();
-                for (int i = 0; i < symbols.length(); i++) {
-                    JSONObject item = symbols.optJSONObject(i);
-                    if (item == null) continue;
-                    String name = item.optString("name", item.optString("symbol", ""));
-                    if (name.isEmpty()) continue;
-                    String description = item.optString("description", item.optString("type", ""));
-                    names.add(name);
-                    labels.add(description.isEmpty() ? name : name + " — " + description);
-                }
-                runOnUiThread(() -> {
-                    if (labels.isEmpty()) {
-                        Toast.makeText(this, "Provider returned no instrument names.", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    String[] choices = labels.toArray(new String[0]);
-                    new AlertDialog.Builder(this)
-                            .setTitle("biquote instruments (" + choices.length + ")")
-                            .setItems(choices, (d, which) -> {
-                                prefs.edit().putString("kronos_symbol", names.get(which)).remove("kronos_candles_json").apply();
-                                Toast.makeText(this, "Selected " + names.get(which) + ". Save market settings to choose the interval.", Toast.LENGTH_LONG).show();
-                                showKronosCandleJsonSettings();
-                            })
-                            .setNegativeButton("CLOSE", null)
-                            .show();
-                });
+                JSONObject quote = new JSONObject(body);
+                String message = "BigQuote connected. EURUSD mid: " + quote.optString("mid", "unavailable")
+                        + ". This market-data API is public and requires no key. Kronos inference is a separate engine.";
+                runOnUiThread(() -> new AlertDialog.Builder(this).setTitle("BigQuote API test").setMessage(message).setPositiveButton("OK", null).show());
             } catch (Exception error) {
-                runOnUiThread(() -> Toast.makeText(this,
-                        "Could not load provider symbols: " + error.getMessage()
-                                + ". Confirm the Kronos service is deployed and reachable.", Toast.LENGTH_LONG).show());
-            } finally {
-                if (connection != null) connection.disconnect();
-            }
+                runOnUiThread(() -> new AlertDialog.Builder(this).setTitle("BigQuote connection failed")
+                        .setMessage(error.getMessage()).setPositiveButton("OK", null).show());
+            } finally { if (connection != null) connection.disconnect(); }
         }).start();
     }
 
