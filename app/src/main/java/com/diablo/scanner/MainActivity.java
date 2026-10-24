@@ -1908,7 +1908,11 @@ public class MainActivity extends Activity {
                 JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
                 prefs.edit().putString("kronos_chart_candles", candleInput.toString())
                         .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
-                        .putString("kronos_candles_json", candleInput.toString()).apply();
+                        .putString("kronos_candles_json", candleInput.toString())
+                        .putString("kronos_status", "LOCAL INFERENCE RUNNING")
+                        .putString("kronos_feed_note", "BigQuote candles loaded and chart updated. Validating input and running the separate on-device Kronos inference now; no hosted inference or fallback engine.")
+                        .apply();
+                runOnUiThread(this::refreshDashboardWebView);
                 // The phone-only Kronos engine must never silently route inference to a host.
                 // BigQuote supplies market data; only the dedicated local runtime may forecast.
                 result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
