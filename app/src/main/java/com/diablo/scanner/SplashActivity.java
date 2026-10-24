@@ -1,50 +1,30 @@
 package com.diablo.scanner;
-
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.widget.ProgressBar;
-import android.widget.TextView;
-
+import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 public class SplashActivity extends Activity {
-    private int progress = 0;
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private TextView tvLoading;
-    private ProgressBar progressBar;
-
-    private final Runnable loading = new Runnable() {
-        @Override public void run() {
-            if (isFinishing()) return;
-            if (progress <= 100) {
-                tvLoading.setText("Loading... " + progress + "%");
-                progressBar.setProgress(progress);
-                long delay = progress < 30 ? 80L : progress < 70 ? 40L : progress < 90 ? 25L : 15L;
-                progress++;
-                handler.postDelayed(this, delay);
-            } else {
-                Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-                startActivity(intent);
-                finish();
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            }
-        }
-    };
-
-    @Override protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(0xFF02040A);
-        getWindow().setNavigationBarColor(0xFF02040A);
-        setContentView(R.layout.activity_splash);
-        tvLoading = findViewById(R.id.tvLoading);
-        progressBar = findViewById(R.id.progressBar);
-        progressBar.setMax(100);
-        handler.post(loading);
-    }
-
-    @Override protected void onDestroy() {
-        handler.removeCallbacks(loading);
-        super.onDestroy();
-    }
+ private boolean dashboardOpened=false;
+ @Override protected void onCreate(Bundle savedInstanceState){
+  super.onCreate(savedInstanceState);
+  getWindow().setStatusBarColor(Color.rgb(2,4,10));
+  getWindow().setNavigationBarColor(Color.rgb(2,4,10));
+  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
+  WebView launcher=new WebView(this); launcher.setBackgroundColor(Color.BLACK);
+  WebSettings settings=launcher.getSettings(); settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(false);
+  launcher.addJavascriptInterface(new SplashBridge(),"DiabloSplash"); launcher.setWebViewClient(new WebViewClient());
+  setContentView(launcher); launcher.loadUrl("file:///android_asset/launcher.html");
+ }
+ private final class SplashBridge {
+  @JavascriptInterface public void openDashboard(){runOnUiThread(()->{
+   if(dashboardOpened||isFinishing())return; dashboardOpened=true;
+   startActivity(new Intent(SplashActivity.this,MainActivity.class)); finish();
+   overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
+  });}
+ }
 }
