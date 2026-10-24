@@ -514,7 +514,7 @@ public class ScreenCaptureService extends Service {
                 .putString("scan_status", "AI_PROCESSING")
                 .putString("scan_message", scalpingMode
                         ? ("KRONOS".equalsIgnoreCase(selectedScalpingEngine)
-                            ? "Connecting to the configured online Kronos-mini service..."
+                            ? "Fetching BigQuote candles on-device; checking the local Kronos runtime..."
                             : ("HYBRID".equalsIgnoreCase(selectedScalpingEngine)
                                 ? "Running standalone Hybrid fast candle analysis (no SmolVLM or Kronos dependency)..."
                                 : "Preparing SmolVLM AI for Scalping Setup..."))
@@ -529,19 +529,10 @@ public class ScreenCaptureService extends Service {
                     if (scalpingMode) {
                         String selectedEngine = selectedScalpingEngine;
                         if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                            // Keep Kronos isolated from SmolVLM. If the user explicitly configured
-                            // an HTTPS inference endpoint, use the online Kronos client; otherwise
-                            // fetch public candles on-device and fail closed through the local runtime.
-                            try {
-                                android.content.SharedPreferences kronosPrefs =
-                                        getSharedPreferences("diablo_scanner", MODE_PRIVATE);
-                                String serviceUrl = kronosPrefs.getString("kronos_service_url", "").trim();
-                                if (!serviceUrl.isEmpty()) {
-                                    result = KronosRuntimeClient.forecast(getApplicationContext());
-                                } else {
-                                    JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
-                                    result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
-                                }
+                             // Phone-only contract: fetch structured BigQuote candles locally,
+                             // then invoke only the dedicated local Kronos runtime. Never route to a host.
+                             JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                             result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
                             } catch (Exception feedError) {
                                 result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
                                         + feedError.getClass().getSimpleName() + " — "
