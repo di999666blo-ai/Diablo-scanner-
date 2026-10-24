@@ -1857,12 +1857,9 @@ public class MainActivity extends Activity {
     }
 
     private void runKronosForecast() {
-        String configuredService = prefs.getString("kronos_service_url", "").trim();
         prefs.edit().putString("scalping_engine", "KRONOS")
                 .putString("kronos_status", "FETCHING DATA")
-                .putString("kronos_feed_note", configuredService.isEmpty()
-                        ? "Fetching completed BiQuote candles on this phone; local Kronos inference is checked next."
-                        : "Fetching completed BiQuote candles and requesting the configured HTTPS Kronos inference service.")
+                .putString("kronos_feed_note", "Fetching completed BigQuote candles on this phone; the independent local Kronos runtime is checked next. No hosted inference service is used.")
                 .apply();
         refreshDashboardWebView();
         new Thread(() -> {
@@ -1874,11 +1871,9 @@ public class MainActivity extends Activity {
                 prefs.edit().putString("kronos_chart_candles", candleInput.toString())
                         .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
                         .putString("kronos_candles_json", candleInput.toString()).apply();
-                if (!configuredService.isEmpty()) {
-                    result = KronosRuntimeClient.forecast(getApplicationContext());
-                } else {
-                    result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
-                }
+                // The phone-only Kronos engine must never silently route inference to a host.
+                // BigQuote supplies market data; only the dedicated local runtime may forecast.
+                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
             } catch (Exception feedError) {
                 result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
                         + feedError.getClass().getSimpleName() + " — "
