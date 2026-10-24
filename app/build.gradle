@@ -1,10 +1,9 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 dependencies {
-    // Separate inference backend for the future dedicated Kronos ONNX export.
-    // This does not alter or replace the existing SmolVLM/llama.cpp runtime.
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'
 }
 
@@ -21,7 +20,11 @@ android {
         versionName '1.0'
     }
 
-    androidResources {\n        noCompress 'onnx'\n    }\n\n    packaging {
+    androidResources {
+        noCompress 'onnx'
+    }
+
+    packaging {
         jniLibs {
             useLegacyPackaging = true
         }
