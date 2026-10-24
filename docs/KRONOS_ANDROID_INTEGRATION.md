@@ -29,3 +29,10 @@ Official upstream: https://github.com/shiyu-coder/Kronos
 ## Why this is intentionally not a fake integration
 
 Bundling arbitrary Kronos files or downloading the Python repository in CI would not make it runnable inside this Android app. The existing native llama.cpp path is for GGUF-compatible models such as SmolVLM. A real Kronos port requires a model-specific runtime and correct structured candle input; claiming otherwise would produce a misleading engine switch.
+
+
+## Phone-only routing correction (2026-10-24)
+
+The selected **KRONOS** engine now routes live scans and the dashboard's Run Kronos action only through `KronosLocalRuntime`. The app fetches structured completed BigQuote candles on the phone, then invokes the local runtime. A saved legacy `kronos_service_url` preference must not redirect this selected engine to a hosted API. The online adapter remains in the repository for legacy/service testing, but it is not the selected phone-only engine path.
+
+**Status remains RED for actual on-device inference:** `KronosLocalRuntime` deliberately returns WAIT because the APK does not yet contain a validated Android-compatible Kronos model/tokenizer export and the matching autoregressive decoding plus price reconstruction implementation. This routing correction prevents accidental hosting dependency; it does not pretend to complete the missing model port. CI must verify that the selected engine calls the local runtime and does not call `KronosRuntimeClient.forecast`.
