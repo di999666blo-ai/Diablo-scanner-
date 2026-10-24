@@ -194,6 +194,9 @@ public class MainActivity extends Activity {
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
                 showKronosCandleJsonSettings();
                 break;
+            case "kronos_refresh_market":
+                refreshKronosMarketDataOnly();
+                break;
             case "kronos_run":
                 runKronosForecast();
                 break;
@@ -1859,6 +1862,36 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("CANCEL", null)
                 .show();
+    }
+
+    /** Refresh completed BigQuote candles for the dashboard without running inference. */
+    private void refreshKronosMarketDataOnly() {
+        prefs.edit().putString("kronos_feed_note", "Refreshing BigQuote market candles…").apply();
+        refreshDashboardWebView();
+        new Thread(() -> {
+            try {
+                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                JSONArray candles = candleInput.optJSONArray("candles");
+                if (candles == null || candles.length() < 2) {
+                    throw new IllegalStateException("BigQuote returned too few candles to draw.");
+                }
+                prefs.edit()
+                        .putString("kronos_chart_candles", candleInput.toString())
+                        .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
+                        .putString("kronos_candles_json", candleInput.toString())
+                        .putString("kronos_feed_note", "BigQuote refreshed: " + candles.length()
+                                + " completed candles for " + prefs.getString("kronos_symbol", "EURUSD")
+                                + " (" + prefs.getString("kronos_interval", "1m")
+                                + "). Market chart refreshed; inference was not started.")
+                        .apply();
+            } catch (Exception error) {
+                String message = "BigQuote refresh failed: " + error.getClass().getSimpleName()
+                        + " - " + (error.getMessage() == null ? "no details" : error.getMessage())
+                        + ". Last successful chart retained; no synthetic candles were created.";
+                prefs.edit().putString("kronos_feed_note", message).apply();
+            }
+            runOnUiThread(this::refreshDashboardWebView);
+        }).start();
     }
 
     private void runKronosForecast() {
