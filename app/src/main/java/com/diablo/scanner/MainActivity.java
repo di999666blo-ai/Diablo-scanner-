@@ -260,7 +260,12 @@ public class MainActivity extends Activity {
             data.put("kronosSignal", prefs.getString("kronos_latest_signal", "WAIT"));
             data.put("kronosStatus", prefs.getString("kronos_status", "NOT RUN"));
             data.put("kronosDetails", prefs.getString("kronos_latest_details", "No Kronos forecast has run yet."));
-            data.put("kronosFeedNote", prefs.getString("kronos_feed_note", "Configure a reachable HTTPS Kronos API to fetch provider candles and run the model."));
+            data.put("kronosFeedNote", prefs.getString("kronos_feed_note", "BigQuote completed candles are fetched on this phone; Kronos-mini inference runs locally without a host."));
+            KronosLocalRuntime.Status localKronos = KronosLocalRuntime.inspect(this);
+            data.put("kronosLocalReady", localKronos.isReady());
+            data.put("kronosLocalModelPresent", localKronos.state != KronosLocalRuntime.State.MODEL_MISSING && localKronos.state != KronosLocalRuntime.State.INVALID_METADATA);
+            data.put("kronosLocalTokenizerPresent", localKronos.state != KronosLocalRuntime.State.TOKENIZER_MISSING);
+            data.put("kronosRuntimeMessage", localKronos.message);
             try { data.put("kronosCandles", new JSONObject(prefs.getString("kronos_chart_candles", "{}")).optJSONArray("candles") == null ? new JSONArray() : new JSONObject(prefs.getString("kronos_chart_candles", "{}")).optJSONArray("candles")); } catch (Exception ignored) { data.put("kronosCandles", new JSONArray()); }
             data.put("kronosLastFeedAt", prefs.getString("kronos_chart_updated_at", "Not fetched yet"));
             SharedPreferences tradePrefs = getSharedPreferences("diablo_trade_records", MODE_PRIVATE);
