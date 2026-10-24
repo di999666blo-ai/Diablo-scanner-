@@ -193,8 +193,8 @@ class KronosEngine private constructor(
         val std = FloatArray(6)
         val normalized = normalize(recent, lookback, mean, std)
 
-        val xStamp = LongArray(lookback * TIME_FEATURES)
-        val yStamp = LongArray(predLen * TIME_FEATURES)
+        val xStamp = FloatArray(lookback * TIME_FEATURES)
+        val yStamp = FloatArray(predLen * TIME_FEATURES)
         fillTimeFeatures(xStamp, recent.map { it.timestamp }, zoneId)
         fillTimeFeatures(yStamp, futureTimestamps.toList(), zoneId)
 
@@ -306,15 +306,15 @@ class KronosEngine private constructor(
      * 计算时间特征，对齐 pandas 的 `dt.minute / dt.hour / dt.weekday / dt.day / dt.month`。
      * 注意 weekday 以周一为 0。
      */
-    private fun fillTimeFeatures(out: LongArray, timestamps: List<Long>, zoneId: ZoneId) {
+    private fun fillTimeFeatures(out: FloatArray, timestamps: List<Long>, zoneId: ZoneId) {
         for (i in timestamps.indices) {
             val zdt = Instant.ofEpochMilli(timestamps[i]).atZone(zoneId)
             val base = i * TIME_FEATURES
-            out[base] = zdt.minute.toLong()
-            out[base + 1] = zdt.hour.toLong()
-            out[base + 2] = (zdt.dayOfWeek.value - 1).toLong()
-            out[base + 3] = zdt.dayOfMonth.toLong()
-            out[base + 4] = zdt.monthValue.toLong()
+            out[base] = zdt.minute.toFloat()
+            out[base + 1] = zdt.hour.toFloat()
+            out[base + 2] = (zdt.dayOfWeek.value - 1).toFloat()
+            out[base + 3] = zdt.dayOfMonth.toFloat()
+            out[base + 4] = zdt.monthValue.toFloat()
         }
     }
 
@@ -335,7 +335,7 @@ class KronosEngine private constructor(
 
     /** 预填充 + 快照。`T = lookback`, `past_len = 0`。 */
     private fun prefill(
-        s1Ids: LongArray, s2Ids: LongArray, xStamp: LongArray, lookback: Int,
+        s1Ids: LongArray, s2Ids: LongArray, xStamp: FloatArray, lookback: Int,
         workTK: FloatBuffer, workTV: FloatBuffer, workDK: FloatBuffer, workDV: FloatBuffer,
         s1Logits: FloatArray, context: FloatArray,
         baseTK: FloatArray, baseTV: FloatArray, baseDK: FloatArray, baseDV: FloatArray,
@@ -343,7 +343,7 @@ class KronosEngine private constructor(
         val s1T = OnnxTensor.createTensor(env, LongBuffer.wrap(s1Ids), longArrayOf(1, lookback.toLong()))
         val s2T = OnnxTensor.createTensor(env, LongBuffer.wrap(s2Ids), longArrayOf(1, lookback.toLong()))
         val stampT = OnnxTensor.createTensor(
-            env, LongBuffer.wrap(xStamp), longArrayOf(1, lookback.toLong(), TIME_FEATURES.toLong()),
+            env, FloatBuffer.wrap(xStamp), longArrayOf(1, lookback.toLong(), TIME_FEATURES.toLong()),
         )
         val pastLenT = OnnxTensor.createTensor(env, LongBuffer.wrap(longArrayOf(0)), longArrayOf(1))
         val tkT = OnnxTensor.createTensor(env, workTK, longArrayOf(layers.toLong(), 1, heads.toLong(), capacity.toLong(), headDim.toLong()))
@@ -385,18 +385,18 @@ class KronosEngine private constructor(
 
     /** 单步解码。`T = 1`，新位置写入 `pastLen` 处。 */
     private fun decodeStep(
-        s1Id: Long, s2Id: Long, yStamp: LongArray, stampIndex: Int,
+        s1Id: Long, s2Id: Long, yStamp: FloatArray, stampIndex: Int,
         pastLen: Int,
         workTK: FloatBuffer, workTV: FloatBuffer, workDK: FloatBuffer, workDV: FloatBuffer,
         s1Logits: FloatArray, context: FloatArray,
         stepTK: FloatArray, stepTV: FloatArray, stepDK: FloatArray, stepDV: FloatArray,
     ) {
-        val stampRow = LongArray(TIME_FEATURES)
+        val stampRow = FloatArray(TIME_FEATURES)
         System.arraycopy(yStamp, stampIndex * TIME_FEATURES, stampRow, 0, TIME_FEATURES)
 
         val s1T = OnnxTensor.createTensor(env, LongBuffer.wrap(longArrayOf(s1Id)), longArrayOf(1, 1))
         val s2T = OnnxTensor.createTensor(env, LongBuffer.wrap(longArrayOf(s2Id)), longArrayOf(1, 1))
-        val stampT = OnnxTensor.createTensor(env, LongBuffer.wrap(stampRow), longArrayOf(1, 1, TIME_FEATURES.toLong()))
+        val stampT = OnnxTensor.createTensor(env, FloatBuffer.wrap(stampRow), longArrayOf(1, 1, TIME_FEATURES.toLong()))
         val pastLenT = OnnxTensor.createTensor(env, LongBuffer.wrap(longArrayOf(pastLen.toLong())), longArrayOf(1))
         val tkT = OnnxTensor.createTensor(env, workTK, longArrayOf(layers.toLong(), 1, heads.toLong(), capacity.toLong(), headDim.toLong()))
         val tvT = OnnxTensor.createTensor(env, workTV, longArrayOf(layers.toLong(), 1, heads.toLong(), capacity.toLong(), headDim.toLong()))
