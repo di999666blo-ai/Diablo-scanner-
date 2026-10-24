@@ -36,11 +36,6 @@ jobs:
           grep -q 'NeoQuasar/Kronos-mini' render.yaml
           grep -q 'NeoQuasar/Kronos-Tokenizer-2k' render.yaml
 
-      - name: Build Kronos online runtime container
-        run: |
-          set -e
-          docker build --tag diablo-kronos-mini-api:test ./kronos-service
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
