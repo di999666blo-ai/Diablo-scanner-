@@ -21,38 +21,9 @@ main{padding:14px 13px 115px;max-width:760px;margin:auto}.view{display:none;anim
 .foot{font-size:9px;line-height:1.55;color:#607391;text-align:center;margin:15px 3px 0}.empty{font-size:10px;line-height:1.6;color:#7A8CA8;padding:9px 0}.settingrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #1C2C48}.settingrow:last-child{border-bottom:0}.settingrow b{font-size:11px}.settingrow span{display:block;font-size:9px;color:var(--muted);margin-top:4px}
 @media(min-width:500px){main{padding:20px}.tile{min-height:116px;padding:13px}.tile b{font-size:11px}.heading{font-size:27px}}
 
-/* Diablo bull launcher splash: overlays the real dashboard and never reloads it. */
-#diabloLauncher{position:fixed;inset:0;z-index:9999;background:#02040A;color:#fff;display:grid;grid-template-rows:44px auto auto 1fr auto;overflow:hidden;font-family:Inter,Roboto,Arial,sans-serif;transition:opacity .45s ease,visibility .45s ease;touch-action:manipulation}
-#diabloLauncher.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
-#diabloLauncher .launch-status{display:flex;justify-content:space-between;align-items:center;padding:0 24px;font-size:12px;color:#dce5f4}
-#diabloLauncher .launch-mark{width:132px;height:132px;margin:20px auto 0;border-radius:50%;border:3px solid #FF0A1F;box-shadow:0 0 45px #ff0a1f88,0 0 80px #ff0a1f44;display:grid;place-items:center;position:relative}
-#diabloLauncher .launch-mark:after{content:'';position:absolute;inset:-12px;border:1px solid #ff0a1f33;border-radius:50%}
-#diabloLauncher .launch-d{width:105px;height:105px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(35% 30% at 30% 28%,#FF3A4C,#B00816 50%,#400008);font-size:62px;font-weight:900;box-shadow:inset 0 0 15px #ff5263}
-#diabloLauncher .launch-title{text-align:center;margin-top:24px}
-#diabloLauncher .launch-title strong{display:block;font-weight:900;letter-spacing:6px;font-size:30px}
-#diabloLauncher .launch-title b{display:block;margin-top:5px;color:#FF0A1F;font-size:16px;letter-spacing:9px}
-#diabloLauncher .launch-title span{display:block;margin-top:9px;color:#8A9BB8;font-size:12px}
-#diabloLauncher .launch-bull{position:absolute;left:0;right:0;bottom:70px;height:min(42vh,360px);display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(255,10,31,.30),rgba(120,0,10,.14) 42%,transparent 72%);pointer-events:none}
-#diabloLauncher .launch-bull svg{width:min(70vw,280px);height:min(70vw,280px);filter:drop-shadow(0 0 25px #ff0a1f99);animation:launchPulse 1.6s ease-in-out infinite}
-#diabloLauncher .launch-loading{position:absolute;bottom:22px;left:0;right:0;text-align:center;padding:0 18px}
-#diabloLauncher #launchText{font-family:'JetBrains Mono',monospace;font-size:12px;color:#FF0A1F}
-#diabloLauncher .launch-bar{width:min(220px,75vw);height:4px;background:#ff0a1f26;border-radius:99px;margin:10px auto 0;border:1px solid #ff0a1f55;overflow:hidden}
-#diabloLauncher #launchFill{height:100%;width:0;background:#FF0A1F;box-shadow:0 0 10px #FF0A1F;transition:width .12s linear}
-#diabloLauncher .launch-skip{position:absolute;right:14px;top:48px;border:1px solid #57202b;border-radius:99px;background:#100b14;color:#c5cede;padding:8px 11px;font-size:10px;font-weight:800;z-index:2}
-@keyframes launchPulse{0%,100%{transform:scale(.96)}50%{transform:scale(1.04)}}
-@media(max-height:700px){#diabloLauncher .launch-mark{width:100px;height:100px;margin-top:8px}#diabloLauncher .launch-d{width:80px;height:80px;font-size:48px}#diabloLauncher .launch-title{margin-top:12px}#diabloLauncher .launch-title strong{font-size:25px}#diabloLauncher .launch-bull{height:34vh;bottom:56px}}
 </style>
 </head>
 <body>
-<div id="diabloLauncher" role="status" aria-label="DIABLO Scanner starting">
- <div class="launch-status"><span id="launchClock">10:24</span><span>DIABLO SCANNER</span></div>
- <button class="launch-skip" id="launchSkip" type="button">SKIP ›</button>
- <div class="launch-mark"><div class="launch-d">D</div></div>
- <div class="launch-title"><strong>DIABLO</strong><b>SCANNER</b><span>Shazam for Trading Charts</span></div>
- <div class="launch-bull"><svg viewBox="0 0 200 200" fill="none" aria-hidden="true"><path d="M100 30 C120 10 150 30 155 60 C160 90 145 110 130 125 C120 140 110 160 100 180 C90 160 80 140 70 125 C55 110 40 90 45 60 C50 30 80 10 100 30Z" fill="#FF0A1F"/><path d="M55 60 C30 40 10 70 20 90 C35 70 50 60 55 60 M145 60 C170 40 190 70 180 90 C165 70 150 60 145 60" fill="#FF0A1F"/><path d="M100 80 C90 85 85 95 90 105 C95 115 105 115 110 105 C115 95 110 85 100 80" fill="#000"/><circle cx="75" cy="95" r="4" fill="#000"/><circle cx="125" cy="95" r="4" fill="#000"/></svg></div>
- <div class="launch-loading"><div id="launchText">Loading... 0%</div><div class="launch-bar"><div id="launchFill"></div></div></div>
-</div>
-
 <header><div class="brand"><div class="mark">D</div><div><h1>DIABLO SCANNER</h1><p>SHAZAM FOR TRADING CHARTS</p></div></div><div class="livepill"><span class="statusdot"></span>LOCAL APP</div></header>
 <main>
 <section id="home" class="view active">
@@ -186,9 +157,6 @@ function historyModelFromSource(source){var s=String(source||'').toUpperCase();i
 function escapeHtml(v){return String(v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshDashboard()});refreshDashboard();setInterval(refreshDashboard,2000);
 </script>
-<script>
-// Launch animation hands control to the existing interactive dashboard; no alert/reload loop.
-(function(){var root=document.getElementById('diabloLauncher');if(!root)return;var p=0,finished=false,txt=document.getElementById('launchText'),fill=document.getElementById('launchFill'),skip=document.getElementById('launchSkip'),clock=document.getElementById('launchClock');function hide(){if(finished)return;finished=true;root.classList.add('is-hidden');setTimeout(function(){if(root&&root.parentNode)root.parentNode.removeChild(root)},500)}function tick(){if(finished)return;if(p<=100){if(txt)txt.textContent='Loading... '+p+'%';if(fill)fill.style.width=p+'%';p++;setTimeout(tick,p<30?35:p<70?22:14)}else{if(txt)txt.textContent='Opening dashboard...';setTimeout(hide,500)}}if(clock){var d=new Date();clock.textContent=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false})}if(skip)skip.addEventListener('click',hide);root.addEventListener('click',function(e){if(e.target===root)hide()});setTimeout(tick,120)})();
-</script>
+
 </body>
 </html>
