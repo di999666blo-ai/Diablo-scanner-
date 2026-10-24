@@ -280,11 +280,16 @@ jobs:
 
           grep -q "assets/models/diablo-text-model.gguf" apk-contents.txt
           grep -q "assets/models/diablo-image-projector.gguf" apk-contents.txt
+          grep -q "assets/kronos/kronos_manifest.json" apk-contents.txt
+          grep -q "assets/kronos/tokenizer_encode.onnx" apk-contents.txt
+          grep -q "assets/kronos/tokenizer_decode.onnx" apk-contents.txt
+          grep -q "assets/kronos/kronos_decode.onnx" apk-contents.txt
+          grep -q "assets/kronos/kronos_step_s2.onnx" apk-contents.txt
           grep -q "lib/arm64-v8a/libdiablo_llama.so" apk-contents.txt
           grep -q "lib/armeabi-v7a/libdiablo_llama.so" apk-contents.txt
 
           ls -lh "$APK"
-          echo "APK contains the expected AI model and engine files."
+          echo "APK contains SmolVLM, all four validated local Kronos graphs, and both AI engine binaries."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
