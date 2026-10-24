@@ -21,7 +21,7 @@ android {
         versionName '1.0'
     }
 
-    packaging {
+    androidResources {\n        noCompress 'onnx'\n    }\n\n    packaging {
         jniLibs {
             useLegacyPackaging = true
         }
