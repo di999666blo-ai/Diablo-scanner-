@@ -138,6 +138,11 @@ public final class ChartAnalyzer {
         else if(score>required && recentUp>=recentDown+confirmationGap && normalizedRecentSlope >= -0.08) signal="UP";
         else if(score < -required && recentDown>=recentUp+confirmationGap && normalizedRecentSlope <= 0.08) signal="DOWN";
 
+        // A static saved screenshot cannot prove that the visible candle has closed.
+        // In candle-close mode, fail closed rather than publishing an unverified entry.
+        boolean candleCloseUnverified = "CLOSE".equalsIgnoreCase(timing);
+        if (candleCloseUnverified) signal = "WAIT";
+
         int confidence=(int)Math.round(Math.max(0,Math.min(79, 42+strength*48)));
         if("WAIT".equals(signal)) confidence=Math.min(confidence,49);
         String directionText="UP".equals(signal)?"bullish visual pressure":"DOWN".equals(signal)?"bearish visual pressure":"mixed/unclear candle evidence";
@@ -154,6 +159,10 @@ public final class ChartAnalyzer {
         details.append("Read: ").append(directionText).append(".\n");
         details.append("CONFIDENCE: ").append(confidence).append("%\n");
         details.append("Confidence is an experimental image-strength score, not a measured win probability. No broker feed or OCR price reading is available.");
+        details.append("\nMandatory visual checks: candle-like structure, recent direction and price-path agreement.");
+        details.append("\nOrder block / FVG: NOT VERIFIED — pixel-only analysis cannot reliably extract OHLC zones; these are not treated as confirmed.");
+        details.append("\nVolatility / momentum: NOT VERIFIED from structured OHLC; no ATR or broker momentum feed is available.");
+        if (candleCloseUnverified) details.append("\nCANDLE CLOSE UNVERIFIED: a static screenshot cannot prove candle closure. Final decision forced to WAIT.");
         details.append("\nSpeed/precision profile changes sampling and confirmation threshold; it does not make this pixel-based analyzer a trained AI model.");
         if("SCALPING".equalsIgnoreCase(mode)) {
             details.append("\nEntry/TP/SL: not shown because reliable numeric price levels cannot be read from this image. Do not invent prices.");
