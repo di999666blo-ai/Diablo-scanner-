@@ -857,6 +857,32 @@ public class FloatingBubbleService extends Service {
         // The user still changes the broker chart timeframe manually and confirms it.
         maybeAutoAdvanceGuidedScalping(scanStatus);
 
+        // Keep the guided instruction screen visible between scans instead of
+        // letting the normal result renderer overwrite it on the next refresh.
+        String guidedStatusNow = statusPrefs.getString("guided_scalping_status", "");
+        int guidedStageNow = statusPrefs.getInt("guided_scalping_stage", -1);
+        if (guidedStatusNow.startsWith("WAITING_FOR_") && guidedStageNow >= 0
+                && guidedStageNow < GUIDED_TIMEFRAMES.length) {
+            if (activityView != null) {
+                activityView.setText("GUIDED SCALPING • STEP " + (guidedStageNow + 1) + "/3 • READY");
+                activityView.setTextColor(Color.rgb(255, 145, 48));
+            }
+            signalView.setText("STEP " + (guidedStageNow + 1) + "/3");
+            signalView.setTextColor(Color.rgb(255, 145, 48));
+            detailsView.setText(guidedInstructions(guidedStageNow));
+            return;
+        }
+        if ("COMPLETE".equals(guidedStatusNow)) {
+            if (activityView != null) {
+                activityView.setText("✓ GUIDED SCALPING COMPLETE");
+                activityView.setTextColor(Color.rgb(0, 255, 122));
+            }
+            signalView.setText("DONE ✓");
+            signalView.setTextColor(Color.rgb(0, 255, 122));
+            detailsView.setText("GUIDED SCALPING 3/3 COMPLETE. Review the separate 4H, 15M and 1M history entries together. The app did not verify broker timeframes or calculate a validated combined win probability.\\nElapsed: " + guidedElapsed());
+            return;
+        }
+
         String signal = "WAIT";
         String time = "No saved result yet";
         String source = "No analysis recorded";
