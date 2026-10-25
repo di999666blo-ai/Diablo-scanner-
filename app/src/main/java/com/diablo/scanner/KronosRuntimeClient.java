@@ -183,9 +183,11 @@ public final class KronosRuntimeClient {
             throw new IllegalArgumentException("Invalid BiQuote instrument symbol.");
         }
         int timeframeSeconds = intervalSeconds(interval);
+        String feedInterval = ("2m".equals(interval) || "3m".equals(interval)) ? "1m"
+                : ("2h".equals(interval) ? "1h" : interval);
         String encodedSymbol = URLEncoder.encode(cleanSymbol, "UTF-8");
         URL url = new URL("https://biquote.io/api/" + encodedSymbol
-                + "/ohlc?interval=" + URLEncoder.encode(interval, "UTF-8") + "&limit=200");
+                + "/ohlc?interval=" + URLEncoder.encode(feedInterval, "UTF-8") + "&limit=1000");
         HttpURLConnection feed = null;
         try {
             feed = (HttpURLConnection) url.openConnection();
@@ -228,9 +230,40 @@ public final class KronosRuntimeClient {
                 completed.add(new MarketCandle(timestamp, candle));
             }
             Collections.sort(completed, Comparator.comparingLong(item -> item.timestamp));
+            if (!feedInterval.equals(interval)) {
+                int factor = timeframeSeconds / intervalSeconds(feedInterval);
+                long targetMs = timeframeSeconds * 1000L;
+                List<MarketCandle> aggregated = new ArrayList<>();
+                int i = 0;
+                while (i < completed.size()) {
+                    long bucket = (completed.get(i).timestamp / targetMs) * targetMs;
+                    int j = i;
+                    double open = completed.get(i).candle.getDouble("open");
+                    double high = open, low = open, close = open, volume = 0;
+                    long lastTimestamp = -1;
+                    while (j < completed.size() && (completed.get(j).timestamp / targetMs) * targetMs == bucket) {
+                        MarketCandle part = completed.get(j);
+                        high = Math.max(high, part.candle.getDouble("high"));
+                        low = Math.min(low, part.candle.getDouble("low"));
+                        close = part.candle.getDouble("close");
+                        volume += part.candle.optDouble("volume", 0);
+                        lastTimestamp = part.timestamp;
+                        j++;
+                    }
+                    if (j - i == factor && lastTimestamp + intervalSeconds(feedInterval) * 1000L == bucket + targetMs) {
+                        JSONObject candle = new JSONObject();
+                        candle.put("timestamp", Instant.ofEpochMilli(bucket).toString());
+                        candle.put("open", open); candle.put("high", high); candle.put("low", low);
+                        candle.put("close", close); candle.put("volume", volume); candle.put("amount", 0);
+                        aggregated.add(new MarketCandle(bucket, candle));
+                    }
+                    i = j;
+                }
+                completed = aggregated;
+            }
             if (completed.size() < 32) {
                 throw new IllegalStateException("BiQuote supplied only " + completed.size()
-                        + " valid completed candles; Kronos requires at least 32. Signal held at WAIT.");
+                        + " valid completed candles for " + interval + "; at least 32 are required.");
             }
             // Reject duplicate or irregular timestamps rather than silently mislabel the timeframe.
             long intervalMs = timeframeSeconds * 1000L;
@@ -241,7 +274,7 @@ public final class KronosRuntimeClient {
                 if (previous >= 0 && (item.timestamp <= previous
                         || (item.timestamp - previous) % intervalMs != 0
                         || item.timestamp - previous < intervalMs)) {
-                    throw new IllegalStateException("BiQuote candle timestamps do not align with " + interval
+                    throw new IllegalStateException("BigQuote candle timestamps do not align with " + interval
                             + ". Signal held at WAIT.");
                 }
                 candles.put(item.candle);
@@ -264,6 +297,9 @@ public final class KronosRuntimeClient {
         if ("15m".equals(interval)) return 900;
         if ("30m".equals(interval)) return 1800;
         if ("1h".equals(interval)) return 3600;
+        if ("2m".equals(interval)) return 120;
+        if ("3m".equals(interval)) return 180;
+        if ("2h".equals(interval)) return 7200;
         if ("4h".equals(interval)) return 14400;
         if ("1d".equals(interval)) return 86400;
         throw new IllegalArgumentException("Unsupported BiQuote interval: " + interval);
