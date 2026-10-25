@@ -272,11 +272,16 @@ public class MainActivity extends Activity {
             data.put("timedSmolAssist", prefs.getBoolean("timed_smolvlm_enabled", false));
             data.put("scalpingEngine", prefs.getString("scalping_engine", "SMOLVLM"));
             data.put("kronosSymbol", prefs.getString("kronos_symbol", "EURUSD"));
-            data.put("kronosInterval", prefs.getString("kronos_interval", "1m"));
+            data.put("kronosInterval", prefs.getString("kronos_view_interval", "1m"));
             data.put("kronosServiceConfigured", !prefs.getString("kronos_service_url", "").trim().isEmpty());
             data.put("kronosSignal", prefs.getString("kronos_latest_signal", "WAIT"));
             data.put("kronosStatus", prefs.getString("kronos_status", "NOT RUN"));
             data.put("kronosDetails", prefs.getString("kronos_latest_details", "No Kronos forecast has run yet."));
+            data.put("kronosMonitorDetails", prefs.getString("kronos_monitor_details", "Continuous monitor is not running."));
+            data.put("kronosMonitorActive", prefs.getBoolean("kronos_monitor_active", false));
+            data.put("kronosHigherTimeframe", prefs.getString("kronos_tf_higher", "4h"));
+            data.put("kronosMiddleTimeframe", prefs.getString("kronos_tf_middle", "15m"));
+            data.put("kronosEntryTimeframe", prefs.getString("kronos_tf_entry", "1m"));
             data.put("kronosFeedNote", prefs.getString("kronos_feed_note", "BigQuote completed candles are fetched on this phone; Kronos-mini inference runs locally without a host."));
             KronosLocalRuntime.Status localKronos = KronosLocalRuntime.inspect(this);
             data.put("kronosLocalReady", localKronos.isReady());
@@ -1889,7 +1894,7 @@ public class MainActivity extends Activity {
         refreshDashboardWebView();
         new Thread(() -> {
             try {
-                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
+                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext(), prefs.getString("kronos_view_interval", "1m"));
                 JSONArray candles = candleInput.optJSONArray("candles");
                 if (candles == null || candles.length() < 2) {
                     throw new IllegalStateException("BigQuote returned too few candles to draw.");
@@ -1897,7 +1902,6 @@ public class MainActivity extends Activity {
                 prefs.edit()
                         .putString("kronos_chart_candles", candleInput.toString())
                         .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
-                        .putString("kronos_candles_json", candleInput.toString())
                         .putString("kronos_feed_note", "BigQuote refreshed: " + candles.length()
                                 + " completed candles for " + prefs.getString("kronos_symbol", "EURUSD")
                                 + " (" + prefs.getString("kronos_interval", "1m")
