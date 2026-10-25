@@ -654,6 +654,22 @@ public class FloatingBubbleService extends Service {
         requestOneScan();
     }
 
+    private void maybeAutoAdvanceGuidedScalping(String scanStatus) {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String guidedStatus = prefs.getString("guided_scalping_status", "");
+        if (!guidedStatus.startsWith("SCANNING_")) return;
+
+        if ("SCANNING".equals(scanStatus) || "AI_PROCESSING".equals(scanStatus)
+                || "AI_ERROR".equals(scanStatus) || "NEEDS_CAPTURE".equals(scanStatus)) {
+            return;
+        }
+
+        // The stage was marked SCANNING_* before the one-shot scan started.
+        // Change the status first so the 1-second UI refresh cannot advance twice.
+        prefs.edit().putString("guided_scalping_status", "ADVANCING_FROM_" + guidedStatus.substring("SCANNING_".length())).apply();
+        advanceGuidedTimeframe();
+    }
+
     private void advanceGuidedTimeframe() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         int stage = prefs.getInt("guided_scalping_stage", -1);
@@ -836,6 +852,10 @@ public class FloatingBubbleService extends Service {
             detailsView.setText(statusPrefs.getString("scan_message", "Start screen capture first."));
             return;
         }
+
+        // Automatically move to the next guided instruction after a scan finishes.
+        // The user still changes the broker chart timeframe manually and confirms it.
+        maybeAutoAdvanceGuidedScalping(scanStatus);
 
         String signal = "WAIT";
         String time = "No saved result yet";
