@@ -129,14 +129,16 @@ public final class ChartAnalyzer {
                 : bearishPattern && !bullishPattern ? -0.04 : 0.0;
         score = Math.max(-1.0, Math.min(1.0, score + patternAdjustment));
         strength = Math.abs(score);
-        // Require agreement between recent candle colours and the price path.
+        // Mandatory confirmation gate: price path, recent momentum, score and
+        // candle-colour majority must all agree. No single pattern/score can override conflict.
         boolean fallingStructure = normalizedRecentSlope < -0.10 && normalizedSlope < -0.04;
         boolean risingStructure = normalizedRecentSlope > 0.10 && normalizedSlope > 0.04;
-        // Pattern evidence is a small tie-breaker, never a standalone trigger.
-        if (fallingStructure && score < 0 && recentDown >= recentUp) signal = "DOWN";
-        else if (risingStructure && score > 0 && recentUp >= recentDown) signal = "UP";
-        else if(score>required && recentUp>=recentDown+confirmationGap && normalizedRecentSlope >= -0.08) signal="UP";
-        else if(score < -required && recentDown>=recentUp+confirmationGap && normalizedRecentSlope <= 0.08) signal="DOWN";
+        boolean bearishMomentumConfirmed = fallingStructure && score < -required
+                && recentDown >= recentUp + confirmationGap;
+        boolean bullishMomentumConfirmed = risingStructure && score > required
+                && recentUp >= recentDown + confirmationGap;
+        if (bearishMomentumConfirmed) signal = "DOWN";
+        else if (bullishMomentumConfirmed) signal = "UP";
 
         // A static saved screenshot cannot prove that the visible candle has closed.
         // In candle-close mode, fail closed rather than publishing an unverified entry.
