@@ -44,8 +44,12 @@ public final class KronosMonitor {
         long time; double open, high, low, close;
         Bar(JSONObject o) throws Exception {
             Object raw=o.opt("timestamp");
-            if (raw instanceof Number) time=((Number)raw).longValue();
-            else time=java.time.Instant.parse(String.valueOf(raw)).toEpochMilli();
+            if (raw instanceof Number) { time=((Number)raw).longValue(); if (time < 100000000000L) time *= 1000L; }
+            else {
+                String value=String.valueOf(raw).trim();
+                if (value.matches("\\d{10,13}")) { time=Long.parseLong(value); if (time < 100000000000L) time *= 1000L; }
+                else time=java.time.Instant.parse(value).toEpochMilli();
+            }
             open=o.getDouble("open"); high=o.getDouble("high"); low=o.getDouble("low"); close=o.getDouble("close");
             if (!(open>0 && high>0 && low>0 && close>0) ||
                 high < Math.max(open, Math.max(close, low)) || low > Math.min(open, Math.min(close, high)))
