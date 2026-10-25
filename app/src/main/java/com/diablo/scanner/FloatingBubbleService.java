@@ -54,6 +54,8 @@ public class FloatingBubbleService extends Service {
     private TextView tradeStatusView;
     private TextView statsView;
     private TextView modeButton;
+    private TextView dismissTargetView;
+    private boolean dismissTargetVisible = false;
 
     private boolean expanded = false;
     private boolean tradeActive = false;
@@ -110,7 +112,10 @@ public class FloatingBubbleService extends Service {
         windowManager = (WindowManager)
                 getSystemService(WINDOW_SERVICE);
 
-        showBubble();
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (!prefs.getBoolean("bubble_dismissed_by_user", false)) {
+            showBubble();
+        }
 
         handler.postDelayed(refreshRunnable, 1000L);
         if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("auto_scan_enabled", false)) {
@@ -231,7 +236,70 @@ public class FloatingBubbleService extends Service {
         );
     }
 
-    // MOVABLE D BUBBLE
+    // MOVABLE D BUBBLE + DRAG-TO-X DISMISS TARGET
+
+    private void showDismissTarget() {
+        if (dismissTargetVisible || windowManager == null) return;
+        TextView target = makeText("✕\\nREMOVE", 12, Color.WHITE);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(Color.rgb(150, 0, 18));
+        bg.setStroke(dp(3), Color.rgb(255, 10, 31));
+        target.setBackground(bg);
+        target.setElevation(dp(12));
+        target.setGravity(Gravity.CENTER);
+        int size = dp(76);
+        WindowManager.LayoutParams params = makeParams(size, size);
+        params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        params.x = 0;
+        params.y = dp(32);
+        try {
+            windowManager.addView(target, params);
+            dismissTargetView = target;
+            dismissTargetVisible = true;
+        } catch (Exception ignored) {
+            dismissTargetView = null;
+            dismissTargetVisible = false;
+        }
+    }
+
+    private void hideDismissTarget() {
+        if (dismissTargetView != null && windowManager != null) {
+            try { windowManager.removeView(dismissTargetView); } catch (Exception ignored) { }
+        }
+        dismissTargetView = null;
+        dismissTargetVisible = false;
+    }
+
+    private boolean bubbleDroppedOnDismissTarget() {
+        if (bubbleParams == null) return false;
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int bubbleSize = dp(54);
+        float bubbleCenterX = bubbleParams.x + bubbleSize / 2f;
+        float bubbleCenterY = bubbleParams.y + bubbleSize / 2f;
+        float targetCenterX = screenWidth / 2f;
+        float targetCenterY = screenHeight - dp(32) - dp(38);
+        float dx = bubbleCenterX - targetCenterX;
+        float dy = bubbleCenterY - targetCenterY;
+        return dx * dx + dy * dy <= dp(82) * dp(82);
+    }
+
+    private void dismissBubbleUntilRestarted() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putBoolean("bubble_dismissed_by_user", true)
+                .putBoolean("auto_scan_enabled", false)
+                .apply();
+        handler.removeCallbacks(autoScanRunnable);
+        hideDismissTarget();
+        if (expanded) collapsePanel();
+        if (bubble != null && windowManager != null) {
+            try { windowManager.removeView(bubble); } catch (Exception ignored) { }
+        }
+        bubble = null;
+        stopForeground(true);
+        stopSelf();
+    }
 
     private void showBubble() {
         TextView icon = makeText("D", 24, Color.WHITE);
@@ -282,27 +350,25 @@ public class FloatingBubbleService extends Service {
 
                     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                         moved = true;
+                        showDismissTarget();
                     }
 
-                    bubbleParams.x =
-                            Math.max(0, startX + (int) dx);
-
-                    bubbleParams.y =
-                            Math.max(0, startY + (int) dy);
+                    bubbleParams.x = Math.max(0, startX + (int) dx);
+                    bubbleParams.y = Math.max(0, startY + (int) dy);
 
                     try {
-                        windowManager.updateViewLayout(
-                                bubble,
-                                bubbleParams
-                        );
-                    } catch (Exception ignored) {
-                    }
+                        windowManager.updateViewLayout(bubble, bubbleParams);
+                    } catch (Exception ignored) { }
 
                     return true;
                 }
 
                 if (event.getAction() == MotionEvent.ACTION_UP) {
-                    if (!moved) {
+                    boolean dismiss = moved && bubbleDroppedOnDismissTarget();
+                    hideDismissTarget();
+                    if (dismiss) {
+                        dismissBubbleUntilRestarted();
+                    } else if (!moved) {
                         requestOneScan();
                     }
                     return true;
