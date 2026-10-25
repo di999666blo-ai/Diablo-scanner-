@@ -2135,51 +2135,6 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private void showLegacyKronosSettingsRemoved() {
-        String[] intervals = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"};
-        String symbol = prefs.getString("kronos_symbol", "EURUSD");
-        String interval = prefs.getString("kronos_interval", "1m");
-        String[] choices = {"Select BigQuote instrument • " + symbol, "Select timeframe • " + interval,
-                "Custom instrument…", "Custom timeframe…", "Test BigQuote API"};
-        new AlertDialog.Builder(this).setTitle("KRONOS • BIGQUOTE SETTINGS")
-                .setItems(choices, (dialog, which) -> {
-                    if (which == 0) browseKronosSymbols();
-                    else if (which == 1) new AlertDialog.Builder(this).setTitle("Choose timeframe")
-                            .setItems(intervals, (d, selected) -> {
-                                prefs.edit().putString("kronos_interval", intervals[selected]).remove("kronos_candles_json").apply();
-                                refreshDashboardWebView();
-                            }).show();
-                    else if (which == 2 || which == 3) {
-                        EditText input = new EditText(this); input.setSingleLine(true);
-                        if (which == 2) {
-                            input.setHint("e.g. EURUSD or XAUUSD");
-                            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-                            input.setText(symbol);
-                        } else {
-                            input.setHint("e.g. 5m or 1h"); input.setText(interval);
-                            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-                        }
-                        final boolean isSymbol = which == 2;
-                        new AlertDialog.Builder(this).setTitle(isSymbol ? "Custom BigQuote instrument" : "Custom timeframe")
-                                .setMessage(isSymbol ? "Enter a BigQuote symbol." : "Documented intervals: 1m, 5m, 15m, 30m, 1h, 4h, 1d. Other intervals may be rejected.")
-                                .setView(input).setPositiveButton("SAVE", (d, w) -> {
-                                    String value = input.getText().toString().trim();
-                                    if (isSymbol) value = value.toUpperCase(Locale.ROOT);
-                                    else value = value.toLowerCase(Locale.ROOT);
-                                    if (isSymbol && !value.matches("[A-Z0-9._-]{1,40}")) {
-                                        Toast.makeText(this, "Invalid instrument symbol.", Toast.LENGTH_LONG).show(); return;
-                                    }
-                                    if (!isSymbol && !value.matches("[0-9]+[mhd]")) {
-                                        Toast.makeText(this, "Enter a timeframe like 5m or 1h.", Toast.LENGTH_LONG).show(); return;
-                                    }
-                                    prefs.edit().putString(isSymbol ? "kronos_symbol" : "kronos_interval", value)
-                                            .remove("kronos_candles_json").apply();
-                                    refreshDashboardWebView();
-                                }).setNegativeButton("CANCEL", null).show();
-                    } else checkBigQuoteConnection();
-                }).setNegativeButton("CLOSE", null).show();
-    }
-
     private void browseKronosSymbols() {
         Toast.makeText(this, "Loading BigQuote instruments…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
