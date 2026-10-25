@@ -60,6 +60,10 @@ public class MainActivity extends Activity {
     private TextView statusText;
     private TextView countText;
     private SharedPreferences prefs;
+    private final Handler kronosMonitorHandler = new Handler(Looper.getMainLooper());
+    private volatile boolean kronosMonitorRunning = false;
+    private volatile boolean kronosMonitorCycleBusy = false;
+    private final Runnable kronosMonitorRunnable = new Runnable() { @Override public void run() { runKronosMonitorCycle(); } };
 
     private final int red = Color.rgb(255, 45, 65);
     private final int background = Color.rgb(12, 12, 16);
@@ -193,6 +197,16 @@ public class MainActivity extends Activity {
             case "kronos_config":
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
                 showKronosCandleJsonSettings();
+                break;
+            case "kronos_monitor_settings":
+                prefs.edit().putString("scalping_engine", "KRONOS").apply();
+                showKronosMonitorSettings();
+                break;
+            case "kronos_monitor_start":
+                startKronosContinuousMonitor();
+                break;
+            case "kronos_monitor_stop":
+                stopKronosContinuousMonitor("Monitoring stopped by user.");
                 break;
             case "kronos_refresh_market":
                 refreshKronosMarketDataOnly();
@@ -2004,6 +2018,115 @@ public class MainActivity extends Activity {
     }
 
     private void showKronosCandleJsonSettings() {
+        showKronosMonitorSettings();
+    }
+
+    private void showKronosMonitorSettings() {
+        String[] intervals = {"1m", "2m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"};
+        String symbol = prefs.getString("kronos_symbol", "EURUSD");
+        String view = prefs.getString("kronos_view_interval", "1m");
+        String higher = prefs.getString("kronos_tf_higher", "4h");
+        String middle = prefs.getString("kronos_tf_middle", "15m");
+        String entry = prefs.getString("kronos_tf_entry", "1m");
+        String[] choices = {"Select BigQuote instrument • " + symbol,
+                "Market chart timeframe • " + view,
+                "Higher analysis timeframe • " + higher,
+                "Middle analysis timeframe • " + middle,
+                "Entry analysis timeframe • " + entry,
+                "START CONTINUOUS MONITORING", "STOP CONTINUOUS MONITORING", "Test BigQuote API"};
+        new AlertDialog.Builder(this).setTitle("KRONOS • MARKET & MONITOR SETTINGS")
+                .setMessage("The visible chart timeframe is independent from the three analysis timeframes. WAIT keeps monitoring active when monitoring is started.")
+                .setItems(choices, (dialog, which) -> {
+                    if (which == 0) browseKronosSymbols();
+                    else if (which >= 1 && which <= 4) {
+                        final int slot = which;
+                        final String[] keys = {"", "kronos_view_interval", "kronos_tf_higher", "kronos_tf_middle", "kronos_tf_entry"};
+                        String current = which == 1 ? view : which == 2 ? higher : which == 3 ? middle : entry;
+                        int selected = 0;
+                        for (int i=0;i<intervals.length;i++) if (intervals[i].equals(current)) selected=i;
+                        new AlertDialog.Builder(this).setTitle(choices[which]).setSingleChoiceItems(intervals, selected, (d, idx) -> {
+                            prefs.edit().putString(keys[slot], intervals[idx]).apply();
+                            d.dismiss(); refreshDashboardWebView(); showKronosMonitorSettings();
+                        }).setNegativeButton("CANCEL", null).show();
+                    } else if (which == 5) startKronosContinuousMonitor();
+                    else if (which == 6) stopKronosContinuousMonitor("Monitoring stopped by user.");
+                    else checkBigQuoteConnection();
+                }).setNegativeButton("CLOSE", null).show();
+    }
+
+    private void startKronosContinuousMonitor() {
+        if (kronosMonitorRunning) {
+            Toast.makeText(this, "Kronos continuous monitoring is already active.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        kronosMonitorRunning = true;
+        prefs.edit().putBoolean("kronos_monitor_active", true)
+                .putString("kronos_status", "ACTIVE SCANNING — WAITING FOR ENTRY")
+                .putString("kronos_latest_signal", "WAIT")
+                .putString("kronos_latest_details", "Kronos monitoring is starting. WAIT does not mean stopped; the next market check is scheduled automatically.")
+                .apply();
+        refreshDashboardWebView();
+        Toast.makeText(this, "Kronos continuous monitoring started.", Toast.LENGTH_LONG).show();
+        kronosMonitorHandler.removeCallbacks(kronosMonitorRunnable);
+        kronosMonitorHandler.post(kronosMonitorRunnable);
+    }
+
+    private void stopKronosContinuousMonitor(String reason) {
+        kronosMonitorRunning = false;
+        prefs.edit().putBoolean("kronos_monitor_active", false).putString("kronos_status", "MONITOR STOPPED")
+                .putString("kronos_feed_note", reason).apply();
+        kronosMonitorHandler.removeCallbacks(kronosMonitorRunnable);
+        refreshDashboardWebView();
+        Toast.makeText(this, reason, Toast.LENGTH_SHORT).show();
+    }
+
+    private void runKronosMonitorCycle() {
+        if (!kronosMonitorRunning || kronosMonitorCycleBusy) return;
+        kronosMonitorCycleBusy = true;
+        prefs.edit().putString("kronos_status", "ACTIVE SCANNING — FETCHING 3 TIMEFRAMES").apply();
+        refreshDashboardWebView();
+        new Thread(() -> {
+            String status = "WAIT — MONITORING FOR ENTRY";
+            String details;
+            try {
+                String symbol = prefs.getString("kronos_symbol", "EURUSD");
+                String higher = prefs.getString("kronos_tf_higher", "4h");
+                String middle = prefs.getString("kronos_tf_middle", "15m");
+                String entry = prefs.getString("kronos_tf_entry", "1m");
+                KronosMonitor.Snapshot snapshot = KronosMonitor.evaluate(symbol, higher, middle, entry);
+                details = snapshot.details;
+                status = snapshot.status;
+                prefs.edit().putString("kronos_monitor_details", details)
+                        .putString("kronos_higher_trend", snapshot.higherTrend)
+                        .putString("kronos_middle_trend", snapshot.middleTrend)
+                        .putString("kronos_entry_trend", snapshot.entryTrend)
+                        .putString("kronos_monitor_updated_at", String.valueOf(snapshot.updatedAt))
+                        .putBoolean("kronos_entry_valid", snapshot.validSetup)
+                        .putString("kronos_entry_price", snapshot.validSetup ? String.valueOf(snapshot.entry) : "")
+                        .putString("kronos_sl_price", snapshot.validSetup ? String.valueOf(snapshot.stopLoss) : "")
+                        .putString("kronos_tp_price", snapshot.validSetup ? String.valueOf(snapshot.takeProfit) : "")
+                        .putString("kronos_status", status)
+                        .putString("kronos_latest_signal", snapshot.validSetup ? (snapshot.entryTrend.equals("BULLISH") ? "UP" : "DOWN") : "WAIT")
+                        .putString("kronos_latest_details", details)
+                        .putString("kronos_feed_note", "Continuous multi-timeframe monitor refreshed from BigQuote. WAIT means scanning continues.")
+                        .apply();
+            } catch (Exception error) {
+                details = "MONITOR DATA ERROR — NOT A NORMAL WAIT\n" + error.getClass().getSimpleName() + ": "
+                        + (error.getMessage() == null ? "No details" : error.getMessage())
+                        + "\nMonitoring will retry automatically when the feed is available.";
+                prefs.edit().putString("kronos_status", "DATA ERROR — RETRYING")
+                        .putString("kronos_latest_signal", "WAIT").putString("kronos_latest_details", details)
+                        .putString("kronos_feed_note", details).apply();
+            }
+            kronosMonitorCycleBusy = false;
+            runOnUiThread(() -> {
+                refreshDashboardWebView();
+                if (kronosMonitorRunning) kronosMonitorHandler.postDelayed(kronosMonitorRunnable, 15000L);
+            });
+        }).start();
+    }
+
+    private void showLegacyKronosSettingsRemoved() {
         String[] intervals = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"};
         String symbol = prefs.getString("kronos_symbol", "EURUSD");
         String interval = prefs.getString("kronos_interval", "1m");
