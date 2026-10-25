@@ -2097,6 +2097,11 @@ public class MainActivity extends Activity {
                 String higher = prefs.getString("kronos_tf_higher", "4h");
                 String middle = prefs.getString("kronos_tf_middle", "15m");
                 String entry = prefs.getString("kronos_tf_entry", "1m");
+                // Refresh the visible market chart independently of the three analysis timeframes.
+                JSONObject viewInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext(), prefs.getString("kronos_view_interval", "1m"));
+                prefs.edit().putString("kronos_chart_candles", viewInput.toString())
+                        .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
+                        .apply();
                 KronosMonitor.Snapshot snapshot = KronosMonitor.evaluate(symbol, higher, middle, entry);
                 details = snapshot.details;
                 status = snapshot.status;
