@@ -444,9 +444,42 @@ public class FloatingBubbleService extends Service {
         shell.setBackground(makePanelBackground());
         shell.setElevation(dp(12));
 
-        TextView title = makeText("● DIABLO SCANNER", 13, Color.rgb(255,10,31));
+        TextView title = makeText("● DIABLO SCANNER  ·  DRAG TO MOVE", 13, Color.rgb(255,10,31));
         title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        title.setPadding(dp(4), dp(3), dp(4), dp(3));
+        title.setPadding(dp(4), dp(5), dp(4), dp(5));
+        title.setContentDescription("Drag this header to move the Diablo Scanner panel");
+        // Drag from the header only so buttons and ScrollView keep their normal touch behaviour.
+        title.setOnTouchListener(new View.OnTouchListener() {
+            private int startX, startY;
+            private float downRawX, downRawY;
+            private boolean dragging;
+            @Override public boolean onTouch(View v, MotionEvent event) {
+                if (panelParams == null || panel == null) return false;
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        startX = panelParams.x; startY = panelParams.y;
+                        downRawX = event.getRawX(); downRawY = event.getRawY();
+                        dragging = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        int dx = (int)(event.getRawX() - downRawX);
+                        int dy = (int)(event.getRawY() - downRawY);
+                        if (Math.abs(dx) > dp(5) || Math.abs(dy) > dp(5)) dragging = true;
+                        if (dragging) {
+                            DisplayMetrics dm = getResources().getDisplayMetrics();
+                            int w = panelParams.width, h = panelParams.height;
+                            panelParams.x = Math.max(0, Math.min(startX + dx, dm.widthPixels - w));
+                            panelParams.y = Math.max(0, Math.min(startY + dy, dm.heightPixels - h));
+                            try { windowManager.updateViewLayout(panel, panelParams); } catch (Exception ignored) {}
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        return true;
+                }
+                return false;
+            }
+        });
         shell.addView(title);
 
         TextView subtitle = makeText("SHAZAM FOR TRADING CHARTS • BOARD 02 • LIVE VISION • LOCAL APP", 8, Color.rgb(138,155,184));
@@ -531,10 +564,14 @@ public class FloatingBubbleService extends Service {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         panel = shell;
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int panelWidth = Math.min(dp(360), screenWidth - dp(16));
-        int maxPanelHeight = Math.max(dp(180), (int)(screenHeight * 0.30f));
+        DisplayMetrics screenMetrics = getResources().getDisplayMetrics();
+        int screenHeight = screenMetrics.heightPixels;
+        int screenWidth = screenMetrics.widthPixels;
+        // Half-screen width, with a taller portrait panel. Keep the existing ScrollView:
+        // long content scrolls inside the panel rather than pushing buttons off-screen.
+        int panelWidth = Math.max(dp(160), Math.min((int)(screenWidth * 0.50f), screenWidth - dp(16)));
+        int requestedHeight = Math.max(dp(280), (int)(screenWidth * 0.75f));
+        int maxPanelHeight = Math.min(requestedHeight, Math.max(dp(220), (int)(screenHeight * 0.75f)));
         panelParams = makeParams(panelWidth, maxPanelHeight);
         panelParams.gravity = Gravity.TOP | Gravity.START;
         panelParams.x = Math.max(dp(8), Math.min(oldX, screenWidth - panelWidth - dp(8)));
