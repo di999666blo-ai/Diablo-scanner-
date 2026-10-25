@@ -1193,6 +1193,11 @@ public class MainActivity extends Activity {
             return;
         }
 
+        // Explicitly restarting from the APK re-enables the bubble after drag-to-X dismissal.
+        getSharedPreferences("diablo_scanner", MODE_PRIVATE).edit()
+                .putBoolean("bubble_dismissed_by_user", false)
+                .apply();
+
         try {
             Intent serviceIntent = new Intent(
                     this,
