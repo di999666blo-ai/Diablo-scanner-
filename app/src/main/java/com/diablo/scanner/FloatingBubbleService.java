@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.view.Gravity;
+import android.util.DisplayMetrics;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
