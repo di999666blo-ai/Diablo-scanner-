@@ -64,14 +64,17 @@ public final class KronosMonitor {
         double atr=atr(entryBars);
         boolean aligned=(ht.equals("BULLISH") && mt.equals("BULLISH")) ||
                         (ht.equals("BEARISH") && mt.equals("BEARISH"));
+        Bar previous=entryBars.get(entryBars.size()-2);
         boolean entryAligned=(ht.equals("BULLISH") && mt.equals("BULLISH") && et.equals("BULLISH")) ||
                               (ht.equals("BEARISH") && mt.equals("BEARISH") && et.equals("BEARISH"));
+        boolean entryTrigger=(ht.equals("BULLISH") && last.close>previous.high) ||
+                             (ht.equals("BEARISH") && last.close<previous.low);
         String direction=ht.equals("BULLISH") ? "UP" : ht.equals("BEARISH") ? "DOWN" : "WAIT";
         double entry=0, sl=0, tp=0, rr=0;
         boolean valid=false;
         String status="WAIT — MONITORING FOR ENTRY";
         String reason="Trend alignment or entry conditions are not yet confirmed. Monitoring remains active.";
-        if (entryAligned && atr>0 && last.close>0) {
+        if (entryAligned && entryTrigger && atr>0 && last.close>0) {
             entry=last.close;
             double risk=Math.max(atr*1.5, entry*0.0002);
             double reward=risk*2.0;
@@ -83,6 +86,8 @@ public final class KronosMonitor {
             reason="Higher and middle timeframe trends disagree. Monitoring continues; no entry levels are issued.";
         } else if (!entryAligned) {
             reason="Higher and middle timeframes agree, but the entry timeframe has not confirmed. Monitoring continues.";
+        } else if (!entryTrigger) {
+            reason="All three trends align, but the entry-timeframe breakout trigger has not occurred. Monitoring continues; no premature entry is issued.";
         }
         String details="KRONOS MULTI-TIMEFRAME MONITOR (rules-based)\n"
                 +"Market: "+symbol+"\n"
