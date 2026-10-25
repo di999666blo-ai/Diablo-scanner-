@@ -1371,8 +1371,14 @@ public class MainActivity extends Activity {
         final boolean scalpingMode = "SCALPING".equalsIgnoreCase(prefs.getString("trading_mode", "TIMED"));
         signalText.setText("ANALYSING…");
         signalText.setTextColor(Color.CYAN);
-        statusText.setText("Preparing shared SmolVLM vision analysis for " +
-                (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...");
+        statusText.setText("Preparing " +
+                (scalpingMode ? "Scalping Setup" : "Timed Signal") + " analysis...");
+        // Explicit state prevents the dashboard from mistaking an unfinished workflow
+        // for a completed signal. The selected preview is cleared only after analysis ends.
+        prefs.edit().putString("scan_status", "SAVED_ANALYZING")
+                .putString("scan_message", "Saved chart analysis is running. Required checks are being evaluated.")
+                .apply();
+        refreshDashboardWebView();
         final Bitmap analysisBitmap;
         try {
             analysisBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
@@ -1450,11 +1456,23 @@ public class MainActivity extends Activity {
                 signalText.setText(display);
                 signalText.setTextColor(colour);
                 statusText.setText((scalpingMode ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • SMOLVLM AI TIMED SIGNAL\n") + (details == null ? "" : details));
-                prefs.edit().putString("scan_status", "SAVED_READY")
-                        .putString("scan_message", "Saved chart analysis complete.").apply();
+                boolean analysisError = details != null && (
+                        details.toUpperCase(Locale.ROOT).contains("ANALYSIS FAILED")
+                        || details.toUpperCase(Locale.ROOT).contains("MARKET FEED ERROR")
+                        || details.toUpperCase(Locale.ROOT).contains("MODEL ERROR"));
+                // A saved screenshot is static: it cannot prove candle closure.
+                // ChartAnalyzer enforces WAIT in candle-close mode; never override that here.
+                String finalStatus = analysisError ? "SAVED_ERROR" : "SAVED_READY";
+                prefs.edit().remove("saved_chart_preview_data")
+                        .putString("scan_status", finalStatus)
+                        .putString("scan_message", analysisError
+                                ? "Saved chart analysis ended with an error. Preview cleared; original gallery image is untouched."
+                                : "SCAN COMPLETE. Preview cleared; original gallery image is untouched.")
+                        .apply();
                 saveHistory(display, confidence, 0, 0, scalpingMode ? "SAVED_AI" : "SAVED_TIMED");
                 publishSavedChartResult(display, details, confidence);
                 refreshCount();
+                refreshDashboardWebView();
             });
         }, "DiabloSavedChartAnalyzer").start();
     }
