@@ -148,7 +148,13 @@ public class MainActivity extends Activity {
                 requestScreenCapture();
                 break;
             case "start_guided_scalping":
-                prefs.edit().putString("trading_mode", "SCALPING").apply();
+                // A new guided run must not inherit stale 4H/15M findings from an older session.
+                prefs.edit().putString("trading_mode", "SCALPING")
+                        .putString("guided_scalping_context", "{}")
+                        .putString("guided_scalping_session_started", String.valueOf(System.currentTimeMillis()))
+                        .remove("guided_scalping_last_stage")
+                        .remove("guided_scalping_last_updated")
+                        .apply();
                 startFloatingBubble();
                 Toast.makeText(this, "Guided scalping selected. Keep the chart visible and follow 4H → 15M → 1M.",
                         Toast.LENGTH_LONG).show();
