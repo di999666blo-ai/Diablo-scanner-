@@ -466,8 +466,11 @@ public final class LocalVisionAI {
 
             String prompt =
                     "You are an experimental visual trading-chart assistant. " +
-                    "The selected chart timeframe is " + timeframe + " and configured trade duration is " +
-                    formatDuration(tradeDurationMs) + ". The candle timing preference is " + candleTiming + ". " +
+                    "TIMED SIGNAL only: the selected visible-chart timeframe is " + timeframe
+                    + " and the requested trade expiry horizon is " + formatDuration(tradeDurationMs)
+                    + ". These are independent settings: do not assume the expiry equals the candle timeframe. "
+                    + "Evaluate visible evidence against the selected expiry, but never claim future price certainty. "
+                    + "The candle timing preference is " + candleTiming + ". " +
                     ("SCALPING".equalsIgnoreCase(mode)
                             ? "PERSISTENT GUIDED SCALPING CONTEXT from earlier completed stages: "
                                 + (priorGuidedFindings.isEmpty() ? "No earlier timeframe findings saved yet. " : priorGuidedFindings)
