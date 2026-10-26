@@ -424,6 +424,25 @@ public final class LocalVisionAI {
             long tradeDurationMs = scannerPrefs.getLong("trade_duration_ms", 60000L);
             String timedProfile = scannerPrefs.getString("timed_analysis_profile", "BALANCED");
             String candleTiming = scannerPrefs.getString("signal_timing", "CLOSE");
+            String guidedContext = scannerPrefs.getString("guided_scalping_context", "{}");
+            String priorGuidedFindings = "";
+            if ("SCALPING".equalsIgnoreCase(mode)) {
+                try {
+                    org.json.JSONObject saved = new org.json.JSONObject(guidedContext);
+                    StringBuilder previous = new StringBuilder();
+                    java.util.Iterator<String> keys = saved.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        org.json.JSONObject stage = saved.optJSONObject(key);
+                        if (stage != null && !key.equalsIgnoreCase(timeframe)) {
+                            previous.append(key).append(" findings: ")
+                                    .append(stage.optString("signal", "WAIT")).append("; ")
+                                    .append(stage.optString("summary", "No summary saved")).append(". ");
+                        }
+                    }
+                    if (previous.length() > 0) priorGuidedFindings = previous.toString();
+                } catch (Exception ignored) { }
+            }
 
             String modeInstructions;
             if ("SCALPING".equalsIgnoreCase(mode)) {
@@ -449,6 +468,11 @@ public final class LocalVisionAI {
                     "You are an experimental visual trading-chart assistant. " +
                     "The selected chart timeframe is " + timeframe + " and configured trade duration is " +
                     formatDuration(tradeDurationMs) + ". The candle timing preference is " + candleTiming + ". " +
+                    ("SCALPING".equalsIgnoreCase(mode)
+                            ? "PERSISTENT GUIDED SCALPING CONTEXT from earlier completed stages: "
+                                + (priorGuidedFindings.isEmpty() ? "No earlier timeframe findings saved yet. " : priorGuidedFindings)
+                                + "Use these saved findings as context, but re-check the current screenshot and state when evidence conflicts. "
+                            : "") +
                     "Use these settings as context only; a static screenshot cannot reveal future price movement. " +
                     "First verify that a real trading chart with visible candles is present. If no usable chart is visible, " +
                     "return TREND: unclear; DIRECTION: WAIT; CONFIDENCE: 0; REASON: no chart detected. " +
@@ -614,6 +638,9 @@ public final class LocalVisionAI {
                                 + output;
             }
 
+            if ("SCALPING".equalsIgnoreCase(mode)) {
+                saveGuidedStage(scannerPrefs, timeframe, signal, output);
+            }
             return new Result(signal, output);
 
         } catch (Exception error) {
@@ -635,6 +662,22 @@ public final class LocalVisionAI {
                 imageFile.delete();
             }
         }
+    }
+
+    private static void saveGuidedStage(SharedPreferences prefs, String timeframe, String signal, String output) {
+        try {
+            org.json.JSONObject saved = new org.json.JSONObject(prefs.getString("guided_scalping_context", "{}"));
+            org.json.JSONObject stage = new org.json.JSONObject();
+            stage.put("timeframe", timeframe);
+            stage.put("signal", signal);
+            stage.put("summary", output.length() > 900 ? output.substring(0, 900) : output);
+            stage.put("updatedAt", System.currentTimeMillis());
+            stage.put("engine", prefs.getString("scalping_engine", "SMOLVLM"));
+            saved.put(timeframe, stage);
+            prefs.edit().putString("guided_scalping_context", saved.toString())
+                    .putString("guided_scalping_last_stage", timeframe)
+                    .putLong("guided_scalping_last_updated", System.currentTimeMillis()).apply();
+        } catch (Exception ignored) { }
     }
 
     /**
