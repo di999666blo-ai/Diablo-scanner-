@@ -581,7 +581,7 @@ public class FloatingBubbleService extends Service {
             {"🔍", "SCAN CURRENT CHART ONCE"},
             {"🧭", "START GUIDED SCALPING 4H → 15M → 1M"},
             {"✅", "CONFIRM TIMEFRAME & SCAN"},
-            {"➡", "NEXT TIMEFRAME"},
+            {"📋", "VIEW SAVED FINDINGS"},
             {"🎯", "END GUIDED SCALPING"},
             {"◷", autoScanButtonLabel()},
             {"⏱", durationButtonLabel()},
@@ -708,7 +708,7 @@ public class FloatingBubbleService extends Service {
                 case 0: showActionToast("SCAN CURRENT CHART"); requestOneScan(); break;
                 case 1: showActionToast("GUIDED SCALPING STARTED 4H → 15M → 1M"); startGuidedScalping(); break;
                 case 2: showActionToast("TIMEFRAME CONFIRMED & SCANNED"); confirmGuidedTimeframeAndScan(); break;
-                case 3: showActionToast("NEXT TIMEFRAME"); advanceGuidedTimeframe(); break;
+                case 3: showActionToast("SAVED GUIDED FINDINGS"); showGuidedSavedFindings(); break;
                 case 4: endGuidedScalping(); showActionToast("GUIDED SCALPING ENDED"); break;
                 case 5: toggleAutoScan(); showActionToast(autoScanButtonLabel()); break;
                 case 6: cycleTradeDuration(); break;
@@ -943,6 +943,21 @@ public class FloatingBubbleService extends Service {
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setCategory(Notification.CATEGORY_STATUS).setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(true).build());
+    }
+
+    private void showGuidedSavedFindings() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String summary = guidedContextSummary(prefs);
+        String status = prefs.getString("guided_scalping_status", "NOT_STARTED");
+        int stage = prefs.getInt("guided_scalping_stage", -1);
+        String stageText = stage >= 0 && stage < GUIDED_TIMEFRAMES.length
+                ? GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT)
+                : "NONE";
+        if (detailsView != null) {
+            detailsView.setText("GUIDED SCALPING SAVED FINDINGS\\nStatus: " + status
+                    + "\\nCurrent step: " + stageText + "\\n\\n" + summary
+                    + "\\n\\nUse CONFIRM TIMEFRAME & SCAN for the current step. The workflow advances after a successful 4H/15M scan; WAIT/errors stay on the same step.");
+        }
     }
 
     private void advanceGuidedTimeframe() {
