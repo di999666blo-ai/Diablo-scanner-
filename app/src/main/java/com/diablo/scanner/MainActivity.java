@@ -410,6 +410,36 @@ public class MainActivity extends Activity {
                 startService(update);
             } catch (Exception ignored) { }
         }
+
+        @JavascriptInterface
+        public void savePulseLockSettings(String json) {
+            if (json == null || json.length() > 4000) return;
+            try {
+                JSONObject settings = new JSONObject(json);
+                String profile = settings.optString("profile", "B");
+                if (!profile.equals("A") && !profile.equals("B") && !profile.equals("C")) profile = "B";
+                int targetPips = settings.optInt("target", 10);
+                int maxDurationSeconds = settings.optInt("maxDuration", 300);
+                if (targetPips < 1 || targetPips > 10000) return;
+                int[] allowedDurations = new int[]{60,120,180,300,600,900,1800,3600,14400};
+                boolean durationAllowed = false;
+                for (int allowed : allowedDurations) if (allowed == maxDurationSeconds) durationAllowed = true;
+                if (!durationAllowed) return;
+                JSONObject clean = new JSONObject();
+                clean.put("profile", profile);
+                clean.put("target", targetPips);
+                clean.put("maxDuration", maxDurationSeconds);
+                clean.put("requireMtf", settings.optBoolean("requireMtf", true));
+                clean.put("rejectStale", true);
+                prefs.edit().putString("pulse_lock_settings_json", clean.toString()).apply();
+            } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public String getPulseLockSettings() {
+            return prefs.getString("pulse_lock_settings_json",
+                    "{\\"profile\\":\\"B\\",\\"target\\":10,\\"maxDuration\\":300,\\"requireMtf\\":true,\\"rejectStale\\":true}");
+        }
     }
 
     private void buildDashboard() {
