@@ -144,7 +144,6 @@ public class MainActivity extends Activity {
         if (action == null) return;
         switch (action) {
             case "start_live_scan":
-                prefs.edit().putString("trading_mode", "TIMED").apply();
                 requestScreenCapture();
                 break;
             case "start_timed_scan":
