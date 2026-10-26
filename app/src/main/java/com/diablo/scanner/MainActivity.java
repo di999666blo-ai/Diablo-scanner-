@@ -161,6 +161,12 @@ public class MainActivity extends Activity {
             case "choose_chart":
                 chooseChart();
                 break;
+            case "start_saved_chart_scan":
+                startSavedChartAnalysis();
+                break;
+            case "clear_saved_chart":
+                clearSavedChartSelection();
+                break;
             case "trade_duration":
                 showTradeDurationSettings();
                 break;
@@ -1315,12 +1321,20 @@ public class MainActivity extends Activity {
             }
 
             try {
+                File selectedFile = new File(getFilesDir(), "diablo_selected_chart.jpg");
+                try (java.io.FileOutputStream output = new java.io.FileOutputStream(selectedFile)) {
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 94, output)) {
+                        throw new IllegalStateException("Could not save selected chart image");
+                    }
+                    output.flush();
+                }
                 saveSavedChartPreview(bitmap);
-                prefs.edit().putString("scan_status", "SAVED_IMAGE_LOADED")
-                        .putString("scan_message", "Saved chart image loaded. Preparing visual analysis…")
+                prefs.edit().putString("saved_chart_path", selectedFile.getAbsolutePath())
+                        .putString("scan_status", "SAVED_IMAGE_LOADED")
+                        .putString("scan_message", "Chart ready. Press START ANALYSIS when you are ready. The image will stay visible until then.")
                         .apply();
                 refreshDashboardWebView();
-                analyseBitmap(bitmap);
+                Toast.makeText(this, "Chart loaded. Tap START ANALYSIS when ready.", Toast.LENGTH_SHORT).show();
             } finally {
                 bitmap.recycle();
             }
@@ -1328,6 +1342,43 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             showImageError();
         }
+    }
+
+    private void startSavedChartAnalysis() {
+        String path = prefs.getString("saved_chart_path", "");
+        if (path.trim().isEmpty()) {
+            Toast.makeText(this, "Choose a saved chart image first.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        File selectedFile = new File(path);
+        if (!selectedFile.isFile()) {
+            clearSavedChartSelection();
+            Toast.makeText(this, "Selected chart is missing. Please choose it again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Bitmap bitmap = BitmapFactory.decodeFile(selectedFile.getAbsolutePath());
+        if (bitmap == null) {
+            Toast.makeText(this, "Could not open this chart image. Please choose another.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            analyseBitmap(bitmap);
+        } finally {
+            if (!bitmap.isRecycled()) bitmap.recycle();
+        }
+    }
+
+    private void clearSavedChartSelection() {
+        String path = prefs.getString("saved_chart_path", "");
+        if (!path.trim().isEmpty()) {
+            try { new File(path).delete(); } catch (Exception ignored) { }
+        }
+        prefs.edit().remove("saved_chart_path").remove("saved_chart_preview_data")
+                .putString("scan_status", "READY")
+                .putString("scan_message", "Saved chart cleared. Choose another image when ready.")
+                .apply();
+        refreshDashboardWebView();
+        Toast.makeText(this, "Saved chart cleared.", Toast.LENGTH_SHORT).show();
     }
 
     private void saveSavedChartPreview(Bitmap source) {
@@ -1485,7 +1536,11 @@ public class MainActivity extends Activity {
                 // A saved screenshot is static: it cannot prove candle closure.
                 // ChartAnalyzer enforces WAIT in candle-close mode; never override that here.
                 String finalStatus = analysisError ? "SAVED_ERROR" : "SAVED_READY";
-                prefs.edit().remove("saved_chart_preview_data")
+                String selectedPath = prefs.getString("saved_chart_path", "");
+                if (!selectedPath.trim().isEmpty()) {
+                    try { new File(selectedPath).delete(); } catch (Exception ignored) { }
+                }
+                prefs.edit().remove("saved_chart_path").remove("saved_chart_preview_data")
                         .putString("scan_status", finalStatus)
                         .putString("scan_message", analysisError
                                 ? "Saved chart analysis ended with an error. Preview cleared; original gallery image is untouched."
