@@ -438,7 +438,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String getPulseLockSettings() {
             return prefs.getString("pulse_lock_settings_json",
-                    "{\\"profile\\":\\"B\\",\\"target\\":10,\\"maxDuration\\":300,\\"requireMtf\\":true,\\"rejectStale\\":true}");
+                    "{\"profile\":\"B\",\"target\":10,\"maxDuration\":300,\"requireMtf\":true,\"rejectStale\":true}");
         }
 
         @JavascriptInterface
