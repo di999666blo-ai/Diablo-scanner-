@@ -815,16 +815,133 @@ public class FloatingBubbleService extends Service {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String guidedStatus = prefs.getString("guided_scalping_status", "");
         if (!guidedStatus.startsWith("SCANNING_")) return;
-
         if ("SCANNING".equals(scanStatus) || "AI_PROCESSING".equals(scanStatus)
-                || "AI_ERROR".equals(scanStatus) || "NEEDS_CAPTURE".equals(scanStatus)) {
+                || "AI_ERROR".equals(scanStatus) || "NEEDS_CAPTURE".equals(scanStatus)
+                || "SAVED_ANALYZING".equals(scanStatus)) return;
+
+        int stage = prefs.getInt("guided_scalping_stage", -1);
+        if (stage < 0 || stage >= GUIDED_TIMEFRAMES.length) return;
+        String signal = normaliseSignal(prefs.getString("latest_ai_signal", "WAIT"));
+        String details = prefs.getString("latest_ai_details", "");
+        if (details == null) details = "";
+        String upperDetails = details.toUpperCase(java.util.Locale.ROOT);
+        boolean failed = "AI_ERROR".equals(scanStatus)
+                || upperDetails.contains("ANALYSIS FAILED")
+                || upperDetails.contains("MODEL ERROR")
+                || upperDetails.contains("MARKET FEED ERROR")
+                || upperDetails.contains("COULD NOT");
+        boolean directional = "BUY".equals(signal) || "SELL".equals(signal)
+                || "UP".equals(signal) || "DOWN".equals(signal);
+
+        if (failed || "WAIT".equals(signal) || !directional) {
+            prefs.edit().putString("guided_scalping_status",
+                            stage == 2 ? "WAITING_FOR_ENTRY" : "WAITING_FOR_" + GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT))
+                    .putString("scan_message", "GUIDED " + (stage + 1) + "/3 • " +
+                            GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT) +
+                            " was not completed: " + (failed ? "analysis error" : "model returned WAIT") +
+                            ". Fix the chart/model issue and scan this same stage again.\nPrevious saved findings: " +
+                            guidedContextSummary(prefs))
+                    .apply();
             return;
         }
 
-        // The stage was marked SCANNING_* before the one-shot scan started.
-        // Change the status first so the 1-second UI refresh cannot advance twice.
-        prefs.edit().putString("guided_scalping_status", "ADVANCING_FROM_" + guidedStatus.substring("SCANNING_".length())).apply();
-        advanceGuidedTimeframe();
+        if (stage == 2) {
+            String entry = findTradeField(details, "ENTRY");
+            String sl = findTradeField(details, "STOP LOSS|STOP_LOSS|SL");
+            String tp = findTradeField(details, "TAKE PROFIT|TAKE_PROFIT|TP");
+            if (entry.isEmpty() || sl.isEmpty() || tp.isEmpty()) {
+                prefs.edit().putString("guided_scalping_status", "WAITING_FOR_ENTRY")
+                        .putString("scan_message", "1M direction returned, but no complete entry + stop-loss + take-profit was found. WAITING FOR ENTRY; rescan later. No signal notification sent.")
+                        .apply();
+                return;
+            }
+            String key = signal + "|" + entry + "|" + sl + "|" + tp;
+            if (!key.equals(prefs.getString("guided_scalping_last_alert_key", ""))) {
+                postGuidedSignalNotification(signal, entry, sl, tp, details);
+                prefs.edit().putString("guided_scalping_last_alert_key", key).apply();
+            }
+            prefs.edit().putString("guided_scalping_status", "COMPLETE")
+                    .putString("scan_message", "GUIDED SCALPING COMPLETE • 1M entry details found. Signal notification issued.\nSaved 4H / 15M context: " + guidedContextSummary(prefs))
+                    .apply();
+            return;
+        }
+
+        try {
+            JSONObject context = new JSONObject(prefs.getString("guided_scalping_context", "{}"));
+            JSONObject finding = new JSONObject();
+            finding.put("timeframe", GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT));
+            finding.put("signal", signal);
+            finding.put("details", details);
+            finding.put("savedAt", System.currentTimeMillis());
+            context.put(GUIDED_TIMEFRAMES[stage], finding);
+            int next = stage + 1;
+            String summary = guidedContextSummary(prefs);
+            prefs.edit().putString("guided_scalping_context", context.toString())
+                    .putString("guided_scalping_last_stage", GUIDED_TIMEFRAMES[stage])
+                    .putString("guided_scalping_last_updated", String.valueOf(System.currentTimeMillis()))
+                    .putInt("guided_scalping_stage", next)
+                    .putString("chart_timeframe", GUIDED_TIMEFRAMES[next])
+                    .putString("guided_scalping_status", "WAITING_FOR_" + GUIDED_TIMEFRAMES[next].toUpperCase(java.util.Locale.ROOT))
+                    .putString("scan_message", "GUIDED " + (stage + 1) + "/3 DONE • " +
+                            GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT) + " " + signal +
+                            " saved. Previous findings: " + summary +
+                            "\nManually switch the broker chart to " + GUIDED_TIMEFRAMES[next].toUpperCase(java.util.Locale.ROOT) +
+                            " and tap CONFIRM TIMEFRAME & SCAN.")
+                    .apply();
+        } catch (Exception ignored) {
+            prefs.edit().putString("guided_scalping_status", "WAITING_FOR_" + GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT)).apply();
+        }
+    }
+
+    private String guidedContextSummary(SharedPreferences prefs) {
+        try {
+            JSONObject context = new JSONObject(prefs.getString("guided_scalping_context", "{}"));
+            StringBuilder out = new StringBuilder();
+            for (String tf : GUIDED_TIMEFRAMES) {
+                JSONObject item = context.optJSONObject(tf);
+                if (item == null) continue;
+                if (out.length() > 0) out.append(" • ");
+                out.append(tf.toUpperCase(java.util.Locale.ROOT)).append(' ')
+                        .append(item.optString("signal", "WAIT"));
+            }
+            return out.length() == 0 ? "No completed timeframe findings yet." : out.toString();
+        } catch (Exception ignored) { return "Saved context unavailable."; }
+    }
+
+    private String findTradeField(String details, String labelPattern) {
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(?im)\\b(?:" + labelPattern + ")\\b\\s*[:=\\-]?\\s*([^\\r\\n;|]+)").matcher(details);
+            if (m.find()) {
+                String value = m.group(1).trim();
+                if (!value.isEmpty() && !value.equalsIgnoreCase("N/A")
+                        && !value.equalsIgnoreCase("not available")) return value;
+            }
+        } catch (Exception ignored) { }
+        return "";
+    }
+
+    private void postGuidedSignalNotification(String signal, String entry, String sl, String tp, String details) {
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        String channelId = "diablo_guided_signal_ready";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(channelId, "Guided Scalping signal alerts", NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("Alerts when Guided Scalping finds entry, stop-loss and take-profit details.");
+            channel.enableVibration(true);
+            manager.createNotificationChannel(channel);
+        }
+        String side = ("BUY".equals(signal) || "UP".equals(signal)) ? "BUY" : "SELL";
+        String body = "1M entry setup • Entry: " + entry + " • SL: " + sl + " • TP: " + tp
+                + "\nModel confidence is an estimate, not a verified win probability.";
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, channelId) : new Notification.Builder(this);
+        manager.notify(7201, builder.setSmallIcon(R.drawable.ic_diablo_launcher_vector)
+                .setContentTitle("DIABLO — GUIDED SIGNAL READY: " + side)
+                .setContentText("Entry " + entry + " • SL " + sl + " • TP " + tp)
+                .setStyle(new Notification.BigTextStyle().bigText(body))
+                .setCategory(Notification.CATEGORY_STATUS).setPriority(Notification.PRIORITY_HIGH)
+                .setAutoCancel(true).build());
     }
 
     private void advanceGuidedTimeframe() {
