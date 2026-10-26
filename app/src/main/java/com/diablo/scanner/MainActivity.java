@@ -2285,22 +2285,52 @@ public class MainActivity extends Activity {
                 prefs.edit().putString("kronos_chart_candles", viewInput.toString())
                         .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
                         .apply();
+                // Run genuine local Kronos inference independently on all three market-data timeframes.
+                // The technical monitor supplies transparent entry/SL/TP levels, but cannot override model disagreement.
+                JSONObject higherInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext(), higher);
+                JSONObject middleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext(), middle);
+                JSONObject entryInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext(), entry);
+                LocalVisionAI.Result higherForecast = KronosLocalRuntime.forecast(getApplicationContext(), higherInput.toString());
+                prefs.edit().putString("kronos_status", "ANALYSING MIDDLE TIMEFRAME").apply();
+                runOnUiThread(this::refreshDashboardWebView);
+                LocalVisionAI.Result middleForecast = KronosLocalRuntime.forecast(getApplicationContext(), middleInput.toString());
+                prefs.edit().putString("kronos_status", "ANALYSING ENTRY TIMEFRAME").apply();
+                runOnUiThread(this::refreshDashboardWebView);
+                LocalVisionAI.Result entryForecast = KronosLocalRuntime.forecast(getApplicationContext(), entryInput.toString());
+                String hSignal = safeKronosDirection(higherForecast);
+                String mSignal = safeKronosDirection(middleForecast);
+                String eSignal = safeKronosDirection(entryForecast);
                 KronosMonitor.Snapshot snapshot = KronosMonitor.evaluate(symbol, higher, middle, entry);
-                details = snapshot.details;
-                status = snapshot.status;
+                boolean modelAligned = ("UP".equals(hSignal) && "UP".equals(mSignal) && "UP".equals(eSignal))
+                        || ("DOWN".equals(hSignal) && "DOWN".equals(mSignal) && "DOWN".equals(eSignal));
+                boolean validSetup = modelAligned && snapshot.validSetup
+                        && (("UP".equals(hSignal) && snapshot.entryTrend.equals("BULLISH"))
+                        || ("DOWN".equals(hSignal) && snapshot.entryTrend.equals("BEARISH")));
+                String modelDirection = validSetup ? hSignal : "WAIT";
+                status = validSetup ? "ENTRY SETUP DETECTED — LOCAL KRONOS AGREEMENT"
+                        : "WAIT — LOCAL KRONOS TIMEFRAMES NOT ALIGNED OR ENTRY NOT CONFIRMED";
+                details = "KRONOS LOCAL MULTI-TIMEFRAME SESSION\n"
+                        + "Instrument: " + symbol + "\n"
+                        + higher + " neural forecast: " + hSignal + "\n" + higherForecast.details + "\n\n"
+                        + middle + " neural forecast: " + mSignal + "\n" + middleForecast.details + "\n\n"
+                        + entry + " neural forecast: " + eSignal + "\n" + entryForecast.details + "\n\n"
+                        + "Technical entry validation: " + snapshot.status + "\n" + snapshot.details + "\n"
+                        + (validSetup ? "MODEL AGREEMENT: all three local Kronos forecasts align; levels below come from the separate transparent technical validation layer.\n"
+                                      : "NO CONFIRMED ENTRY: local model forecasts or technical entry validation do not fully agree.\n")
+                        + "This is experimental forecasting, not a guarantee.";
                 prefs.edit().putString("kronos_monitor_details", details)
-                        .putString("kronos_higher_trend", snapshot.higherTrend)
-                        .putString("kronos_middle_trend", snapshot.middleTrend)
-                        .putString("kronos_entry_trend", snapshot.entryTrend)
-                        .putString("kronos_monitor_updated_at", String.valueOf(snapshot.updatedAt))
-                        .putBoolean("kronos_entry_valid", snapshot.validSetup)
-                        .putString("kronos_entry_price", snapshot.validSetup ? String.valueOf(snapshot.entry) : "")
-                        .putString("kronos_sl_price", snapshot.validSetup ? String.valueOf(snapshot.stopLoss) : "")
-                        .putString("kronos_tp_price", snapshot.validSetup ? String.valueOf(snapshot.takeProfit) : "")
+                        .putString("kronos_higher_trend", hSignal)
+                        .putString("kronos_middle_trend", mSignal)
+                        .putString("kronos_entry_trend", eSignal)
+                        .putString("kronos_monitor_updated_at", String.valueOf(System.currentTimeMillis()))
+                        .putBoolean("kronos_entry_valid", validSetup)
+                        .putString("kronos_entry_price", validSetup ? String.valueOf(snapshot.entry) : "")
+                        .putString("kronos_sl_price", validSetup ? String.valueOf(snapshot.stopLoss) : "")
+                        .putString("kronos_tp_price", validSetup ? String.valueOf(snapshot.takeProfit) : "")
                         .putString("kronos_status", status)
-                        .putString("kronos_latest_signal", snapshot.validSetup ? (snapshot.entryTrend.equals("BULLISH") ? "UP" : "DOWN") : "WAIT")
+                        .putString("kronos_latest_signal", modelDirection)
                         .putString("kronos_latest_details", details)
-                        .putString("kronos_feed_note", "Continuous multi-timeframe monitor refreshed from BigQuote. WAIT means scanning continues.")
+                        .putString("kronos_feed_note", "Continuous local Kronos model forecasts refreshed from real BigQuote candles for all three timeframes. WAIT means monitoring continues.")
                         .apply();
             } catch (Exception error) {
                 details = "MONITOR DATA ERROR — NOT A NORMAL WAIT\n" + error.getClass().getSimpleName() + ": "
@@ -2316,6 +2346,12 @@ public class MainActivity extends Activity {
                 if (kronosMonitorRunning) kronosMonitorHandler.postDelayed(kronosMonitorRunnable, 15000L);
             });
         }).start();
+    }
+
+    private String safeKronosDirection(LocalVisionAI.Result result) {
+        if (result == null || result.signal == null) return "WAIT";
+        String direction = result.signal.trim().toUpperCase(Locale.ROOT);
+        return ("UP".equals(direction) || "DOWN".equals(direction)) ? direction : "WAIT";
     }
 
     private void browseKronosSymbols() {
