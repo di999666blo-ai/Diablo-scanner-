@@ -1093,6 +1093,29 @@ public class FloatingBubbleService extends Service {
         if ("SCANNING".equals(scanStatus) || "AI_PROCESSING".equals(scanStatus)) {
             long startedAt = statusPrefs.getLong("scan_started_at", System.currentTimeMillis());
             long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - startedAt) / 1000L);
+            boolean timedObservation = statusPrefs.getBoolean("timed_scan_active", false);
+            boolean hybridFast = "SCALPING".equalsIgnoreCase(
+                    statusPrefs.getString("trading_mode", "TIMED"))
+                    ? "HYBRID".equalsIgnoreCase(statusPrefs.getString("scalping_engine", "SMOLVLM"))
+                    : "HYBRID".equalsIgnoreCase(statusPrefs.getString("timed_engine", "HYBRID"));
+            // Hybrid Fast is lightweight and should never leave the overlay in AI BUSY
+            // for minutes. Do not apply this scan-age timeout to an intentional timed
+            // observation, whose total duration is user-configurable.
+            if (!timedObservation && hybridFast && elapsedSeconds >= 15L) {
+                String timeoutMessage = "HYBRID FAST TIMEOUT • no result arrived within 15 seconds. "
+                        + "The scan was rejected instead of leaving AI BUSY running indefinitely. "
+                        + "Keep the chart visible and tap D to retry.";
+                statusPrefs.edit().putString("scan_status", "AI_ERROR")
+                        .putString("scan_message", timeoutMessage).apply();
+                if (activityView != null) {
+                    activityView.setText("✕ HYBRID TIMEOUT");
+                    activityView.setTextColor(Color.RED);
+                }
+                signalView.setText("ERROR");
+                signalView.setTextColor(Color.RED);
+                detailsView.setText(timeoutMessage);
+                return;
+            }
             String[] ray = {"◢", "◣", "◤", "◥"};
             String currentRay = ray[scanRayFrame++ % ray.length];
             boolean processingAI = "AI_PROCESSING".equals(scanStatus);
