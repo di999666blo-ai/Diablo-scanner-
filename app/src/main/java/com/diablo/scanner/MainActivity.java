@@ -195,12 +195,16 @@ public class MainActivity extends Activity {
             case "candle_timing":
                 showSignalTimingSettings();
                 break;
+            case "timed_engine":
+                showTimedEngineSettings();
+                break;
             case "timed_smolvlm": {
-                boolean enabled = !prefs.getBoolean("timed_smolvlm_enabled", false);
-                prefs.edit().putBoolean("timed_smolvlm_enabled", enabled).apply();
+                boolean enabled = !"COMBINED".equalsIgnoreCase(prefs.getString("timed_engine", "HYBRID"));
+                prefs.edit().putString("timed_engine", enabled ? "COMBINED" : "HYBRID")
+                        .putBoolean("timed_smolvlm_enabled", enabled).apply();
                 Toast.makeText(this, enabled
-                        ? "Optional SmolVLM confirmation enabled for Timed Signal. Fast hybrid remains primary."
-                        : "Optional SmolVLM confirmation disabled. Timed Signal will use the fast hybrid analyzer only.",
+                        ? "Timed Signal engine: Hybrid Fast + SmolVLM combined."
+                        : "Timed Signal engine: standalone Hybrid Fast.",
                         Toast.LENGTH_LONG).show();
                 break;
             }
@@ -301,7 +305,8 @@ public class MainActivity extends Activity {
             data.put("scanWindow", formatDuration(prefs.getLong("timed_scan_duration_ms", 30000L)));
             data.put("timeframe", prefs.getString("chart_timeframe", "1m"));
             data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
-            data.put("timedSmolAssist", prefs.getBoolean("timed_smolvlm_enabled", false));
+            data.put("timedSmolAssist", "COMBINED".equalsIgnoreCase(prefs.getString("timed_engine", "HYBRID")));
+            data.put("timedEngine", prefs.getString("timed_engine", "HYBRID"));
             data.put("scalpingEngine", prefs.getString("scalping_engine", "SMOLVLM"));
             data.put("kronosSymbol", prefs.getString("kronos_symbol", "EURUSD"));
             data.put("kronosInterval", prefs.getString("kronos_view_interval", "1m"));
@@ -1929,6 +1934,30 @@ public class MainActivity extends Activity {
                     dialog.dismiss();
                     refreshControlSummary();
                     Toast.makeText(this, "Timed engine: " + labels[which], Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    private void showTimedEngineSettings() {
+        String[] labels = {
+                "HYBRID FAST — quickest standalone chart analysis",
+                "SMOLVLM — standalone visual AI (slower)",
+                "COMBINED — Hybrid Fast + SmolVLM review (slowest)"
+        };
+        String[] values = {"HYBRID", "SMOLVLM", "COMBINED"};
+        String current = prefs.getString("timed_engine", "HYBRID");
+        int selected = "SMOLVLM".equalsIgnoreCase(current) ? 1
+                : "COMBINED".equalsIgnoreCase(current) ? 2 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle("Timed Signal engine")
+                .setMessage("This setting affects Timed Signal only. Guided Scalping and Kronos are unchanged. SmolVLM and combined scans can be slower; stale results are downgraded to WAIT.")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    prefs.edit().putString("timed_engine", values[which])
+                            .putBoolean("timed_smolvlm_enabled", which == 2).apply();
+                    dialog.dismiss();
+                    refreshDashboardWebView();
+                    Toast.makeText(this, "Timed Signal engine: " + values[which], Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton("CANCEL", null)
                 .show();
