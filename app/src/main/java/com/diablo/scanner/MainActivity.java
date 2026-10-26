@@ -310,6 +310,7 @@ public class MainActivity extends Activity {
             data.put("wait", wait);
             data.put("modelFilesReady", LocalVisionAI.modelsReady(this));
             data.put("scanStatus", prefs.getString("scan_status", "READY"));
+            data.put("screenCaptureActive", prefs.getBoolean("screen_capture_active", false));
             data.put("scanMessage", prefs.getString("scan_message", "Scanner ready. No live chart read yet."));
             data.put("mode", prefs.getString("trading_mode", "TIMED"));
             data.put("tradeDuration", formatDuration(prefs.getLong(TRADE_DURATION_MS, DEFAULT_TRADE_DURATION_MS)));
