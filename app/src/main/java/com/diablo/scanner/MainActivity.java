@@ -390,6 +390,18 @@ public class MainActivity extends Activity {
         public void action(String action) {
             runOnUiThread(() -> runDashboardAction(action));
         }
+
+        @JavascriptInterface
+        public void saveAppearance(String json) {
+            if (json == null || json.length() > 12000) return;
+            try {
+                JSONObject appearance = new JSONObject(json);
+                prefs.edit().putString("appearance_settings_json", appearance.toString()).apply();
+                Intent update = new Intent(MainActivity.this, FloatingBubbleService.class);
+                update.setAction("com.diablo.scanner.APPLY_APPEARANCE");
+                startService(update);
+            } catch (Exception ignored) { }
+        }
     }
 
     private void buildDashboard() {
@@ -2283,6 +2295,10 @@ public class MainActivity extends Activity {
     }
 
     private void startKronosContinuousMonitor() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7102);
+        }
         if (kronosMonitorRunning) {
             Toast.makeText(this, "Kronos continuous monitoring is already active.", Toast.LENGTH_SHORT).show();
             return;
