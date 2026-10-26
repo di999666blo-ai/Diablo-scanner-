@@ -21,6 +21,15 @@ main{padding:14px 13px 115px;max-width:760px;margin:auto}.view{display:none;anim
 .foot{font-size:9px;line-height:1.55;color:#607391;text-align:center;margin:15px 3px 0}.empty{font-size:10px;line-height:1.6;color:#7A8CA8;padding:9px 0}.settingrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #1C2C48}.settingrow:last-child{border-bottom:0}.settingrow b{font-size:11px}.settingrow span{display:block;font-size:9px;color:var(--muted);margin-top:4px}
 @media(min-width:500px){main{padding:20px}.tile{min-height:116px;padding:13px}.tile b{font-size:11px}.heading{font-size:27px}}
 
+
+#customStudio .csInput{max-width:55%;min-width:112px;background:#0B1322;color:var(--white);border:1px solid var(--stroke);border-radius:8px;padding:8px;font-size:10px}
+#customStudio .csColours{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+#customStudio .csColours label{display:flex;align-items:center;justify-content:space-between;gap:7px;background:#0B1322;border:1px solid var(--stroke);padding:8px;border-radius:9px;font-size:9px;color:var(--muted)}
+#customStudio input[type=color]{width:34px;height:30px;padding:0;border:0;background:transparent}
+#customStudio input[type=range]{max-width:46%;accent-color:var(--red)}
+#customStudio input[type=checkbox]{width:19px;height:19px;accent-color:var(--red)}
+body.csCompact .card{padding:9px;margin:6px 0}body.csCompact .tile{min-height:86px;padding:8px}
+body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,body.csNoMotion *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 </style>
 </head>
 <body>
@@ -125,7 +134,38 @@ main{padding:14px 13px 115px;max-width:760px;margin:auto}.view{display:none;anim
 <div class="card"><div class="settingrow"><div><b>Trade duration</b><span id="settingTrade">1 minute</span></div><button class="btn" onclick="act('trade_duration')">CHANGE</button></div><div class="settingrow"><div><b>Timed observation window</b><span id="settingWindow">30 seconds</span></div><button class="btn" onclick="act('scan_window')">CHANGE</button></div><div class="settingrow"><div><b>Chart timeframe</b><span id="settingTf">1m</span></div><button class="btn" onclick="act('timeframe')">CHANGE</button></div><div class="settingrow"><div><b>Trading mode</b><span id="settingMode">TIMED</span></div><button class="btn" onclick="act('trading_mode')">CHANGE</button></div><div class="settingrow"><div><b>Analysis profile</b><span id="settingProfile">BALANCED</span></div><button class="btn" onclick="act('analysis_profile')">CHANGE</button></div><div class="settingrow"><div><b>Visual sensitivity</b><span>Image-analysis setting</span></div><button class="btn" onclick="act('sensitivity')">CHANGE</button></div><div class="settingrow"><div><b>Candle timing</b><span>Forming candle / candle close</span></div><button class="btn" onclick="act('candle_timing')">CHANGE</button></div><div class="settingrow"><div><b>Timed Signal AI assist</b><span id="timedSmolStatus">Fast hybrid only</span></div><button class="btn" id="timedSmolButton" onclick="act('timed_smolvlm')">ENABLE SMOLVLM</button></div><div class="settingrow"><div><b>Scalping engine</b><span id="scalpingEngineStatus">SmolVLM visual engine • Kronos phone-only needs a validated local model/tokenizer and real OHLCV candles</span></div><button class="btn" onclick="act('scalping_engine')">CHOOSE</button></div></div>
 <button class="btn full" onclick="act('all_settings')">OPEN ALL SETTINGS</button><button class="btn full" onclick="act('overlay_permission')">FLOATING BUBBLE PERMISSION</button>
 <div class="card"><div class="label">SAFETY</div><p class="sub">Manual trading only. No automatic trade placement. Signals are experimental and can be wrong.</p></div>
-</section>
+
+<div class="card" id="customStudio">
+ <div class="cardhead"><span class="label">DIABLO CUSTOMIZATION STUDIO</span><span class="badge">SAVED ON THIS PHONE</span></div>
+ <p class="sub">Make the interface yours. Your app name, launcher icon, and the D inside the floating bubble are protected and will not change.</p>
+ <div class="label">01 · THEME & COLOURS</div>
+ <div class="settingrow"><div><b>Theme preset</b><span>Choose a complete colour set</span></div><select id="csPreset" class="csInput"><option value="classic">Diablo Classic</option><option value="green">Neon Green</option><option value="blue">Cyber Blue</option><option value="purple">Purple Phantom</option><option value="orange">Inferno Orange</option><option value="stealth">Stealth Monochrome</option><option value="custom">Custom</option></select></div>
+ <div class="csColours"><label>Background <input type="color" id="csBg" value="#02040A"></label><label>Panels <input type="color" id="csPanel" value="#0E172A"></label><label>Accent <input type="color" id="csAccent" value="#FF0A1F"></label><label>UP signals <input type="color" id="csUp" value="#00FF7A"></label><label>DOWN signals <input type="color" id="csDown" value="#FF0A1F"></label><label>Text <input type="color" id="csText" value="#E6EEFB"></label><label>Muted text <input type="color" id="csMuted" value="#6D80A0"></label><label>Borders <input type="color" id="csBorder" value="#1E345A"></label></div>
+ <div class="settingrow"><div><b>Custom HEX colour</b><span>Enter a colour such as #FF0A1F</span></div><input id="csHex" class="csInput" value="#FF0A1F" maxlength="7" aria-label="Custom hex colour"></div>
+ <div class="row"><span class="tiny">Text contrast check</span><strong id="csContrast">Checking…</strong></div>
+ <div class="line"></div><div class="label">02 · FLOATING BUBBLE STUDIO</div>
+ <p class="tiny">The letter D is permanently kept in the bubble. These controls are saved as appearance preferences; native bubble rendering must support each option before it can change on-screen.</p>
+ <div class="csColours"><label>Bubble colour <input type="color" id="csBubble" value="#FF0A1F"></label><label>Bubble border <input type="color" id="csBubbleBorder" value="#FF0A1F"></label></div>
+ <div class="settingrow"><div><b>Bubble shape</b><span>D stays visible in every shape</span></div><select id="csShape" class="csInput"><option value="circle">Circle</option><option value="rounded">Rounded square</option><option value="hexagon">Hexagon</option><option value="diamond">Diamond</option></select></div>
+ <div class="settingrow"><div><b>Bubble size</b><span>Compact to large</span></div><input id="csSize" type="range" min="44" max="76" value="58"></div>
+ <div class="settingrow"><div><b>Bubble transparency</b><span>Keep D readable</span></div><input id="csOpacity" type="range" min="65" max="100" value="100"></div>
+ <div class="settingrow"><div><b>Glow effect</b><span>Reduce effects for older phones</span></div><input id="csGlow" type="checkbox" checked></div>
+ <div class="label">03 · DASHBOARD LAYOUT</div>
+ <div class="settingrow"><div><b>Dashboard density</b><span>Compact saves screen space</span></div><select id="csLayout" class="csInput"><option value="balanced">Balanced</option><option value="compact">Compact</option><option value="expanded">Expanded</option></select></div>
+ <div class="label">04 · ANIMATIONS & PERFORMANCE</div>
+ <div class="settingrow"><div><b>Scanning ray / glow animations</b><span>Disable to reduce visual load</span></div><input id="csAnimations" type="checkbox" checked></div>
+ <div class="settingrow"><div><b>Performance mode</b><span>Recommended for Huawei Y6 / low memory</span></div><input id="csPerformance" type="checkbox"></div>
+ <div class="label">05 · SIGNAL DISPLAY</div>
+ <div class="settingrow"><div><b>Show confidence label</b><span>Display only; does not alter analysis</span></div><input id="csConfidence" type="checkbox" checked></div>
+ <div class="settingrow"><div><b>Show entry / SL / TP cards</b><span>Only when real analysis provides values</span></div><input id="csLevels" type="checkbox" checked></div>
+ <div class="settingrow"><div><b>History density</b><span>Choose how much history detail is shown</span></div><select id="csHistory" class="csInput"><option value="full">Full details</option><option value="compact">Compact</option></select></div>
+ <div class="label">06 · PERSONAL PROFILES</div>
+ <div class="settingrow"><div><b>Profile name</b><span>Save or load a named appearance</span></div><input id="csProfileName" class="csInput" maxlength="24" value="My Custom Design"></div>
+ <div class="btnrow"><button class="btn green" onclick="csSaveProfile()">SAVE PROFILE</button><button class="btn" onclick="csLoadProfile()">LOAD PROFILE</button></div>
+ <div class="btnrow"><button class="btn primary" onclick="csApply()">APPLY CHANGES</button><button class="btn" onclick="csReset()">RESET APPEARANCE</button></div>
+ <div class="tiny" id="csStatus" role="status">Classic appearance is the default. Changes are stored locally in this dashboard.</div>
+ <div class="card" style="margin-top:12px"><div class="label">LIVE PREVIEW · D IS LOCKED</div><div id="csPreview" style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid #1E345A;border-radius:12px;background:#02040A"><div id="csPreviewBubble" style="width:58px;height:58px;flex:0 0 58px;border-radius:50%;display:grid;place-items:center;background:#FF0A1F;border:2px solid #FF0A1F;color:white;font-weight:900;font-size:25px;box-shadow:0 0 18px #FF0A1F66">D</div><div><b>DIABLO SCANNER</b><div class="tiny">Floating bubble preview · D cannot be removed</div><div class="raybox"><div class="ray"></div></div></div></div></div>
+</div></section>
 </main>
 <nav class="bottomnav" aria-label="Dashboard navigation">
 <button class="navitem active" data-view="home" onclick="go('home')"><span class="navicon">⌂</span>HOME</button>
@@ -207,5 +247,28 @@ function escapeHtml(v){return String(v).replace(/[&<>"']/g,function(c){return {'
 document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshDashboard()});refreshDashboard();setInterval(refreshDashboard,2000);
 </script>
 
-</body>
+
+<script>
+(function(){
+const ids=['csBg','csPanel','csAccent','csUp','csDown','csText','csMuted','csBorder','csBubble','csBubbleBorder','csShape','csSize','csOpacity','csGlow','csLayout','csAnimations','csPerformance','csConfidence','csLevels','csHistory','csPreset'];
+const presets={
+classic:{csBg:'#02040A',csPanel:'#0E172A',csAccent:'#FF0A1F',csUp:'#00FF7A',csDown:'#FF0A1F',csText:'#E6EEFB',csMuted:'#6D80A0',csBorder:'#1E345A',csBubble:'#FF0A1F',csBubbleBorder:'#FF0A1F'},
+green:{csBg:'#030806',csPanel:'#0D1C17',csAccent:'#00FF7A',csUp:'#00FF7A',csDown:'#FF5364',csText:'#E6FFF2',csMuted:'#7DAE99',csBorder:'#1C5A43',csBubble:'#00FF7A',csBubbleBorder:'#00FF7A'},
+blue:{csBg:'#030711',csPanel:'#0E1A30',csAccent:'#42A5FF',csUp:'#00FF7A',csDown:'#FF5364',csText:'#E8F3FF',csMuted:'#8299BA',csBorder:'#244C7D',csBubble:'#42A5FF',csBubbleBorder:'#42A5FF'},
+purple:{csBg:'#08040D',csPanel:'#1A1028',csAccent:'#C56BFF',csUp:'#00FF7A',csDown:'#FF5364',csText:'#F6E9FF',csMuted:'#A58DBA',csBorder:'#563572',csBubble:'#C56BFF',csBubbleBorder:'#C56BFF'},
+orange:{csBg:'#0C0602',csPanel:'#21150C',csAccent:'#FF7A18',csUp:'#00FF7A',csDown:'#FF4B35',csText:'#FFF0E2',csMuted:'#B99A7E',csBorder:'#70421F',csBubble:'#FF7A18',csBubbleBorder:'#FF7A18'},
+stealth:{csBg:'#050505',csPanel:'#151515',csAccent:'#E0E0E0',csUp:'#A6F2C8',csDown:'#FF7777',csText:'#F5F5F5',csMuted:'#A0A0A0',csBorder:'#424242',csBubble:'#292929',csBubbleBorder:'#E0E0E0'}};
+function el(id){return document.getElementById(id)}
+function read(){let o={};ids.forEach(k=>{let n=el(k);if(n)o[k]=n.type==='checkbox'?n.checked:n.value});o.csProfileName=el('csProfileName')?.value||'My Custom Design';return o}
+function fill(o){Object.keys(o||{}).forEach(k=>{let n=el(k);if(n)n.type==='checkbox'?n.checked=!!o[k]:n.value=o[k]})}
+function contrast(a,b){function lum(hex){let v=hex.replace('#','');let c=[0,2,4].map(i=>parseInt(v.slice(i,i+2),16)/255).map(x=>x<=.04045?x/12.92:Math.pow((x+.055)/1.055,2));return .2126*c[0]+.7152*c[1]+.0722*c[2]}let x=lum(a),y=lum(b);return ((Math.max(x,y)+.05)/(Math.min(x,y)+.05)).toFixed(2)+':1'}
+function preview(){let p=el('csPreview'),b=el('csPreviewBubble');if(!p||!b)return;let bg=el('csBg').value,accent=el('csAccent').value,bub=el('csBubble').value,shape=el('csShape').value,size=+el('csSize').value,opacity=+el('csOpacity').value/100;document.documentElement.style.setProperty('--bg',bg);document.documentElement.style.setProperty('--phone',el('csPanel').value);document.documentElement.style.setProperty('--red',accent);document.documentElement.style.setProperty('--green',el('csUp').value);document.documentElement.style.setProperty('--stroke',el('csBorder').value);document.documentElement.style.setProperty('--muted',el('csMuted').value);document.documentElement.style.setProperty('--white',el('csText').value);document.body.style.background=bg;p.style.background=bg;p.style.color=el('csText').value;b.style.background=bub;b.style.borderColor=el('csBubbleBorder').value;b.style.width=size+'px';b.style.height=size+'px';b.style.flexBasis=size+'px';b.style.opacity=opacity;b.style.borderRadius=shape==='circle'?'50%':shape==='rounded'?'18%':shape==='diamond'?'8%':'12%';b.style.transform=shape==='diamond'?'rotate(45deg)':'';b.style.clipPath=shape==='hexagon'?'polygon(25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0 50%)':'none';b.style.boxShadow=el('csGlow').checked?'0 0 18px '+bub+'66':'none';b.style.color='#FFFFFF';b.textContent='D';let c=contrast(el('csText').value,bg);el('csContrast').textContent=c+' '+(parseFloat(c)>=4.5?'GOOD':'LOW');el('csContrast').style.color=parseFloat(c)>=4.5?'#00FF7A':'#FFD166';document.body.classList.toggle('csCompact',el('csLayout').value==='compact');document.body.classList.toggle('csExpanded',el('csLayout').value==='expanded');document.body.classList.toggle('csNoMotion',!el('csAnimations').checked||el('csPerformance').checked);if(el('csPerformance').checked)document.body.classList.add('csCompact');}
+function apply(){let data=read();try{localStorage.setItem('diabloAppearanceV1',JSON.stringify(data))}catch(e){}preview();let st=el('csStatus');if(st)st.textContent='Appearance applied and saved on this phone. D and the app identity remain locked.';try{if(window.DiabloAndroid&&DiabloAndroid.action)DiabloAndroid.action('appearance_settings_changed')}catch(e){}}
+window.csApply=apply;
+window.csReset=function(){fill({...presets.classic,csShape:'circle',csSize:'58',csOpacity:'100',csGlow:true,csLayout:'balanced',csAnimations:true,csPerformance:false,csConfidence:true,csLevels:true,csHistory:'full',csPreset:'classic',csProfileName:'My Custom Design'});apply();el('csStatus').textContent='Appearance reset to Diablo Classic. Trading settings and history were not changed.'};
+window.csSaveProfile=function(){let name=(el('csProfileName').value||'My Custom Design').trim().slice(0,24),data=read();try{let all=JSON.parse(localStorage.getItem('diabloAppearanceProfilesV1')||'{}');all[name]=data;localStorage.setItem('diabloAppearanceProfilesV1',JSON.stringify(all));el('csStatus').textContent='Saved appearance profile: '+name}catch(e){el('csStatus').textContent='Could not save profile in local storage.'}};
+window.csLoadProfile=function(){let name=(el('csProfileName').value||'My Custom Design').trim(),all={};try{all=JSON.parse(localStorage.getItem('diabloAppearanceProfilesV1')||'{}')}catch(e){}if(!all[name]){el('csStatus').textContent='No saved profile named '+name+'. Save it first.';return}fill(all[name]);apply();el('csStatus').textContent='Loaded profile: '+name};
+document.addEventListener('DOMContentLoaded',function(){let saved={};try{saved=JSON.parse(localStorage.getItem('diabloAppearanceV1')||'{}')}catch(e){}fill({...presets.classic,csShape:'circle',csSize:'58',csOpacity:'100',csGlow:true,csLayout:'balanced',csAnimations:true,csPerformance:false,csConfidence:true,csLevels:true,csHistory:'full',csPreset:'classic',csProfileName:'My Custom Design',...saved});let p=el('csPreset');if(p)p.addEventListener('change',function(){if(p.value==='custom')return;fill({...presets[p.value],csPreset:p.value});preview()});['csBg','csPanel','csAccent','csUp','csDown','csText','csMuted','csBorder','csBubble','csBubbleBorder','csShape','csSize','csOpacity','csGlow','csLayout','csAnimations','csPerformance','csConfidence','csLevels','csHistory'].forEach(k=>{let n=el(k);if(n)n.addEventListener('input',function(){el('csPreset').value='custom';preview()})});let hx=el('csHex');if(hx)hx.addEventListener('change',function(){let v=hx.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v)){el('csAccent').value=v;el('csBubble').value=v;el('csPreset').value='custom';preview()}else el('csStatus').textContent='Enter a valid HEX colour, e.g. #FF0A1F.'});preview()});
+})();
+</script></body>
 </html>
