@@ -111,16 +111,16 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <section id="market" class="view">
 <div class="kicker">DASHBOARD 05 / CHART LAB</div><h2 class="heading">Market / Chart</h2><p class="sub">Live chart capture analyzes the currently visible screen. Saved-chart analysis uses an image you select from your phone.</p>
 <div class="card" id="liveChartDesk">
- <div class="cardhead"><span class="label">LIVE CANDLE DESK</span><span class="badge" id="liveDeskStatus">WAITING FOR REAL OHLC</span></div>
+ <div class="cardhead"><span class="label">LIVE CANDLE DESK · MARKET DATA</span><span class="badge" id="liveDeskStatus">WAITING FOR REAL OHLC</span></div>
  <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
   <button class="btn" onclick="act('kronos_select_pair')">⇄ SELECT MARKET PAIR</button>
-  <button class="btn" onclick="act('kronos_view_timeframe')">◷ CHART VIEW TIMEFRAME</button>
-  <button class="btn" onclick="act('timeframe')">⚙ SCAN TIMEFRAME</button>
+  <button class="btn" onclick="act('kronos_view_timeframe')">◷ DISPLAY / VIEW TIMEFRAME</button>
+  <button class="btn" onclick="act('timeframe')">⚙ WORKING / SCAN TIMEFRAME</button>
   <button class="btn primary" onclick="diabloRefreshChart(true)">↻ REFRESH MARKET</button>
  </div>
- <div class="settingrow"><div><b>5-second candle refresh</b><span id="liveRefreshState">OFF · manual refresh only</span></div><input type="checkbox" id="liveRefreshToggle" aria-label="Enable five second candle refresh" onchange="diabloToggleRefresh(this.checked)" style="width:20px;height:20px;accent-color:var(--red)"></div>
+ <div class="settingrow"><div><b>5-second visual scan refresh</b><span id="liveRefreshState">OFF · manual visual scan only</span></div><input type="checkbox" id="liveRefreshToggle" aria-label="Enable five second visual screen scan refresh" onchange="diabloToggleRefresh(this.checked)" style="width:20px;height:20px;accent-color:var(--red)"></div>
  <div class="btnrow"><button class="btn primary" onclick="act('start_live_scan')">▶ START SCREEN SCAN</button><button class="btn" onclick="act('stop_live_scan')">■ STOP SCANNING</button></div>
- <div class="tiny">Chart view timeframe controls this market-data chart. Scan timeframe controls the visual scanner. Pair/market-data options depend on the connected provider; OTC pairs may not be available here.</div>
+ <div class="tiny">DISPLAY TIMEFRAME changes only the API candle chart below. WORKING TIMEFRAME changes the visual scanner’s analysis setting. The API chart is separate from the broker screen capture; OTC may require the visual route.</div>
 </div>
 <div class="card">
  <div class="cardhead"><span class="label">CANDLE CHART + STRATEGY MARKUP</span><span class="badge" id="liveChartCandleCount">0 CANDLES</span></div>
