@@ -872,6 +872,7 @@ public class FloatingBubbleService extends Service {
             finding.put("timeframe", GUIDED_TIMEFRAMES[stage].toUpperCase(java.util.Locale.ROOT));
             finding.put("signal", signal);
             finding.put("details", details);
+            finding.put("summary", details);
             finding.put("savedAt", System.currentTimeMillis());
             context.put(GUIDED_TIMEFRAMES[stage], finding);
             int next = stage + 1;
