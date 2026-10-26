@@ -508,6 +508,7 @@ public class ScreenCaptureService extends Service {
         boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
         final boolean timedObservation = scanPrefs.getBoolean("timed_scan_active", false);
         final String selectedTimedEngine = scanPrefs.getString("timed_engine", "HYBRID");
+        // MainActivity keeps legacy timed_smolvlm_enabled synchronized for older UI clients.
         final boolean optionalSmolAssist = "COMBINED".equalsIgnoreCase(selectedTimedEngine);
         final String selectedScalpingEngine = scanPrefs.getString("scalping_engine", "SMOLVLM");
         if (!scalpingMode && timedObservation && optionalSmolAssist) {
