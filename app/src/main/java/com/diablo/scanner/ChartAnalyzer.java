@@ -198,7 +198,11 @@ public final class ChartAnalyzer {
             long totalGreen, long totalRed, int width, int height) {
         if (candles == null || candles.size() < 8) return false;
         long total = totalGreen + totalRed;
-        if (total < 70 || totalGreen < 12 || totalRed < 12) return false;
+        // A genuine strong trend may show mostly one candle colour. Requiring at
+        // least 12 red AND 12 green pixels rejected clean one-direction charts
+        // (the exact Meta/Coffee trend case) before direction analysis could run.
+        // Keep the total-pixel and spatial-structure checks to reject coloured UI noise.
+        if (total < 70 || (totalGreen < 12 && totalRed < 12)) return false;
         int n = candles.size();
         if (candles.get(n - 1).x - candles.get(0).x < width * 0.18) return false;
         int distinctRows = 0, minY = height, maxY = 0, activeRecent = 0;
