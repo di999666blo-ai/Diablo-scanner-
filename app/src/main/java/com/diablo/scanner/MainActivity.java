@@ -1,6 +1,10 @@
 package com.diablo.scanner;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -2378,6 +2382,7 @@ public class MainActivity extends Activity {
                         prefs.edit().putString("kronos_last_history_setup_key", setupKey).apply();
                         saveHistory(modelDirection, 0, 0L, 0L, "KRONOS_MARKET_FORECAST");
                     }
+                    notifyKronosSignalReady(symbol, modelDirection, snapshot, higher, middle, entry);
                 }
             } catch (Exception error) {
                 details = "MONITOR DATA ERROR — NOT A NORMAL WAIT\n" + error.getClass().getSimpleName() + ": "
@@ -2393,6 +2398,54 @@ public class MainActivity extends Activity {
                 if (kronosMonitorRunning) kronosMonitorHandler.postDelayed(kronosMonitorRunnable, 15000L);
             });
         }).start();
+    }
+
+    private void notifyKronosSignalReady(String symbol, String direction, KronosMonitor.Snapshot snapshot,
+                                         String higherTf, String middleTf, String entryTf) {
+        if (snapshot == null || !snapshot.validSetup) return;
+        long now = System.currentTimeMillis();
+        String directionKey = symbol + "|" + direction + "|" + higherTf + "|" + middleTf + "|" + entryTf;
+        String previousKey = prefs.getString("kronos_last_notified_direction_key", "");
+        long previousAt = prefs.getLong("kronos_last_notified_at", 0L);
+        // Avoid buzzing on every 15-second monitoring pass for the same market setup.
+        if (directionKey.equals(previousKey) && now - previousAt < 30L * 60L * 1000L) return;
+        prefs.edit().putString("kronos_last_notified_direction_key", directionKey)
+                .putLong("kronos_last_notified_at", now).apply();
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        final String channelId = "diablo_kronos_signal_ready";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(channelId, "Kronos signal alerts",
+                    NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("Alerts when Kronos confirms a new entry setup.");
+            channel.enableVibration(true);
+            manager.createNotificationChannel(channel);
+        }
+        String side = "UP".equals(direction) ? "BUY / UP" : "SELL / DOWN";
+        // The model does not emit calibrated probability: 70/100 is a setup-quality heuristic,
+        // not a 70% chance of winning.
+        String title = "DIABLO — SIGNAL READY: " + side;
+        String body = symbol + " • Setup score 70/100 (heuristic, not win probability)"
+                + "\nEntry: " + String.format(Locale.US, "%.6f", snapshot.entry)
+                + "  |  SL: " + String.format(Locale.US, "%.6f", snapshot.stopLoss)
+                + "  |  TP: " + String.format(Locale.US, "%.6f", snapshot.takeProfit)
+                + "\nTimeframes aligned: " + higherTf + " / " + middleTf + " / " + entryTf;
+        Intent open = new Intent(this, MainActivity.class);
+        open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        int pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) pendingFlags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pending = PendingIntent.getActivity(this, 7101, open, pendingFlags);
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, channelId) : new Notification.Builder(this);
+        Notification notification = builder.setSmallIcon(R.drawable.ic_diablo_launcher_vector)
+                .setContentTitle(title).setContentText(symbol + " • Entry " + String.format(Locale.US, "%.6f", snapshot.entry)
+                        + " • SL " + String.format(Locale.US, "%.6f", snapshot.stopLoss)
+                        + " • TP " + String.format(Locale.US, "%.6f", snapshot.takeProfit))
+                .setStyle(new Notification.BigTextStyle().bigText(body))
+                .setContentIntent(pending).setAutoCancel(true)
+                .setCategory(Notification.CATEGORY_STATUS)
+                .setPriority(Notification.PRIORITY_HIGH).build();
+        manager.notify(7101, notification);
     }
 
     private String safeKronosDirection(LocalVisionAI.Result result) {
