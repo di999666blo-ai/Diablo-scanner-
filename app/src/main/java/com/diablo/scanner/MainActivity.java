@@ -298,6 +298,7 @@ public class MainActivity extends Activity {
             data.put("kronosDetails", prefs.getString("kronos_latest_details", "No Kronos forecast has run yet."));
             data.put("kronosMonitorDetails", prefs.getString("kronos_monitor_details", "Continuous monitor is not running."));
             data.put("kronosMonitorActive", prefs.getBoolean("kronos_monitor_active", false));
+            data.put("kronosLiveWatchActive", kronosLiveWatchRunning);
             data.put("kronosHigherTimeframe", prefs.getString("kronos_tf_higher", "4h"));
             data.put("kronosMiddleTimeframe", prefs.getString("kronos_tf_middle", "15m"));
             data.put("kronosEntryTimeframe", prefs.getString("kronos_tf_entry", "1m"));
