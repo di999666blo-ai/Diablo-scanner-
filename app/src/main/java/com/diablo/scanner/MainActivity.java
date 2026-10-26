@@ -2418,7 +2418,7 @@ public class MainActivity extends Activity {
             kronosMonitorCycleBusy = false;
             runOnUiThread(() -> {
                 refreshDashboardWebView();
-                if (kronosMonitorRunning) kronosMonitorHandler.postDelayed(kronosMonitorRunnable, 15000L);
+                if (kronosMonitorRunning) kronosMonitorHandler.postDelayed(kronosMonitorRunnable, 5000L);
             });
         }).start();
     }
@@ -2430,7 +2430,7 @@ public class MainActivity extends Activity {
         String directionKey = symbol + "|" + direction + "|" + higherTf + "|" + middleTf + "|" + entryTf;
         String previousKey = prefs.getString("kronos_last_notified_direction_key", "");
         long previousAt = prefs.getLong("kronos_last_notified_at", 0L);
-        // Avoid buzzing on every 15-second monitoring pass for the same market setup.
+        // Avoid buzzing on every 5-second monitoring pass for the same market setup.
         if (directionKey.equals(previousKey) && now - previousAt < 30L * 60L * 1000L) return;
         prefs.edit().putString("kronos_last_notified_direction_key", directionKey)
                 .putLong("kronos_last_notified_at", now).apply();
