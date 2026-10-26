@@ -196,11 +196,30 @@ public class MainActivity extends Activity {
                 break;
             case "kronos_config":
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
-                showKronosCandleJsonSettings();
+                showKronosMarketSettings();
+                break;
+            case "kronos_analysis_settings":
+                prefs.edit().putString("scalping_engine", "KRONOS").apply();
+                showKronosAnalysisSettings();
+                break;
+            case "kronos_set_higher":
+                chooseKronosTimeframe("kronos_tf_higher", prefs.getString("kronos_tf_higher", "4h"), "Higher analysis timeframe", this::showKronosAnalysisSettings);
+                break;
+            case "kronos_set_middle":
+                chooseKronosTimeframe("kronos_tf_middle", prefs.getString("kronos_tf_middle", "15m"), "Middle analysis timeframe", this::showKronosAnalysisSettings);
+                break;
+            case "kronos_set_entry":
+                chooseKronosTimeframe("kronos_tf_entry", prefs.getString("kronos_tf_entry", "1m"), "Entry analysis timeframe", this::showKronosAnalysisSettings);
                 break;
             case "kronos_monitor_settings":
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
-                showKronosMonitorSettings();
+                showKronosMarketSettings();
+                break;
+            case "kronos_live_start":
+                startKronosLiveWatch();
+                break;
+            case "kronos_live_stop":
+                stopKronosLiveWatch();
                 break;
             case "kronos_monitor_start":
                 startKronosContinuousMonitor();
@@ -2039,41 +2058,83 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void showKronosCandleJsonSettings() {
-        showKronosMonitorSettings();
-    }
+    private void showKronosCandleJsonSettings() { showKronosMarketSettings(); }
 
-    private void showKronosMonitorSettings() {
-        String[] intervals = {"1m", "2m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"};
+    /** Pair and visible chart interval are independent from analysis timeframes. */
+    private void showKronosMarketSettings() {
         String symbol = prefs.getString("kronos_symbol", "EURUSD");
         String view = prefs.getString("kronos_view_interval", "1m");
+        String[] choices = {"Select BigQuote pair • " + symbol, "Visible chart timeframe • " + view,
+                "Start live market updates", "Stop live market updates", "Refresh chart once",
+                "Open separate Kronos analysis settings", "Test BigQuote connection"};
+        new AlertDialog.Builder(this).setTitle("KRONOS • LIVE MARKET DESK")
+                .setMessage("These controls only select the pair and visible chart interval. Live updates poll BigQuote every 15 seconds while the app is open. The current endpoint supplies completed OHLC candles, not a guaranteed tick-by-tick stream; no synthetic prices are shown.")
+                .setItems(choices, (dialog, which) -> {
+                    if (which == 0) browseKronosSymbols();
+                    else if (which == 1) chooseKronosTimeframe("kronos_view_interval", view, "Visible chart timeframe", this::showKronosMarketSettings);
+                    else if (which == 2) startKronosLiveWatch();
+                    else if (which == 3) stopKronosLiveWatch();
+                    else if (which == 4) refreshKronosMarketDataOnly();
+                    else if (which == 5) showKronosAnalysisSettings();
+                    else checkBigQuoteConnection();
+                }).setNegativeButton("CLOSE", null).show();
+    }
+
+    private void showKronosAnalysisSettings() {
         String higher = prefs.getString("kronos_tf_higher", "4h");
         String middle = prefs.getString("kronos_tf_middle", "15m");
         String entry = prefs.getString("kronos_tf_entry", "1m");
-        String[] choices = {"Select BigQuote instrument • " + symbol,
-                "Market chart timeframe • " + view,
-                "Higher analysis timeframe • " + higher,
-                "Middle analysis timeframe • " + middle,
-                "Entry analysis timeframe • " + entry,
-                "START CONTINUOUS MONITORING", "STOP CONTINUOUS MONITORING", "Test BigQuote API"};
-        new AlertDialog.Builder(this).setTitle("KRONOS • MARKET & MONITOR SETTINGS")
-                .setMessage("The visible chart timeframe is independent from the three analysis timeframes. WAIT keeps monitoring active when monitoring is started.")
+        String[] choices = {"Higher analysis timeframe • " + higher, "Middle analysis timeframe • " + middle,
+                "Entry analysis timeframe • " + entry, "Start Kronos analysis monitoring", "Stop Kronos analysis monitoring"};
+        new AlertDialog.Builder(this).setTitle("KRONOS • ANALYSIS SETTINGS")
+                .setMessage("These are strategy timeframes used by the analysis engine. They do not change the visible chart timeframe.")
                 .setItems(choices, (dialog, which) -> {
-                    if (which == 0) browseKronosSymbols();
-                    else if (which >= 1 && which <= 4) {
-                        final int slot = which;
-                        final String[] keys = {"", "kronos_view_interval", "kronos_tf_higher", "kronos_tf_middle", "kronos_tf_entry"};
-                        String current = which == 1 ? view : which == 2 ? higher : which == 3 ? middle : entry;
-                        int selected = 0;
-                        for (int i=0;i<intervals.length;i++) if (intervals[i].equals(current)) selected=i;
-                        new AlertDialog.Builder(this).setTitle(choices[which]).setSingleChoiceItems(intervals, selected, (d, idx) -> {
-                            prefs.edit().putString(keys[slot], intervals[idx]).apply();
-                            d.dismiss(); refreshDashboardWebView(); showKronosMonitorSettings();
-                        }).setNegativeButton("CANCEL", null).show();
-                    } else if (which == 5) startKronosContinuousMonitor();
-                    else if (which == 6) stopKronosContinuousMonitor("Monitoring stopped by user.");
-                    else checkBigQuoteConnection();
-                }).setNegativeButton("CLOSE", null).show();
+                    if (which == 0) chooseKronosTimeframe("kronos_tf_higher", higher, choices[0], this::showKronosAnalysisSettings);
+                    else if (which == 1) chooseKronosTimeframe("kronos_tf_middle", middle, choices[1], this::showKronosAnalysisSettings);
+                    else if (which == 2) chooseKronosTimeframe("kronos_tf_entry", entry, choices[2], this::showKronosAnalysisSettings);
+                    else if (which == 3) startKronosContinuousMonitor();
+                    else if (which == 4) stopKronosContinuousMonitor("Kronos analysis monitoring stopped by user.");
+                }).setNegativeButton("BACK TO MARKET DESK", (dialog, which) -> showKronosMarketSettings())
+                .setNeutralButton("CLOSE", null).show();
+    }
+
+    private void chooseKronosTimeframe(String key, String current, String title, Runnable onSaved) {
+        String[] intervals = {"1m", "2m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"};
+        int selected = 0;
+        for (int i = 0; i < intervals.length; i++) if (intervals[i].equals(current)) selected = i;
+        new AlertDialog.Builder(this).setTitle(title).setSingleChoiceItems(intervals, selected, (d, idx) -> {
+            prefs.edit().putString(key, intervals[idx]).apply();
+            d.dismiss(); refreshDashboardWebView(); onSaved.run();
+        }).setNegativeButton("CANCEL", null).show();
+    }
+
+    private volatile boolean kronosLiveWatchRunning = false;
+    private final Runnable kronosLiveWatchRunnable = new Runnable() {
+        @Override public void run() {
+            if (!kronosLiveWatchRunning) return;
+            refreshKronosMarketDataOnly();
+            kronosMonitorHandler.postDelayed(this, 15000L);
+        }
+    };
+
+    private void startKronosLiveWatch() {
+        kronosLiveWatchRunning = true;
+        prefs.edit().putBoolean("kronos_live_watch_active", true)
+                .putString("kronos_feed_note", "Live market watch enabled: refreshing the real BigQuote feed every 15 seconds.")
+                .apply();
+        kronosMonitorHandler.removeCallbacks(kronosLiveWatchRunnable);
+        refreshKronosMarketDataOnly();
+        kronosMonitorHandler.postDelayed(kronosLiveWatchRunnable, 15000L);
+        refreshDashboardWebView();
+        Toast.makeText(this, "Live market updates started. No synthetic prices are used.", Toast.LENGTH_LONG).show();
+    }
+
+    private void stopKronosLiveWatch() {
+        kronosLiveWatchRunning = false;
+        prefs.edit().putBoolean("kronos_live_watch_active", false).putString("kronos_feed_note", "Live market watch stopped by user.").apply();
+        kronosMonitorHandler.removeCallbacks(kronosLiveWatchRunnable);
+        refreshDashboardWebView();
+        Toast.makeText(this, "Live market updates stopped.", Toast.LENGTH_SHORT).show();
     }
 
     private void startKronosContinuousMonitor() {
