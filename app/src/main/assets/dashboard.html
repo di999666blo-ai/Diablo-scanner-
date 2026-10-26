@@ -70,9 +70,25 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <button class="tile" onclick="go('performance')"><span class="icon">◒</span><span><b>PERFORMANCE</b><small>Recorded outcomes</small></span></button>
 <button class="tile" onclick="go('model')"><span class="icon">✦</span><span><b>AI MODEL</b><small>Model status</small></span></button>
 <button class="tile" onclick="go('settings')"><span class="icon">⚙</span><span><b>SETTINGS</b><small>Mode and duration</small></span></button>
+<button class="tile" onclick="go('pulseLock')"><span class="icon">🔒</span><span><b>PULSE-LOCK™</b><small>Setup validation gate</small></span></button>
 </div>
 <div class="card latestCard"><div class="cardhead"><span class="label">LATEST SIGNAL</span><span class="badge" id="homeStatus">WAITING</span></div><div class="signal"><div id="homeSignal" class="signalword waitText">WAIT</div><span class="tiny" id="homeCount">0 scans recorded</span></div><p class="tiny" id="homeDetails">No scan result recorded yet.</p><div class="tradelevels"><div><span>ENTRY</span><b id="homeEntry">N/A</b></div><div><span>STOP LOSS</span><b id="homeSL">N/A</b></div><div><span>TAKE PROFIT</span><b id="homeTP">N/A</b></div></div><p class="tiny">Values appear only when the selected analyzer returns them; no price is invented.</p></div>
 <p class="foot">Experimental chart analysis only. Confidence is not a guaranteed win probability. Confirm signals manually.</p>
+</section>
+<section id="pulseLock" class="view">
+<div class="kicker">DIABLO PULSE-LOCK™ / VALIDATION GATE</div>
+<h2 class="heading"><span class="redAccent">PULSE</span>-LOCK™</h2>
+<p class="sub">A visible decision gate above the selected analyzer. It can reject weak, stale or conflicting setups; LOCKED means checks passed at that moment, never a guaranteed win.</p>
+<div class="card"><div class="cardhead"><span class="label">LOCK STATE</span><span id="plState" class="badge">WAIT · NOT VERIFIED</span></div><div class="signal"><div id="plWord" class="signalword waitText">WAIT</div><span class="tiny" id="plEngine">Engine: awaiting verified analysis</span></div><p class="tiny" id="plReason">No verified OHLC analysis is connected to this gate yet. It will not invent a setup or lock a trade from missing data.</p><div class="metricgrid"><div class="metric"><strong id="plScore">—</strong><span>VALIDATION SCORE</span></div><div class="metric"><strong id="plFresh">UNKNOWN</strong><span>DATA FRESHNESS</span></div><div class="metric"><strong id="plProfileRead">B · BALANCED</strong><span>PROFILE</span></div><div class="metric"><strong id="plTargetRead">10 pips</strong><span>TARGET / MAX</span></div></div></div>
+<div class="card"><div class="label">SETUP CHECKLIST</div><div id="plChecks" class="tiny"><p>01 · Data source — WAITING FOR VERIFIED OHLC</p><p>02 · Candle freshness — NOT VERIFIED</p><p>03 · Trend / momentum — NOT VERIFIED</p><p>04 · Multi-timeframe agreement — NOT VERIFIED</p><p>05 · Target fits max duration — NOT VERIFIED</p><p>06 · Invalidation / stop level — NOT VERIFIED</p></div></div>
+<div class="card"><div class="label">PULSE-LOCK PROFILE</div><p class="tiny">A = Precision (strict), B = Balanced, C = Rapid (more permissive). These are selectivity settings, not proven win-rate rankings.</p><div class="btnrow"><button id="plA" class="btn" onclick="plSetProfile('A')">A · PRECISION</button><button id="plB" class="btn primary" onclick="plSetProfile('B')">B · BALANCED</button><button id="plC" class="btn" onclick="plSetProfile('C')">C · RAPID</button></div>
+<div class="settingrow"><div><b>Target move (pips)</b><span>Requested target; never silently reduced</span></div><input id="plTarget" type="number" min="1" max="10000" step="1" value="10" style="width:90px;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px"></div>
+<div class="settingrow"><div><b>Maximum duration</b><span>Maximum time allowed for the target</span></div><select id="plMaxDuration" style="background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px"><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300" selected>5 minutes</option><option value="600">10 minutes</option><option value="900">15 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="14400">4 hours</option></select></div>
+<div class="settingrow"><div><b>Require multi-timeframe agreement</b><span>Do not lock on a single unverified view</span></div><input id="plRequireMtf" type="checkbox" checked></div>
+<div class="settingrow"><div><b>Reject stale market data</b><span>Required safety gate</span></div><input id="plRejectStale" type="checkbox" checked disabled></div>
+<button class="btn primary full" onclick="plSave()">SAVE PULSE-LOCK SETTINGS</button><p class="tiny" id="plSaveStatus">Settings are stored on this phone/browser. A UI setting does not prove the trading engine consumes it.</p></div>
+<div class="card"><div class="label">LIVE VALIDATION TRACE</div><p class="tiny" id="plTrace">No eligible market-data payload has been passed to Pulse-Lock. The gate stays WAIT until verified candle data, timestamps and analyzer output are wired and tested.</p><button class="btn full" onclick="plRefresh()">REFRESH VALIDATION STATUS</button></div>
+<p class="foot">Pulse-Lock is a risk filter, not a profit guarantee. Confirm every trade manually. Market-data pips, spread, contract type and broker execution may differ.</p>
 </section>
 <section id="scanner" class="view">
 <div class="kicker">DASHBOARD 02 / LIVE VISION</div><h2 class="heading">Live Scanner</h2><p class="sub">Capture the chart currently visible on your phone. Android asks permission before screen capture begins.</p>
@@ -248,6 +264,20 @@ document.addEventListener('visibilitychange',function(){if(!document.hidden)refr
 </script>
 
 
+<script>
+(function(){
+const KEY='diabloPulseLockV1';
+function $pl(id){return document.getElementById(id)}
+function plCfg(){return {profile:($pl('plProfile')||{}).value||'B',target:Math.max(1,Math.min(10000,parseInt($pl('plTarget').value||'10',10))),maxDuration:parseInt($pl('plMaxDuration').value||'300',10),requireMtf:!!$pl('plRequireMtf').checked,rejectStale:true}}
+function plLoad(){let c={profile:'B',target:10,maxDuration:300,requireMtf:true};try{c=Object.assign(c,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){};$pl('plTarget').value=c.target;$pl('plMaxDuration').value=String(c.maxDuration);$pl('plRequireMtf').checked=!!c.requireMtf;window.plProfileValue=c.profile;plPaintProfile();$pl('plTargetRead').textContent=c.target+' pips / '+plDuration(c.maxDuration);$pl('plProfileRead').textContent=c.profile+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[c.profile]||'BALANCED');}
+function plDuration(s){return s<60?s+'s':s%3600===0?(s/3600)+'h':s%60===0?(s/60)+'m':s+'s'}
+function plPaintProfile(){['A','B','C'].forEach(k=>{let b=$pl('pl'+k);if(b)b.className='btn '+((window.plProfileValue||'B')===k?'primary':'')})}
+window.plSetProfile=function(p){window.plProfileValue=p;plPaintProfile();$pl('plProfileRead').textContent=p+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[p]);};
+window.plSave=function(){let c=plCfg();c.profile=window.plProfileValue||'B';try{localStorage.setItem(KEY,JSON.stringify(c));$pl('plSaveStatus').textContent='Saved on this device. Target '+c.target+' pips; maximum '+plDuration(c.maxDuration)+'. No target reduction or duration extension is allowed.';$pl('plTargetRead').textContent=c.target+' pips / '+plDuration(c.maxDuration);$pl('plProfileRead').textContent=c.profile+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[c.profile])}catch(e){$pl('plSaveStatus').textContent='Save failed in local storage.'}};
+window.plRefresh=function(){$pl('plState').textContent='WAIT · DATA NOT VERIFIED';$pl('plWord').textContent='WAIT';$pl('plWord').className='signalword waitText';$pl('plScore').textContent='—';$pl('plFresh').textContent='UNKNOWN';$pl('plReason').textContent='Safe default: the dashboard has not yet received a validated OHLC payload plus timestamps and a completed analyzer result. No lock is issued.';$pl('plChecks').innerHTML=['01 · Data source — NOT VERIFIED BY GATE','02 · Candle freshness — UNKNOWN','03 · Trend / momentum — NOT VERIFIED','04 · Multi-timeframe agreement — NOT VERIFIED','05 · Target fits maximum duration — NOT CALCULATED','06 · Invalidation / stop level — NOT VERIFIED'].map(x=>'<p>'+x+'</p>').join('');$pl('plTrace').textContent='Refresh checked the gate UI, not the market provider. A true live lock requires wiring validated candles and analyzer results into the decision engine; until then WAIT is intentional.'};
+document.addEventListener('DOMContentLoaded',function(){if($pl('plTarget'))plLoad()});
+})();
+</script>
 <script>
 (function(){
 const ids=['csBg','csPanel','csAccent','csUp','csDown','csText','csMuted','csBorder','csBubble','csBubbleBorder','csShape','csSize','csOpacity','csGlow','csLayout','csAnimations','csPerformance','csConfidence','csLevels','csHistory','csPreset'];
