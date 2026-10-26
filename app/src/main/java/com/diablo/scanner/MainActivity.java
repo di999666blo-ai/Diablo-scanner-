@@ -164,7 +164,44 @@ public class MainActivity extends Activity {
                         Toast.LENGTH_LONG).show();
                 break;
             case "stop_live_scan":
+                prefs.edit().putBoolean("auto_scan_enabled", false).apply();
                 stopScreenCapture();
+                break;
+            case "visual_auto_scan_on":
+                prefs.edit().putBoolean("auto_scan_enabled", true).apply();
+                if (!prefs.getBoolean("screen_capture_active", false)) {
+                    Toast.makeText(this, "Enable screen capture first; visual auto-scan will wait for permission.", Toast.LENGTH_LONG).show();
+                    requestScreenCapture();
+                } else {
+                    Toast.makeText(this, "Visual auto-scan enabled: fresh screen analysis every 5 seconds while this workspace is open.", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            case "visual_auto_scan_off":
+                prefs.edit().putBoolean("auto_scan_enabled", false).apply();
+                Toast.makeText(this, "Visual auto-scan stopped.", Toast.LENGTH_SHORT).show();
+                break;
+            case "visual_scan_once":
+                if (!prefs.getBoolean("screen_capture_active", false)) {
+                    prefs.edit().putString("scan_status", "WAIT")
+                            .putString("scan_message", "WAIT · screen capture is not active. Start screen capture first.")
+                            .apply();
+                    Toast.makeText(this, "Start screen capture before visual scanning.", Toast.LENGTH_SHORT).show();
+                } else {
+                    String scanStatus = prefs.getString("scan_status", "WAIT");
+                    if (!"SCANNING".equals(scanStatus) && !"AI_PROCESSING".equals(scanStatus)) {
+                        prefs.edit().putString("scan_status", "SCANNING")
+                                .putLong("scan_started_at", System.currentTimeMillis())
+                                .putString("scan_message", "Visual auto-scan: requesting fresh broker-screen analysis.")
+                                .apply();
+                        Intent scanIntent = new Intent(this, ScreenCaptureService.class);
+                        scanIntent.setAction(ScreenCaptureService.ACTION_ANALYZE_ONCE);
+                        try { startService(scanIntent); }
+                        catch (Exception e) {
+                            prefs.edit().putString("scan_status", "WAIT")
+                                    .putString("scan_message", "WAIT · visual scan request failed: " + e.getMessage()).apply();
+                        }
+                    }
+                }
                 break;
             case "start_bubble":
                 startFloatingBubble();
