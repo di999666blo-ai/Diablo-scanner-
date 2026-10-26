@@ -174,6 +174,13 @@ public class ScreenCaptureService extends Service {
 
         if (ACTION_ANALYZE_ONCE.equals(intent.getAction())) {
             if (captureStarted) {
+                SharedPreferences freshScanState = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                freshScanState.edit()
+                        .putString("latest_ai_signal", "WAIT")
+                        .putString("latest_ai_details", "Scan in progress. No current signal or trade levels yet.")
+                        .putString("scan_status", "SCANNING")
+                        .putString("scan_message", "New scan started. Previous entry, stop loss and take profit cleared.")
+                        .apply();
                 SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
                 boolean timedMode = "TIMED".equalsIgnoreCase(state.getString("trading_mode", "TIMED"));
                 if (timedMode && timedScanActive) return START_NOT_STICKY;
@@ -999,6 +1006,8 @@ public class ScreenCaptureService extends Service {
                 .putBoolean("screen_capture_active", false)
                 .putBoolean("timed_scan_active", false)
                 .putString("scan_status", "WAIT")
+                .putString("latest_ai_signal", "WAIT")
+                .putString("latest_ai_details", "Screen capture stopped. No active signal or trade levels.")
                 .putString("scan_message", "Screen capture stopped. Start it again to scan.")
                 .apply();
 
