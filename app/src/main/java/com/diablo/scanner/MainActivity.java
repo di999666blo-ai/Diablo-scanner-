@@ -35,6 +35,7 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
