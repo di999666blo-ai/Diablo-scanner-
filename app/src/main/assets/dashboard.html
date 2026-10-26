@@ -110,6 +110,38 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 </section>
 <section id="market" class="view">
 <div class="kicker">DASHBOARD 05 / CHART LAB</div><h2 class="heading">Market / Chart</h2><p class="sub">Live chart capture analyzes the currently visible screen. Saved-chart analysis uses an image you select from your phone.</p>
+<div class="card" id="liveChartDesk">
+ <div class="cardhead"><span class="label">LIVE CANDLE DESK</span><span class="badge" id="liveDeskStatus">WAITING FOR REAL OHLC</span></div>
+ <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+  <button class="btn" onclick="act('kronos_select_pair')">⇄ SELECT MARKET PAIR</button>
+  <button class="btn" onclick="act('kronos_view_timeframe')">◷ CHART VIEW TIMEFRAME</button>
+  <button class="btn" onclick="act('timeframe')">⚙ SCAN TIMEFRAME</button>
+  <button class="btn primary" onclick="diabloRefreshChart(true)">↻ REFRESH MARKET</button>
+ </div>
+ <div class="settingrow"><div><b>5-second candle refresh</b><span id="liveRefreshState">OFF · manual refresh only</span></div><input type="checkbox" id="liveRefreshToggle" aria-label="Enable five second candle refresh" onchange="diabloToggleRefresh(this.checked)" style="width:20px;height:20px;accent-color:var(--red)"></div>
+ <div class="btnrow"><button class="btn primary" onclick="act('start_live_scan')">▶ START SCREEN SCAN</button><button class="btn" onclick="act('stop_live_scan')">■ STOP SCANNING</button></div>
+ <div class="tiny">Chart view timeframe controls this market-data chart. Scan timeframe controls the visual scanner. Pair/market-data options depend on the connected provider; OTC pairs may not be available here.</div>
+</div>
+<div class="card">
+ <div class="cardhead"><span class="label">CANDLE CHART + STRATEGY MARKUP</span><span class="badge" id="liveChartCandleCount">0 CANDLES</span></div>
+ <div class="chart" style="height:245px"><svg id="liveCandleChart" viewBox="0 0 360 245" preserveAspectRatio="none" role="img" aria-label="Market-data candle chart with calculated strategy overlays"><text x="180" y="112" text-anchor="middle" fill="#6D80A0" font-size="11">Waiting for real OHLC candles</text><text x="180" y="132" text-anchor="middle" fill="#6D80A0" font-size="9">Choose a market pair, then refresh</text></svg></div>
+ <div class="tiny" style="margin-top:8px">OVERLAYS: Support · Resistance · EMA trend · Last price · Candidate supply/demand zones. Markings are calculated only from loaded OHLC candles; no synthetic candles.</div>
+ <div class="metricgrid" style="margin-top:10px">
+  <div class="metric"><span>LAST CANDLE</span><strong id="liveCandleDirection">—</strong></div>
+  <div class="metric"><span>LAST CLOSE</span><strong id="liveCandleClose">—</strong></div>
+  <div class="metric"><span>SUPPORT</span><strong id="liveCandleSupport">—</strong></div>
+  <div class="metric"><span>RESISTANCE</span><strong id="liveCandleResistance">—</strong></div>
+  <div class="metric"><span>AVG RANGE (14)</span><strong id="liveCandleRange">—</strong></div>
+  <div class="metric"><span>EMA TREND</span><strong id="liveCandleTrend">UNKNOWN</strong></div>
+ </div>
+</div>
+<div class="card">
+ <div class="cardhead"><span class="label">ANALYSIS WORKFLOW BENCH</span><span class="badge" id="liveWorkflowStatus">WAIT</span></div>
+ <div class="scanSteps" id="liveWorkflowBench">
+  <div>01 · MARKET / PAIR — WAITING</div><div>02 · OHLC CANDLES — WAITING</div><div>03 · SUPPORT / RESISTANCE — WAITING</div><div>04 · EMA TREND / MOMENTUM — WAITING</div><div>05 · CANDLE PATTERN / SUPPLY-DEMAND — WAITING</div><div>06 · SCAN ENGINE / TIMEFRAME — WAITING</div><div>07 · FINAL DECISION — WAIT · NO VERIFIED SETUP</div>
+ </div>
+ <p class="tiny" id="liveWorkflowNote">A green workflow step means the data/calculation exists, not that a trade is guaranteed. The visual screen scanner and OHLC market-data engine are separate inputs.</p>
+</div>
 <div class="card"><div class="cardhead"><span class="label">VISIBLE MARKET READ</span><span class="badge" id="marketTf">TIMEFRAME 1m</span></div><div class="chart"><svg viewBox="0 0 320 140" preserveAspectRatio="none" aria-label="Illustrative empty chart grid"><text x="160" y="72" text-anchor="middle" fill="#6A7C9A" font-size="10">Chart preview appears after scan</text></svg></div><div class="row" style="margin-top:10px"><span class="tiny">PRICE</span><b id="marketPrice">—</b></div><p class="tiny">No live broker price is invented here. This screen only shows data the scanner actually records.</p></div>
 <div class="card"><div class="cardhead"><span class="label">SAVED CHART · MANUAL START</span><span class="badge" id="savedChartBadge">NO IMAGE</span></div><div id="savedChartStage" class="savedChartStage"><div class="empty" id="savedChartPlaceholder">Choose an image from storage. The image stays here until you press START ANALYSIS.</div></div><div class="btnrow"><button class="btn primary" onclick="act('start_saved_chart_scan')">▶ START ANALYSIS</button><button class="btn" aria-label="Clear selected chart" title="Clear selected chart" onclick="act('clear_saved_chart')">✕ CLEAR IMAGE</button></div><div id="savedChartRaybox" class="raybox" style="display:none"><div class="ray"></div></div><div class="label">AI WORK PROCESS · SELECTED SCREENSHOT</div><div class="scanSteps" id="savedChartPipeline"><div>01 · IMAGE LOAD — WAITING</div><div>02 · CANDLE / STRUCTURE — WAITING</div><div>03 · SUPPORT &amp; RESISTANCE — WAITING</div><div>04 · ORDER BLOCK / FVG — WAITING</div><div>05 · VOLATILITY / MOMENTUM — WAITING</div><div>06 · FINAL SIGNAL — WAITING</div></div><div class="label">LIVE ANALYSIS STATUS</div><p class="scanSteps" id="savedChartProgress">Waiting for a saved chart image.</p><div class="line"></div><div class="label">MODEL FINDINGS</div><p class="scanSteps" id="savedChartFindings">Bullish / bearish structure, FVG and other patterns will only be shown when the analyzer actually reports them.</p></div>
 <div class="btnrow"><button class="btn primary" onclick="act('start_live_scan')">SCAN VISIBLE CHART</button><button class="btn" onclick="act('choose_chart')">CHOOSE SAVED CHART</button></div><button class="btn full" onclick="act('timeframe')">SET CHART TIMEFRAME</button><button class="btn full" onclick="go('history')">VIEW CHART ANALYSIS HISTORY</button>
@@ -301,5 +333,54 @@ window.csSaveProfile=function(){let name=(el('csProfileName').value||'My Custom 
 window.csLoadProfile=function(){let name=(el('csProfileName').value||'My Custom Design').trim(),all={};try{all=JSON.parse(localStorage.getItem('diabloAppearanceProfilesV1')||'{}')}catch(e){}if(!all[name]){el('csStatus').textContent='No saved profile named '+name+'. Save it first.';return}fill(all[name]);apply();el('csStatus').textContent='Loaded profile: '+name};
 document.addEventListener('DOMContentLoaded',function(){let saved={};try{saved=JSON.parse(localStorage.getItem('diabloAppearanceV1')||'{}')}catch(e){}fill({...presets.classic,csShape:'circle',csSize:'58',csOpacity:'100',csGlow:true,csLayout:'balanced',csAnimations:true,csPerformance:false,csConfidence:true,csLevels:true,csHistory:'full',csPreset:'classic',csProfileName:'My Custom Design',...saved});let p=el('csPreset');if(p)p.addEventListener('change',function(){if(p.value==='custom')return;fill({...presets[p.value],csPreset:p.value});apply()});['csBg','csPanel','csAccent','csUp','csDown','csText','csMuted','csBorder','csBubble','csBubbleBorder','csShape','csSize','csOpacity','csGlow','csLayout','csAnimations','csPerformance','csConfidence','csLevels','csHistory'].forEach(k=>{let n=el(k);if(n)n.addEventListener('input',function(){el('csPreset').value='custom';apply()})});let hx=el('csHex');if(hx)hx.addEventListener('change',function(){let v=hx.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v)){el('csAccent').value=v;el('csBubble').value=v;el('csPreset').value='custom';preview()}else el('csStatus').textContent='Enter a valid HEX colour, e.g. #FF0A1F.'});preview()});
 })();
-</script></body>
+</script><script>
+(function(){
+ var liveRefreshTimer=null,liveRefreshBusy=false;
+ function byId(id){return document.getElementById(id)}
+ function n(v){var x=Number(v);return Number.isFinite(x)?x:NaN}
+ function fmt(v){return Number.isFinite(v)?(Math.abs(v)<10?v.toFixed(5):v.toFixed(3)):'—'}
+ function validBars(c){return (Array.isArray(c)?c:[]).filter(function(b){if(!b)return false;var o=n(b.open),h=n(b.high),l=n(b.low),cl=n(b.close);return [o,h,l,cl].every(Number.isFinite)&&o>0&&h>=Math.max(o,cl,l)&&l<=Math.min(o,cl,h)&&cl>0}).slice(-70)}
+ function ema(values,period){if(values.length<period)return [];var k=2/(period+1),out=[],v=values.slice(0,period).reduce(function(a,b){return a+b},0)/period;out[period-1]=v;for(var i=period;i<values.length;i++){v=values[i]*k+v*(1-k);out[i]=v}return out}
+ function put(id,v){var el=byId(id);if(el)el.textContent=v}
+ window.diabloRenderLiveChart=function(){
+  var d={};try{d=typeof safeData==='function'?safeData():{}}catch(e){}
+  var bars=validBars(d.kronosCandles||[]),svg=byId('liveCandleChart');
+  put('marketTf','TIMEFRAME '+(d.kronosInterval||d.timeframe||'1m'));
+  put('liveDeskStatus',bars.length>=20?'OHLC LOADED':'WAITING FOR REAL OHLC');
+  put('liveChartCandleCount',bars.length+' CANDLES · '+(d.kronosSymbol||'PAIR NOT SET'));
+  if(!svg)return;
+  if(bars.length<5){svg.innerHTML='<text x="180" y="108" text-anchor="middle" fill="#FFD166" font-size="11">No valid market-data candles yet</text><text x="180" y="128" text-anchor="middle" fill="#6D80A0" font-size="9">Select pair and chart timeframe, then tap REFRESH MARKET</text>';['liveCandleDirection','liveCandleClose','liveCandleSupport','liveCandleResistance','liveCandleRange'].forEach(function(id){put(id,'—')});put('liveCandleTrend','UNKNOWN');put('liveWorkflowStatus','WAIT');byId('liveWorkflowBench').innerHTML=['01 · MARKET / PAIR — '+(d.kronosSymbol||'NOT SELECTED'),'02 · OHLC CANDLES — WAIT · NO VALID DATA','03 · SUPPORT / RESISTANCE — NOT CALCULATED','04 · EMA TREND / MOMENTUM — NOT CALCULATED','05 · CANDLE PATTERN / SUPPLY-DEMAND — NOT CALCULATED','06 · SCAN ENGINE / TIMEFRAME — '+(d.timeframe||'1m')+' · '+(d.mode||'TIMED'),'07 · FINAL DECISION — WAIT · NO VERIFIED SETUP'].map(function(x){return '<div>'+x+'</div>'}).join('');return}
+  var closes=bars.map(function(b){return n(b.close)}),lows=bars.map(function(b){return n(b.low)}),highs=bars.map(function(b){return n(b.high)}),last=bars[bars.length-1],sup=Math.min.apply(null,lows.slice(-30)),res=Math.max.apply(null,highs.slice(-30)),ranges=bars.slice(-14).map(function(b){return n(b.high)-n(b.low)}),avg=ranges.reduce(function(a,b){return a+b},0)/ranges.length,e20=ema(closes,20),e50=ema(closes,50),trend='NEUTRAL';
+  if(e20.length&&e50.length){trend=e20[e20.length-1]>e50[e50.length-1]?'BULLISH':e20[e20.length-1]<e50[e50.length-1]?'BEARISH':'NEUTRAL'}
+  var dir=n(last.close)>=n(last.open)?'BULLISH':'BEARISH';put('liveCandleDirection',dir);put('liveCandleClose',fmt(n(last.close)));put('liveCandleSupport',fmt(sup));put('liveCandleResistance',fmt(res));put('liveCandleRange',fmt(avg));put('liveCandleTrend',trend);
+  var lo=Math.min.apply(null,lows.slice(-70)),hi=Math.max.apply(null,highs.slice(-70)),pad=(hi-lo)*.09||Math.abs(hi)*.001||1;lo-=pad;hi+=pad;
+  var W=360,H=245,L=8,R=34,T=10,B=12,pw=W-L-R,ph=H-T-B,step=pw/bars.length;
+  function y(v){return T+(hi-v)/(hi-lo)*ph}function x(i){return L+step*i+step/2}
+  var out='';for(var g=0;g<5;g++){var gy=T+g*ph/4;out+='<line x1="'+L+'" y1="'+gy+'" x2="'+(W-R)+'" y2="'+gy+'" stroke="#1E345A" stroke-width=".7"/><text x="'+(W-2)+'" y="'+(gy+3)+'" text-anchor="end" fill="#6D80A0" font-size="7">'+fmt(hi-(hi-lo)*g/4)+'</text>'}
+  out+='<line x1="'+L+'" y1="'+y(res)+'" x2="'+(W-R)+'" y2="'+y(res)+'" stroke="#FF5B68" stroke-dasharray="4 2"/><text x="'+(L+2)+'" y="'+(y(res)-3)+'" fill="#FF5B68" font-size="8">RESISTANCE</text>';
+  out+='<line x1="'+L+'" y1="'+y(sup)+'" x2="'+(W-R)+'" y2="'+y(sup)+'" stroke="#00FF7A" stroke-dasharray="4 2"/><text x="'+(L+2)+'" y="'+(y(sup)-3)+'" fill="#00FF7A" font-size="8">SUPPORT</text>';
+  var cw=Math.max(1,step*.52);bars.forEach(function(b,i){var o=n(b.open),c=n(b.close),h=n(b.high),l=n(b.low),col=c>=o?'#00FF7A':'#FF0A1F';out+='<line x1="'+x(i)+'" y1="'+y(h)+'" x2="'+x(i)+'" y2="'+y(l)+'" stroke="'+col+'" stroke-width="1"/><rect x="'+(x(i)-cw/2)+'" y="'+Math.min(y(o),y(c))+'" width="'+cw+'" height="'+Math.max(1,Math.abs(y(c)-y(o)))+'" fill="'+col+'"/>'});
+  if(e20.length){var path='';e20.forEach(function(v,i){if(Number.isFinite(v))path+=(path?' L':'M')+x(i)+' '+y(v)});if(path)out+='<path d="'+path+'" fill="none" stroke="#FFD166" stroke-width="1.3"/>'}
+  var lastY=y(n(last.close));out+='<line x1="'+L+'" y1="'+lastY+'" x2="'+(W-R)+'" y2="'+lastY+'" stroke="#E6EEFB" stroke-dasharray="2 3"/>';
+  svg.innerHTML=out;
+  var ok=bars.length>=20;put('liveWorkflowStatus',ok?'OHLC CHECKED':'PARTIAL DATA');
+  var steps=[
+   ['01 · MARKET / PAIR',d.kronosSymbol||'PAIR NOT SELECTED',!!d.kronosSymbol],
+   ['02 · OHLC CANDLES',bars.length+' VALID BARS',bars.length>=20],
+   ['03 · SUPPORT / RESISTANCE','CALCULATED FROM LAST 30 BARS',bars.length>=5],
+   ['04 · EMA TREND / MOMENTUM','EMA20 '+(e20.length?'AVAILABLE':'WAIT')+' · EMA50 '+(e50.length?'AVAILABLE':'NEED 50 BARS'),e20.length>0&&e50.length>0],
+   ['05 · CANDLE / RANGE','LAST '+dir+' · AVG RANGE(14) '+fmt(avg),bars.length>=14],
+   ['06 · SCAN ENGINE / TIMEFRAME',(d.mode||'TIMED')+' · SCAN '+(d.timeframe||'1m')+' · CHART '+(d.kronosInterval||'1m'),true],
+   ['07 · FINAL DECISION',String(d.kronosSignal||'WAIT')+' · '+String(d.kronosStatus||'NOT RUN'),/UP|DOWN|BUY|SELL/i.test(String(d.kronosSignal||''))&&/READY|COMPLETE|FORECAST/i.test(String(d.kronosStatus||''))]
+  ];
+  byId('liveWorkflowBench').innerHTML=steps.map(function(s){return '<div>'+s[0]+' — <strong style="color:'+(s[2]?'#00FF7A':'#FFD166')+'">'+s[1]+'</strong></div>'}).join('');
+  put('liveWorkflowNote','Support/resistance and EMA20 are calculated from loaded candles. EMA50 needs enough bars. Supply/demand zones are candidates only; pattern validation and a final signal still depend on the selected engine.');
+ };
+ window.diabloRefreshChart=function(userTap){if(liveRefreshBusy)return;liveRefreshBusy=true;try{act('kronos_refresh_market');put('liveDeskStatus','REFRESH REQUESTED');if(userTap)put('liveRefreshState',byId('liveRefreshToggle').checked?'AUTO · REQUESTING EVERY 5 SECONDS':'MANUAL REFRESH REQUESTED')}finally{setTimeout(function(){liveRefreshBusy=false;try{window.diabloRenderLiveChart()}catch(e){}},1200)}};
+ window.diabloToggleRefresh=function(on){if(liveRefreshTimer){clearInterval(liveRefreshTimer);liveRefreshTimer=null}try{localStorage.setItem('diabloChartRefresh5s',on?'1':'0')}catch(e){}put('liveRefreshState',on?'ON · refresh request every 5 seconds':'OFF · manual refresh only');if(on){window.diabloRefreshChart(false);liveRefreshTimer=setInterval(function(){if(!document.hidden&&document.getElementById('market')&&document.getElementById('market').classList.contains('active'))window.diabloRefreshChart(false)},5000)}};
+ document.addEventListener('DOMContentLoaded',function(){var t=byId('liveRefreshToggle');if(t){try{t.checked=localStorage.getItem('diabloChartRefresh5s')==='1'}catch(e){}if(t.checked)window.diabloToggleRefresh(true)}});
+ var oldRefresh=window.refreshDashboard;window.refreshDashboard=function(){if(typeof oldRefresh==='function')oldRefresh();try{window.diabloRenderLiveChart()}catch(e){}};
+})();
+</script>
+</body>
 </html>
