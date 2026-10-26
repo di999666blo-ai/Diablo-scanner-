@@ -780,7 +780,7 @@ public class FloatingBubbleService extends Service {
                 "1. Change the broker chart timeframe manually.\n" +
                 "2. Check that the visible chart matches this step.\n" +
                 "3. Tap CONFIRM TIMEFRAME & SCAN.\n" +
-                "4. Wait for this scan to finish before NEXT TIMEFRAME.\n\n" +
+                "4. Wait for the scan. After a successful 4H/15M result, manually change to the next timeframe and tap CONFIRM TIMEFRAME & SCAN. Use VIEW SAVED FINDINGS to review context.\n\n" +
                 "Elapsed workflow time: " + guidedElapsed() + "\n" +
                 "The app cannot verify the broker timeframe from the screenshot alone. Each stage is saved separately; no combined setup is claimed until all three stages have been reviewed.";
     }
