@@ -1479,6 +1479,7 @@ public class MainActivity extends Activity {
         prefs.edit().putString("scan_message", "Preparing shared SmolVLM vision analysis for " +
                 (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...").apply();
         savedProgressHandler.post(savedProgressUpdater);
+        final long savedScanStartedAt = System.currentTimeMillis();
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
@@ -1512,7 +1513,7 @@ public class MainActivity extends Activity {
                 if (!analysisBitmap.isRecycled()) analysisBitmap.recycle();
             }
             final LocalVisionAI.Result finalResult = result;
-            runOnUiThread(() -> {
+            Runnable finishAnalysis = () -> {
                 savedAnalysisDone.set(true);
                 savedProgressHandler.removeCallbacks(savedProgressUpdater);
                 String direction = finalResult == null || finalResult.signal == null ? "WAIT" :
@@ -1551,7 +1552,10 @@ public class MainActivity extends Activity {
                 publishSavedChartResult(display, details, confidence);
                 refreshCount();
                 refreshDashboardWebView();
-            });
+            };
+            long elapsed = System.currentTimeMillis() - savedScanStartedAt;
+            long minimumRayTimeRemaining = Math.max(0L, 2500L - elapsed);
+            new Handler(Looper.getMainLooper()).postDelayed(finishAnalysis, minimumRayTimeRemaining);
         }, "DiabloSavedChartAnalyzer").start();
     }
 
