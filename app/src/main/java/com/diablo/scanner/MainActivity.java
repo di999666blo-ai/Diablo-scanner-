@@ -1633,6 +1633,14 @@ public class MainActivity extends Activity {
             item.put("green", green);
             item.put("red", redPixels);
             item.put("source", source);
+            String savedDetails = "KRONOS_MARKET_FORECAST".equals(source)
+                    ? prefs.getString("kronos_latest_details", prefs.getString("latest_ai_details", ""))
+                    : prefs.getString("latest_ai_details", "");
+            item.put("details", savedDetails);
+            item.put("instrument", prefs.getString("kronos_symbol", ""));
+            item.put("higherTimeframe", prefs.getString("kronos_tf_higher", "4h"));
+            item.put("middleTimeframe", prefs.getString("kronos_tf_middle", "15m"));
+            item.put("entryTimeframe", prefs.getString("kronos_tf_entry", "1m"));
 
             updated.put(item);
 
@@ -2331,7 +2339,17 @@ public class MainActivity extends Activity {
                         .putString("kronos_latest_signal", modelDirection)
                         .putString("kronos_latest_details", details)
                         .putString("kronos_feed_note", "Continuous local Kronos model forecasts refreshed from real BigQuote candles for all three timeframes. WAIT means monitoring continues.")
+                        .putString("latest_ai_signal", modelDirection)
+                        .putString("latest_ai_details", details)
                         .apply();
+                if (validSetup) {
+                    String setupKey = symbol + "|" + higher + "|" + middle + "|" + entry + "|" + snapshot.entry + "|" + modelDirection;
+                    String previousSetupKey = prefs.getString("kronos_last_history_setup_key", "");
+                    if (!setupKey.equals(previousSetupKey)) {
+                        prefs.edit().putString("kronos_last_history_setup_key", setupKey).apply();
+                        saveHistory(modelDirection, 0, 0L, 0L, "KRONOS_MARKET_FORECAST");
+                    }
+                }
             } catch (Exception error) {
                 details = "MONITOR DATA ERROR — NOT A NORMAL WAIT\n" + error.getClass().getSimpleName() + ": "
                         + (error.getMessage() == null ? "No details" : error.getMessage())
