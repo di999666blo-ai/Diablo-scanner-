@@ -219,6 +219,13 @@ public class MainActivity extends Activity {
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
                 showKronosMarketSettings();
                 break;
+            case "kronos_select_pair":
+                prefs.edit().putString("scalping_engine", "KRONOS").apply();
+                browseKronosSymbols();
+                break;
+            case "kronos_view_timeframe":
+                chooseKronosTimeframe("kronos_view_interval", prefs.getString("kronos_view_interval", "1m"), "Visible chart timeframe", () -> {});
+                break;
             case "kronos_analysis_settings":
                 prefs.edit().putString("scalping_engine", "KRONOS").apply();
                 showKronosAnalysisSettings();
@@ -2497,11 +2504,24 @@ public class MainActivity extends Activity {
                 java.util.ArrayList<String> labels = new java.util.ArrayList<>();
                 java.util.ArrayList<String> names = new java.util.ArrayList<>();
                 for (int i = 0; i < symbols.length(); i++) {
-                    JSONObject item = symbols.optJSONObject(i); if (item == null) continue;
-                    String name = item.optString("name", item.optString("symbol", "")).trim();
+                    Object raw = symbols.opt(i);
+                    String name = "";
+                    String desc = "";
+                    if (raw instanceof JSONObject) {
+                        JSONObject item = (JSONObject) raw;
+                        name = item.optString("name", item.optString("symbol",
+                                item.optString("ticker", item.optString("instrument", "")))).trim();
+                        desc = item.optString("description", item.optString("type",
+                                item.optString("displayName", ""))).trim();
+                    } else if (raw instanceof String) {
+                        name = ((String) raw).trim();
+                    }
                     if (name.isEmpty()) continue;
-                    String desc = item.optString("description", item.optString("type", "")).trim();
-                    names.add(name); labels.add(desc.isEmpty() ? name : name + " — " + desc);
+                    if (!names.contains(name)) {
+                        names.add(name);
+                        labels.add(desc.isEmpty() || desc.equalsIgnoreCase(name)
+                                ? name : name + " — " + desc);
+                    }
                 }
                 runOnUiThread(() -> {
                     if (labels.isEmpty()) { Toast.makeText(this, "BigQuote returned no readable instruments.", Toast.LENGTH_LONG).show(); return; }
