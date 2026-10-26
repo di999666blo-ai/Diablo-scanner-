@@ -178,23 +178,27 @@ public class ScreenCaptureService extends Service {
                 boolean timedMode = "TIMED".equalsIgnoreCase(state.getString("trading_mode", "TIMED"));
                 if (timedMode && timedScanActive) return START_NOT_STICKY;
                 if (timedMode && workerHandler != null) {
+                    String timedEngine = state.getString("timed_engine", "HYBRID");
+                    boolean fastObservation = !"SMOLVLM".equalsIgnoreCase(timedEngine)
+                            && !"COMBINED".equalsIgnoreCase(timedEngine);
                     timedScanDurationMs = Math.max(5000L, Math.min(300000L,
                             state.getLong("timed_scan_duration_ms", 30000L)));
                     timedScanStartedAt = System.currentTimeMillis();
-                    timedScanActive = true;
+                    timedScanActive = fastObservation;
                     workerHandler.removeCallbacks(timedScanRunnable);
-                    state.edit().putBoolean("timed_scan_active", true)
+                    state.edit().putBoolean("timed_scan_active", fastObservation)
                             .putLong("timed_scan_started_at", timedScanStartedAt)
                             .putLong("timed_scan_duration_ms", timedScanDurationMs)
                             .putInt("timed_samples", 0).putInt("timed_up_votes", 0)
                             .putInt("timed_down_votes", 0).putInt("timed_wait_votes", 0)
                             .putString("timed_last_details", "")
                             .putString("scan_status", "SCANNING")
-                            .putString("scan_message", "TIMED SIGNAL • starting live observation for "
-                                    + (timedScanDurationMs / 1000L) + " seconds...")
+                            .putString("scan_message", fastObservation
+                                    ? "TIMED SIGNAL • starting fast live observation for " + (timedScanDurationMs / 1000L) + " seconds..."
+                                    : "TIMED SIGNAL • single analysis using " + timedEngine + "; slow results will be rejected if stale.")
                             .apply();
                     analysisRequested = true;
-                    workerHandler.postDelayed(timedScanRunnable, 5000L);
+                    if (fastObservation) workerHandler.postDelayed(timedScanRunnable, 5000L);
                 } else {
                     analysisRequested = true;
                     state.edit().putBoolean("timed_scan_active", false)
@@ -479,6 +483,7 @@ public class ScreenCaptureService extends Service {
     private void startAIAnalysis(Bitmap capturedChart) {
         if (capturedChart == null || capturedChart.isRecycled()) return;
         if (!aiRunning.compareAndSet(false, true)) return;
+        final long analysisStartedAt = System.currentTimeMillis();
         final Bitmap analysisBitmap;
         try {
             analysisBitmap = capturedChart.copy(Bitmap.Config.ARGB_8888, false);
@@ -502,7 +507,8 @@ public class ScreenCaptureService extends Service {
         String selectedMode = scanPrefs.getString("trading_mode", "TIMED");
         boolean scalpingMode = "SCALPING".equalsIgnoreCase(selectedMode);
         final boolean timedObservation = scanPrefs.getBoolean("timed_scan_active", false);
-        final boolean optionalSmolAssist = scanPrefs.getBoolean("timed_smolvlm_enabled", false);
+        final String selectedTimedEngine = scanPrefs.getString("timed_engine", "HYBRID");
+        final boolean optionalSmolAssist = "COMBINED".equalsIgnoreCase(selectedTimedEngine);
         final String selectedScalpingEngine = scanPrefs.getString("scalping_engine", "SMOLVLM");
         if (!scalpingMode && timedObservation && optionalSmolAssist) {
             Bitmap cached = analysisBitmap.copy(Bitmap.Config.ARGB_8888, false);
@@ -549,14 +555,26 @@ public class ScreenCaptureService extends Service {
                         } else {
                             result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                         }
+                    } else if ("SMOLVLM".equalsIgnoreCase(selectedTimedEngine)) {
+                        result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     } else {
                         result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
-                        // During multi-sample observation, defer the slow optional model
-                        // until the window ends so it cannot block the 5-second fast samples.
                         if (optionalSmolAssist && !timedObservation && result != null) {
                             LocalVisionAI.Result visualResult =
                                     LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                             result = combineTimedHybrid(result, visualResult);
+                        }
+                    }
+                    if (result != null && !scalpingMode) {
+                        long elapsedInferenceMs = Math.max(0L, System.currentTimeMillis() - analysisStartedAt);
+                        long expiryMs = scanPrefs.getLong("trade_duration_ms", 60000L);
+                        long staleLimitMs = Math.min(20000L, Math.max(5000L, expiryMs / 4L));
+                        if (elapsedInferenceMs > staleLimitMs) {
+                            result = new LocalVisionAI.Result("WAIT",
+                                    "STALE TIMED SIGNAL REJECTED: analysis took " + (elapsedInferenceMs / 1000L)
+                                            + " seconds, exceeding the freshness limit of " + (staleLimitMs / 1000L)
+                                            + " seconds for the selected " + (expiryMs / 1000L)
+                                            + "-second trade duration. No late UP/DOWN entry was issued. Retry with Hybrid Fast or a clearer chart.");
                         }
                     }
                     if (result != null) saveAIResult(result);
@@ -726,8 +744,10 @@ public class ScreenCaptureService extends Service {
                         : "HYBRID".equalsIgnoreCase(selectedEngine) ? "Hybrid Fast"
                         : "SmolVLM";
             } else {
-                modelUsed = prefs.getBoolean("timed_smolvlm_enabled", false)
-                        ? "Hybrid Fast + SmolVLM assist" : "Hybrid Fast";
+                String timedEngine = prefs.getString("timed_engine", "HYBRID");
+                modelUsed = "SMOLVLM".equalsIgnoreCase(timedEngine) ? "SmolVLM"
+                        : "COMBINED".equalsIgnoreCase(timedEngine) ? "Hybrid Fast + SmolVLM"
+                        : "Hybrid Fast";
             }
             item.put("signal", displaySignal);
             item.put("model", modelUsed);
