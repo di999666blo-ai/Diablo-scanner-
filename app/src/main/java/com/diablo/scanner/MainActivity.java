@@ -440,6 +440,24 @@ public class MainActivity extends Activity {
             return prefs.getString("pulse_lock_settings_json",
                     "{\\"profile\\":\\"B\\",\\"target\\":10,\\"maxDuration\\":300,\\"requireMtf\\":true,\\"rejectStale\\":true}");
         }
+
+        @JavascriptInterface
+        public void notifyPulseLockSignal(String json) {
+            if (json == null || json.length() > 4000) return;
+            try {
+                JSONObject signal = new JSONObject(json);
+                String direction = signal.optString("direction", "WAIT").toUpperCase(Locale.ROOT);
+                String entry = signal.optString("entry", "").trim();
+                String sl = signal.optString("stopLoss", "").trim();
+                String tp = signal.optString("takeProfit", "").trim();
+                String symbol = signal.optString("symbol", prefs.getString("kronos_symbol", "Market")).trim();
+                boolean locked = signal.optBoolean("locked", false);
+                if (!locked || !(direction.equals("UP") || direction.equals("DOWN"))
+                        || entry.isEmpty() || sl.isEmpty() || tp.isEmpty()) return;
+                postPulseLockSignalNotification(symbol, direction, entry, sl, tp,
+                        signal.optString("reason", "Pulse-Lock validation passed"));
+            } catch (Exception ignored) { }
+        }
     }
 
     private void buildDashboard() {
@@ -2500,6 +2518,39 @@ public class MainActivity extends Activity {
                 .setCategory(Notification.CATEGORY_STATUS)
                 .setPriority(Notification.PRIORITY_HIGH).build();
         manager.notify(7101, notification);
+    }
+
+    private void postPulseLockSignalNotification(String symbol, String direction, String entry,
+                                                   String sl, String tp, String reason) {
+        long now = System.currentTimeMillis();
+        String key = symbol + "|" + direction + "|" + entry + "|" + sl + "|" + tp;
+        if (key.equals(prefs.getString("pulse_lock_last_alert_key", ""))
+                && now - prefs.getLong("pulse_lock_last_alert_at", 0L) < 30L * 60L * 1000L) return;
+        prefs.edit().putString("pulse_lock_last_alert_key", key)
+                .putLong("pulse_lock_last_alert_at", now).apply();
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        String channelId = "diablo_pulse_lock_signal_ready";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(channelId, "Pulse-Lock confirmed signals",
+                    NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("Alerts only when Pulse-Lock passes a validated setup with entry, stop-loss and take-profit.");
+            channel.enableVibration(true);
+            manager.createNotificationChannel(channel);
+        }
+        String side = "UP".equals(direction) ? "BUY / UP" : "SELL / DOWN";
+        String body = symbol + " • " + side + "\\nEntry: " + entry + "\\nStop loss: " + sl
+                + "\\nTake profit: " + tp + "\\nPulse-Lock: " + reason
+                + "\\nValidation is not a guarantee of profit. Confirm manually.";
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, channelId) : new Notification.Builder(this);
+        Notification notification = builder.setSmallIcon(R.drawable.ic_diablo_launcher_vector)
+                .setContentTitle("DIABLO — PULSE-LOCK CONFIRMED: " + side)
+                .setContentText(symbol + " • Entry " + entry + " • SL " + sl + " • TP " + tp)
+                .setStyle(new Notification.BigTextStyle().bigText(body))
+                .setCategory(Notification.CATEGORY_STATUS).setPriority(Notification.PRIORITY_HIGH)
+                .setAutoCancel(true).build();
+        manager.notify(7301, notification);
     }
 
     private String safeKronosDirection(LocalVisionAI.Result result) {
