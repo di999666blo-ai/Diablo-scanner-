@@ -148,9 +148,13 @@ public final class ChartAnalyzer {
         if (bearishMomentumConfirmed) signal = "DOWN";
         else if (bullishMomentumConfirmed) signal = "UP";
 
-        // A static saved screenshot cannot prove that the visible candle has closed.
-        // In candle-close mode, fail closed rather than publishing an unverified entry.
-        boolean candleCloseUnverified = "CLOSE".equalsIgnoreCase(timing);
+        // In Timed Signal, CLOSE mode means the user wants a confirmed candle-close
+        // before an entry; a screenshot alone cannot verify that boundary. Do not apply
+        // that entry-timing gate to Guided Scalping: that mode is explicitly analysing
+        // the visible structure for a directional setup, and the old unconditional gate
+        // forced every Hybrid Fast scalping scan to WAIT even when the chart was readable.
+        boolean candleCloseUnverified = !"SCALPING".equalsIgnoreCase(mode)
+                && "CLOSE".equalsIgnoreCase(timing);
         if (candleCloseUnverified) signal = "WAIT";
 
         int confidence=(int)Math.round(Math.max(0,Math.min(79, 42+strength*48)));
