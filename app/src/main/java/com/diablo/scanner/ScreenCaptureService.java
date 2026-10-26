@@ -578,7 +578,19 @@ public class ScreenCaptureService extends Service {
                                             + "-second trade duration. No late UP/DOWN entry was issued. Retry with Hybrid Fast or a clearer chart.");
                         }
                     }
-                    if (result != null) saveAIResult(result);
+                    if (result != null) {
+                        SharedPreferences latestState = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                        long latestScanStartedAt = latestState.getLong("scan_started_at", analysisStartedAt);
+                        String latestStatus = latestState.getString("scan_status", "WAIT");
+                        String latestMessage = latestState.getString("scan_message", "");
+                        boolean supersededByNewScan = latestScanStartedAt > analysisStartedAt;
+                        boolean timedOutAtOverlay = "AI_ERROR".equals(latestStatus)
+                                && latestMessage.toUpperCase(Locale.ROOT).contains("HYBRID FAST TIMEOUT");
+                        // A slow/stale worker must not overwrite a timeout or a newer scan.
+                        if (!supersededByNewScan && !timedOutAtOverlay) {
+                            saveAIResult(result);
+                        }
+                    }
                 } catch (Exception error) {
                     SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
                     state.edit().putString("scan_status", "AI_ERROR")
