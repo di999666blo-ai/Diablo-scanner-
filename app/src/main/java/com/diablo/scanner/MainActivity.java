@@ -310,6 +310,8 @@ public class MainActivity extends Activity {
             data.put("kronosRuntimeMessage", localKronos.message);
             try { data.put("kronosCandles", new JSONObject(prefs.getString("kronos_chart_candles", "{}")).optJSONArray("candles") == null ? new JSONArray() : new JSONObject(prefs.getString("kronos_chart_candles", "{}")).optJSONArray("candles")); } catch (Exception ignored) { data.put("kronosCandles", new JSONArray()); }
             data.put("kronosLastFeedAt", prefs.getString("kronos_chart_updated_at", "Not fetched yet"));
+            data.put("kronosLivePrice", prefs.getString("kronos_live_price", ""));
+            data.put("kronosLivePriceUpdatedAt", prefs.getString("kronos_live_price_updated_at", "Not fetched yet"));
             SharedPreferences tradePrefs = getSharedPreferences("diablo_trade_records", MODE_PRIVATE);
             JSONArray trades = new JSONArray(tradePrefs.getString("trades", "[]"));
             int wins = 0, losses = 0, unknownTrades = 0;
@@ -1927,11 +1929,44 @@ public class MainActivity extends Activity {
     }
 
     /** Refresh completed BigQuote candles for the dashboard without running inference. */
+    private double fetchBigQuoteLivePrice(String symbol) throws Exception {
+        String safe = symbol == null ? "" : symbol.trim().toUpperCase(Locale.ROOT);
+        if (!safe.matches("[A-Z0-9._-]{1,40}")) throw new IllegalArgumentException("Invalid BigQuote symbol.");
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new java.net.URL("https://biquote.io/api/" + java.net.URLEncoder.encode(safe, "UTF-8")).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(12000);
+            connection.setRequestProperty("Accept", "application/json");
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+            String body;
+            try (InputStream in = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[2048]; int count;
+                while (in != null && (count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                body = out.toString("UTF-8");
+            }
+            if (status < 200 || status >= 300) throw new IllegalStateException("BigQuote live quote HTTP " + status);
+            JSONObject quote = new JSONObject(body);
+            double mid = quote.optDouble("mid", Double.NaN);
+            if (!Double.isFinite(mid) || mid <= 0) mid = quote.optDouble("last", Double.NaN);
+            if (!Double.isFinite(mid) || mid <= 0) {
+                double bid = quote.optDouble("bid", Double.NaN), ask = quote.optDouble("ask", Double.NaN);
+                if (Double.isFinite(bid) && Double.isFinite(ask) && bid > 0 && ask > 0) mid = (bid + ask) / 2.0;
+            }
+            if (!Double.isFinite(mid) || mid <= 0) throw new IllegalStateException("BigQuote response has no valid mid/last/bid-ask quote.");
+            return mid;
+        } finally { if (connection != null) connection.disconnect(); }
+    }
+
     private void refreshKronosMarketDataOnly() {
         prefs.edit().putString("kronos_feed_note", "Refreshing BigQuote market candles…").apply();
         refreshDashboardWebView();
         new Thread(() -> {
             try {
+                String liveSymbol = prefs.getString("kronos_symbol", "EURUSD");
+                double livePrice = fetchBigQuoteLivePrice(liveSymbol);
                 JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext(), prefs.getString("kronos_view_interval", "1m"));
                 JSONArray candles = candleInput.optJSONArray("candles");
                 if (candles == null || candles.length() < 2) {
@@ -1940,7 +1975,9 @@ public class MainActivity extends Activity {
                 prefs.edit()
                         .putString("kronos_chart_candles", candleInput.toString())
                         .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
-                        .putString("kronos_feed_note", "BigQuote refreshed: " + candles.length()
+                        .putString("kronos_live_price", String.valueOf(livePrice))
+                        .putString("kronos_live_price_updated_at", java.time.Instant.now().toString())
+                        .putString("kronos_feed_note", "BigQuote live quote + chart refreshed: " + candles.length()
                                 + " completed candles for " + prefs.getString("kronos_symbol", "EURUSD")
                                 + " (" + prefs.getString("kronos_interval", "1m")
                                 + "). Market chart refreshed; inference was not started.")
