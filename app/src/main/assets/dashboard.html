@@ -86,7 +86,7 @@ main{padding:14px 13px 115px;max-width:760px;margin:auto}.view{display:none;anim
 <section id="market" class="view">
 <div class="kicker">DASHBOARD 05 / CHART LAB</div><h2 class="heading">Market / Chart</h2><p class="sub">Live chart capture analyzes the currently visible screen. Saved-chart analysis uses an image you select from your phone.</p>
 <div class="card"><div class="cardhead"><span class="label">VISIBLE MARKET READ</span><span class="badge" id="marketTf">TIMEFRAME 1m</span></div><div class="chart"><svg viewBox="0 0 320 140" preserveAspectRatio="none" aria-label="Illustrative empty chart grid"><text x="160" y="72" text-anchor="middle" fill="#6A7C9A" font-size="10">Chart preview appears after scan</text></svg></div><div class="row" style="margin-top:10px"><span class="tiny">PRICE</span><b id="marketPrice">—</b></div><p class="tiny">No live broker price is invented here. This screen only shows data the scanner actually records.</p></div>
-<div class="card"><div class="cardhead"><span class="label">SAVED IMAGE SCAN PLAYBACK</span><span class="badge" id="savedChartBadge">NO IMAGE</span></div><div id="savedChartStage" class="savedChartStage"><div class="empty" id="savedChartPlaceholder">Choose an image from storage. Your actual chart screenshot will appear here.</div></div><div class="raybox"><div class="ray"></div></div><div class="label">AI WORK PROCESS · SELECTED SCREENSHOT</div><div class="scanSteps" id="savedChartPipeline"><div>01 · IMAGE LOAD — WAITING</div><div>02 · CANDLE / STRUCTURE — WAITING</div><div>03 · SUPPORT &amp; RESISTANCE — WAITING</div><div>04 · ORDER BLOCK / FVG — WAITING</div><div>05 · VOLATILITY / MOMENTUM — WAITING</div><div>06 · FINAL SIGNAL — WAITING</div></div><div class="label">LIVE ANALYSIS STATUS</div><p class="scanSteps" id="savedChartProgress">Waiting for a saved chart image.</p><div class="line"></div><div class="label">MODEL FINDINGS</div><p class="scanSteps" id="savedChartFindings">Bullish / bearish structure, FVG and other patterns will only be shown when the analyzer actually reports them.</p></div>
+<div class="card"><div class="cardhead"><span class="label">SAVED CHART · MANUAL START</span><span class="badge" id="savedChartBadge">NO IMAGE</span></div><div id="savedChartStage" class="savedChartStage"><div class="empty" id="savedChartPlaceholder">Choose an image from storage. The image stays here until you press START ANALYSIS.</div></div><div class="btnrow"><button class="btn primary" onclick="act('start_saved_chart_scan')">▶ START ANALYSIS</button><button class="btn" aria-label="Clear selected chart" title="Clear selected chart" onclick="act('clear_saved_chart')">✕ CLEAR IMAGE</button></div><div id="savedChartRaybox" class="raybox" style="display:none"><div class="ray"></div></div><div class="label">AI WORK PROCESS · SELECTED SCREENSHOT</div><div class="scanSteps" id="savedChartPipeline"><div>01 · IMAGE LOAD — WAITING</div><div>02 · CANDLE / STRUCTURE — WAITING</div><div>03 · SUPPORT &amp; RESISTANCE — WAITING</div><div>04 · ORDER BLOCK / FVG — WAITING</div><div>05 · VOLATILITY / MOMENTUM — WAITING</div><div>06 · FINAL SIGNAL — WAITING</div></div><div class="label">LIVE ANALYSIS STATUS</div><p class="scanSteps" id="savedChartProgress">Waiting for a saved chart image.</p><div class="line"></div><div class="label">MODEL FINDINGS</div><p class="scanSteps" id="savedChartFindings">Bullish / bearish structure, FVG and other patterns will only be shown when the analyzer actually reports them.</p></div>
 <div class="btnrow"><button class="btn primary" onclick="act('start_live_scan')">SCAN VISIBLE CHART</button><button class="btn" onclick="act('choose_chart')">CHOOSE SAVED CHART</button></div><button class="btn full" onclick="act('timeframe')">SET CHART TIMEFRAME</button><button class="btn full" onclick="go('history')">VIEW CHART ANALYSIS HISTORY</button>
 </section>
 <section id="kronos" class="view">
@@ -169,15 +169,21 @@ function updateSavedChartPreview(d){
  var running=/SAVED_ANALYZING|ANALYS|PROCESS|SCANNING|RUNNING/i.test(status+' '+message);
  var done=/SAVED_READY|SAVED_ERROR|COMPLETE|FINISHED/i.test(status+' '+message);
  var failed=/SAVED_ERROR|ANALYSIS ERROR|FAILED/i.test(status+' '+message);
+ var raybox=document.getElementById('savedChartRaybox'),startButton=null;
+ if(raybox)raybox.style.display=running?'block':'none';
  if(preview){
    stage.classList.toggle('scanning',running);
-   stage.innerHTML='<img id="savedChartImage" alt="Selected chart from phone storage" src="'+preview+'"><div class="savedScanShade"></div>'+(running?'<div class="savedScanRay"></div>':'');
-   if(badge)badge.textContent=running?'ANALYZING IMAGE':done?'SCAN COMPLETE':'IMAGE LOADED';
+   stage.innerHTML='<img id="savedChartImage" alt="Selected chart from phone storage" src="'+preview+'">'+(running?'<div class="savedScanShade"></div><div class="savedScanRay"></div>':'');
+   if(badge)badge.textContent=running?'ANALYZING IMAGE':done?'SCAN COMPLETE':'IMAGE READY · NOT STARTED';
  }else{
    stage.classList.remove('scanning');
-   stage.innerHTML=done?'<div class="empty" style="padding:26px 12px;text-align:center"><strong style="color:'+(failed?'#FF5B68':'#00FF7A')+'">'+(failed?'✕ ANALYSIS ERROR':'✓ SCAN COMPLETE')+'</strong><br>Chart preview cleared. Original image remains in your phone gallery.</div>':'<div class="empty" id="savedChartPlaceholder">Choose an image from storage. Your actual chart screenshot will appear here.</div>';
-   if(badge)badge.textContent=done?(failed?'ANALYSIS ERROR':'SCAN COMPLETE'):'NO IMAGE';
+   stage.innerHTML=done?'<div class="empty" style="padding:26px 12px;text-align:center"><strong style="color:'+(failed?'#FF5B68':'#00FF7A')+'">'+(failed?'✕ ANALYSIS ERROR':'✓ CHART COMPLETE')+'</strong><br>Analysis finished. Choose another image when ready.</div>':'<div class="empty" id="savedChartPlaceholder">Choose an image from storage. The image stays here until you press START ANALYSIS.</div>';
+   if(badge)badge.textContent=done?(failed?'ANALYSIS ERROR':'CHART COMPLETE'):'NO IMAGE';
  }
+ var startBtn=document.querySelector("button[onclick=\"act('start_saved_chart_scan')\"]");
+ if(startBtn){startBtn.disabled=!preview||running;startBtn.style.opacity=startBtn.disabled?'.45':'1';}
+ var clearBtn=document.querySelector("button[onclick=\"act('clear_saved_chart')\"]");
+ if(clearBtn){clearBtn.disabled=!preview||running;clearBtn.style.opacity=clearBtn.disabled?'.45':'1';}
  if(progress)progress.textContent=running?(message||'Analyzer is working on the selected image…'):done?(message||'Scan finished. Preview cleared; original gallery image untouched.'):'Waiting for a saved chart image.';
  if(findings)findings.textContent=dt|| (done?'No detailed findings were returned.':'Findings will appear when analysis finishes.');
  if(pipe){
