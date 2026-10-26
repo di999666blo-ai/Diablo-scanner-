@@ -171,6 +171,10 @@ public class FloatingBubbleService extends Service {
             int flags,
             int startId
     ) {
+        if (intent != null && "com.diablo.scanner.APPLY_APPEARANCE".equals(intent.getAction())) {
+            applySavedBubbleAppearance();
+            return START_STICKY;
+        }
         return START_STICKY;
     }
 
@@ -190,6 +194,49 @@ public class FloatingBubbleService extends Service {
         shape.setCornerRadius(24);
         shape.setStroke(2, Color.rgb(30, 52, 90));
         return shape;
+    }
+
+    private void applySavedBubbleAppearance() {
+        if (bubble instanceof TextView) {
+            applySavedBubbleAppearance((TextView) bubble);
+            if (bubbleParams != null && windowManager != null) {
+                try { windowManager.updateViewLayout(bubble, bubbleParams); } catch (Exception ignored) { }
+            }
+        }
+    }
+
+    private void applySavedBubbleAppearance(TextView icon) {
+        try {
+            JSONObject appearance = new JSONObject(getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .getString("appearance_settings_json", "{}"));
+            int color = Color.parseColor(appearance.optString("csBubble", "#FF0A1F"));
+            int border = Color.parseColor(appearance.optString("csBubbleBorder", "#FF0A1F"));
+            int sizeDp = Math.max(44, Math.min(76, appearance.optInt("csSize", 58)));
+            int alpha = Math.max(65, Math.min(100, appearance.optInt("csOpacity", 100)));
+            String shapeName = appearance.optString("csShape", "circle");
+            GradientDrawable shape = new GradientDrawable();
+            shape.setColor(color);
+            if ("circle".equals(shapeName)) shape.setShape(GradientDrawable.OVAL);
+            else shape.setShape(GradientDrawable.RECTANGLE);
+            shape.setCornerRadius("rounded".equals(shapeName) ? dp(13) : dp(5));
+            shape.setStroke(dp(2), border);
+            icon.setBackground(shape);
+            icon.setText("D");
+            icon.setTextColor(Color.WHITE);
+            icon.setAlpha(alpha / 100f);
+            boolean glow = appearance.optBoolean("csGlow", true);
+            icon.setShadowLayer(glow ? 8f : 0f, 0f, 0f, glow ? color : Color.TRANSPARENT);
+            int size = dp(sizeDp);
+            if (bubbleParams != null) {
+                bubbleParams.width = size;
+                bubbleParams.height = size;
+            }
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean("appearance_animations", appearance.optBoolean("csAnimations", true)
+                            && !appearance.optBoolean("csPerformance", false)).apply();
+        } catch (Exception ignored) {
+            icon.setText("D");
+        }
     }
 
     private GradientDrawable makeBubbleBackground() {
@@ -307,9 +354,15 @@ public class FloatingBubbleService extends Service {
         icon.setShadowLayer(8f, 0f, 0f, Color.rgb(255, 10, 31));
         icon.setBackground(makeBubbleBackground());
         icon.setElevation(10f);
+        applySavedBubbleAppearance(icon);
         icon.setScaleX(0.94f);
         icon.setScaleY(0.94f);
-        icon.animate().scaleX(1f).scaleY(1f).setDuration(850).start();
+        if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("appearance_animations", true)) {
+            icon.animate().scaleX(1f).scaleY(1f).setDuration(850).start();
+        } else {
+            icon.setScaleX(1f);
+            icon.setScaleY(1f);
+        }
 
         bubble = icon;
 
