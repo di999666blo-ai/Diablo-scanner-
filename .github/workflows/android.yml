@@ -26,6 +26,11 @@ jobs:
       - name: Checkout Diablo Scanner
         uses: actions/checkout@v4
 
+      - name: Set up Python for service tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Test Kronos service input contract
         run: |
           set -e
@@ -60,11 +65,6 @@ jobs:
             "build-tools;35.0.0" \
             "ndk;27.2.12479018" \
             "cmake;3.22.1"
-
-      - name: Set up Python for reproducible Kronos ONNX export
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
 
       - name: Export and validate genuine local Kronos-mini graphs
         run: |
