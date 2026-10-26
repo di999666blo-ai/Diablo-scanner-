@@ -82,9 +82,17 @@ public final class ChartAnalyzer {
                     "NO VISIBLE CHART\\nNo readable trading chart/candles were detected on the screen. Open the broker chart so the candles are visible, close menus or pop-ups, then tap D to scan again.\\nNo UP/DOWN signal was generated.");
         }
 
-        int lookback = "PRECISION".equals(profile) ? (duration <= 60000L ? 8 : duration <= 180000L ? 12 : 16)
-                : "FAST".equals(profile) ? (duration <= 60000L ? 4 : duration <= 180000L ? 6 : 9)
-                : (duration <= 60000L ? 5 : duration <= 180000L ? 8 : 12);
+        // Expiry horizon changes the evidence window independently of chart timeframe.
+        // Pixel columns are not guaranteed to map one-to-one to actual broker candles.
+        int durationBucket = duration <= 30000L ? 0 : duration <= 60000L ? 1
+                : duration <= 120000L ? 2 : duration <= 180000L ? 3
+                : duration <= 300000L ? 4 : 5;
+        int[] fastWindows = {3, 4, 5, 6, 8, 9};
+        int[] balancedWindows = {4, 5, 7, 8, 10, 12};
+        int[] precisionWindows = {6, 8, 10, 12, 14, 16};
+        int lookback = "PRECISION".equals(profile) ? precisionWindows[durationBucket]
+                : "FAST".equals(profile) ? fastWindows[durationBucket]
+                : balancedWindows[durationBucket];
         int recentStart=Math.max(0,candles.size()-lookback);
         int recentUp=0,recentDown=0,recentFlat=0;
         for(int i=recentStart;i<candles.size();i++) {
@@ -153,7 +161,10 @@ public final class ChartAnalyzer {
         details.append("ON-DEVICE CHART ANALYSIS\n");
         details.append("Mode: ").append("SCALPING".equalsIgnoreCase(mode)?"Scalping":"Timed signal").append("\n");
         details.append("Chart timeframe setting: ").append(timeframe).append("\n");
-        details.append("Timed strategy: ").append(duration <= 60000L ? "1-minute fast confirmation" : duration <= 180000L ? "3-minute balanced confirmation" : "5-minute broader-lookback confirmation").append("\n");
+        details.append("Trade expiry horizon: ").append(formatDuration(duration)).append("\n");
+        details.append("Timeframe/expiry handling: chart timeframe setting (").append(timeframe)
+                .append(") and trade expiry are independent; visual evidence window adapts to expiry. ")
+                .append("Exact candle boundaries are not recoverable from pixels alone.\n");
         details.append("Timing: ").append(timingText).append("\n");
         details.append("Visual candle columns: ").append(columnsWithColour).append("\n");
         details.append("Timed pattern library: ").append(patternSummary).append("\n");
