@@ -1648,6 +1648,7 @@ public class MainActivity extends Activity {
         prefs.edit().putString("scan_message", "Preparing image-only on-device analysis for " +
                 (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...").apply();
         savedProgressHandler.post(savedProgressUpdater);
+        final String analysisSourcePath = prefs.getString("saved_chart_path", "");
         final long savedScanStartedAt = System.currentTimeMillis();
         new Thread(() -> {
             LocalVisionAI.Result result;
@@ -1686,17 +1687,30 @@ public class MainActivity extends Activity {
                 String selectedPath = prefs.getString("saved_chart_path", "");
                 String selectedPreview = prefs.getString("saved_chart_preview_data", "");
                 boolean imageStillSelected = !selectedPath.trim().isEmpty()
+                        && selectedPath.equals(analysisSourcePath)
                         && new File(selectedPath).isFile() && !selectedPreview.trim().isEmpty();
                 if (!imageStillSelected) {
-                    String missing = "IMAGE MISSING — screenshot was removed during scanning. WAIT. Upload an image again to interpret it.";
+                    boolean anotherImageSelected = !selectedPath.trim().isEmpty()
+                            && new File(selectedPath).isFile() && !selectedPreview.trim().isEmpty();
+                    String missing = anotherImageSelected
+                            ? "WAIT — a different screenshot was selected during scanning. The old result was discarded; press START ANALYSIS for the new image."
+                            : "IMAGE MISSING — screenshot was removed during scanning. WAIT. Upload an image again to interpret it.";
                     signalText.setText("WAIT");
                     signalText.setTextColor(Color.YELLOW);
                     statusText.setText(missing);
-                    prefs.edit().putString("scan_status", "SAVED_IMAGE_MISSING")
-                            .putString("scan_message", "WAIT · image removed during scanning. Upload a screenshot again to interpret it.")
-                            .putString("latest_ai_signal", "WAIT")
-                            .putString("latest_ai_details", missing)
-                            .apply();
+                    if (anotherImageSelected) {
+                        prefs.edit().putString("scan_status", "SAVED_IMAGE_LOADED")
+                                .putString("scan_message", missing)
+                                .putString("latest_ai_signal", "WAIT")
+                                .putString("latest_ai_details", missing)
+                                .apply();
+                    } else {
+                        prefs.edit().putString("scan_status", "SAVED_IMAGE_MISSING")
+                                .putString("scan_message", "WAIT · image removed during scanning. Upload a screenshot again to interpret it.")
+                                .putString("latest_ai_signal", "WAIT")
+                                .putString("latest_ai_details", missing)
+                                .apply();
+                    }
                     refreshDashboardWebView();
                     return;
                 }
