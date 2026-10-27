@@ -133,6 +133,8 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
   <div class="metric"><span>RESISTANCE</span><strong id="liveCandleResistance">—</strong></div>
   <div class="metric"><span>AVG RANGE (14)</span><strong id="liveCandleRange">—</strong></div>
   <div class="metric"><span>EMA TREND</span><strong id="liveCandleTrend">UNKNOWN</strong></div>
+  <div class="metric"><span>RSI (14) · OB/OS</span><strong id="liveCandleRsi">—</strong></div>
+  <div class="metric"><span>STRUCTURE</span><strong id="liveCandleStructure">—</strong></div>
  </div>
 </div>
 <div class="card">
@@ -352,7 +354,15 @@ document.addEventListener('DOMContentLoaded',function(){let saved={};try{saved=J
   if(bars.length<5){svg.innerHTML='<text x="180" y="108" text-anchor="middle" fill="#FFD166" font-size="11">No valid market-data candles yet</text><text x="180" y="128" text-anchor="middle" fill="#6D80A0" font-size="9">Select pair and chart timeframe, then tap REFRESH MARKET</text>';['liveCandleDirection','liveCandleClose','liveCandleSupport','liveCandleResistance','liveCandleRange'].forEach(function(id){put(id,'—')});put('liveCandleTrend','UNKNOWN');put('liveWorkflowStatus','WAIT');byId('liveWorkflowBench').innerHTML=['01 · MARKET / PAIR — '+(d.kronosSymbol||'NOT SELECTED'),'02 · OHLC CANDLES — WAIT · NO VALID DATA','03 · SUPPORT / RESISTANCE — NOT CALCULATED','04 · EMA TREND / MOMENTUM — NOT CALCULATED','05 · CANDLE PATTERN / SUPPLY-DEMAND — NOT CALCULATED','06 · SCAN ENGINE / TIMEFRAME — '+(d.timeframe||'1m')+' · '+(d.mode||'TIMED'),'07 · FINAL DECISION — WAIT · NO VERIFIED SETUP'].map(function(x){return '<div>'+x+'</div>'}).join('');return}
   var closes=bars.map(function(b){return n(b.close)}),lows=bars.map(function(b){return n(b.low)}),highs=bars.map(function(b){return n(b.high)}),last=bars[bars.length-1],sup=Math.min.apply(null,lows.slice(-30)),res=Math.max.apply(null,highs.slice(-30)),ranges=bars.slice(-14).map(function(b){return n(b.high)-n(b.low)}),avg=ranges.reduce(function(a,b){return a+b},0)/ranges.length,e20=ema(closes,20),e50=ema(closes,50),trend='NEUTRAL';
   if(e20.length&&e50.length){trend=e20[e20.length-1]>e50[e50.length-1]?'BULLISH':e20[e20.length-1]<e50[e50.length-1]?'BEARISH':'NEUTRAL'}
-  var dir=n(last.close)>=n(last.open)?'BULLISH':'BEARISH';put('liveCandleDirection',dir);put('liveCandleClose',fmt(n(last.close)));put('liveCandleSupport',fmt(sup));put('liveCandleResistance',fmt(res));put('liveCandleRange',fmt(avg));put('liveCandleTrend',trend);
+  var dir=n(last.close)>=n(last.open)?'BULLISH':'BEARISH';
+  var rsi=50, gains=0, losses=0, rsiN=Math.min(14,closes.length-1);
+  for(var ri=closes.length-rsiN;ri<closes.length;ri++){var delta=closes[ri]-closes[ri-1];if(delta>0)gains+=delta;else losses-=delta}
+  if(rsiN>0){var ag=gains/rsiN,al=losses/rsiN;rsi=al===0?100:100-(100/(1+ag/al))}
+  var priorHigh=Math.max.apply(null,highs.slice(-21,-1)),priorLow=Math.min.apply(null,lows.slice(-21,-1));
+  var structure=n(last.close)>priorHigh?'BOS ↑':n(last.close)<priorLow?'CHoCH / BOS ↓':'NO BREAK';
+  var rsiState=rsi>=70?'OVERBOUGHT':rsi<=30?'OVERSOLD':'NEUTRAL';
+  put('liveCandleDirection',dir);put('liveCandleClose',fmt(n(last.close)));put('liveCandleSupport',fmt(sup));put('liveCandleResistance',fmt(res));put('liveCandleRange',fmt(avg));put('liveCandleTrend',trend);
+  put('liveCandleRsi',rsi.toFixed(1)+' · '+rsiState);put('liveCandleStructure',structure);
   var lo=Math.min.apply(null,lows.slice(-70)),hi=Math.max.apply(null,highs.slice(-70)),pad=(hi-lo)*.09||Math.abs(hi)*.001||1;lo-=pad;hi+=pad;
   var W=360,H=245,L=8,R=34,T=10,B=12,pw=W-L-R,ph=H-T-B,step=pw/bars.length;
   function y(v){return T+(hi-v)/(hi-lo)*ph}function x(i){return L+step*i+step/2}
@@ -370,8 +380,9 @@ document.addEventListener('DOMContentLoaded',function(){let saved={};try{saved=J
    ['03 · SUPPORT / RESISTANCE','CALCULATED FROM LAST 30 BARS',bars.length>=5],
    ['04 · EMA TREND / MOMENTUM','EMA20 '+(e20.length?'AVAILABLE':'WAIT')+' · EMA50 '+(e50.length?'AVAILABLE':'NEED 50 BARS'),e20.length>0&&e50.length>0],
    ['05 · CANDLE / RANGE','LAST '+dir+' · AVG RANGE(14) '+fmt(avg),bars.length>=14],
-   ['06 · SCAN ENGINE / TIMEFRAME',(d.mode||'TIMED')+' · SCAN '+(d.timeframe||'1m')+' · CHART '+(d.kronosInterval||'1m'),true],
-   ['07 · FINAL DECISION',String(d.kronosSignal||'WAIT')+' · '+String(d.kronosStatus||'NOT RUN'),/UP|DOWN|BUY|SELL/i.test(String(d.kronosSignal||''))&&/READY|COMPLETE|FORECAST/i.test(String(d.kronosStatus||''))]
+   ['06 · MARKET STRUCTURE',structure+' · RSI14 '+rsi.toFixed(1)+' '+rsiState,bars.length>=21],
+   ['07 · SCAN ENGINE / TIMEFRAME',(d.mode||'TIMED')+' · WORKING '+(d.timeframe||'1m')+' · DISPLAY '+(d.kronosInterval||'1m'),true],
+   ['08 · FINAL DECISION',String(d.kronosSignal||'WAIT')+' · '+String(d.kronosStatus||'NOT RUN'),/UP|DOWN|BUY|SELL/i.test(String(d.kronosSignal||''))&&/READY|COMPLETE|FORECAST/i.test(String(d.kronosStatus||''))]
   ];
   byId('liveWorkflowBench').innerHTML=steps.map(function(s){return '<div>'+s[0]+' — <strong style="color:'+(s[2]?'#00FF7A':'#FFD166')+'">'+s[1]+'</strong></div>'}).join('');
   put('liveWorkflowNote','Support/resistance and EMA20 are calculated from loaded candles. EMA50 needs enough bars. Supply/demand zones are candidates only; pattern validation and a final signal still depend on the selected engine.');
