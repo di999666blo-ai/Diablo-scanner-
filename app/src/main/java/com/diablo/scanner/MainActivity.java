@@ -2359,9 +2359,16 @@ public class MainActivity extends Activity {
         }
         kronosMonitorRunning = true;
         prefs.edit().putBoolean("kronos_monitor_active", true)
-                .putString("kronos_status", "ACTIVE SCANNING — WAITING FOR ENTRY")
+                .putString("kronos_status", "ACTIVE SCANNING — WAITING FOR THREE TIMEFRAMES")
                 .putString("kronos_latest_signal", "WAIT")
-                .putString("kronos_latest_details", "Kronos monitoring is starting. WAIT does not mean stopped; the next market check is scheduled automatically.")
+                .putString("kronos_latest_details", "Kronos monitoring is starting. No UP/DOWN result is valid until the selected higher, middle and entry timeframe forecasts finish and the technical entry check agrees.")
+                .putString("kronos_higher_trend", "WAIT / NOT RUN")
+                .putString("kronos_middle_trend", "WAIT / NOT RUN")
+                .putString("kronos_entry_trend", "WAIT / NOT RUN")
+                .putBoolean("kronos_entry_valid", false)
+                .putString("kronos_entry_price", "")
+                .putString("kronos_sl_price", "")
+                .putString("kronos_tp_price", "")
                 .apply();
         refreshDashboardWebView();
         Toast.makeText(this, "Kronos continuous monitoring started.", Toast.LENGTH_LONG).show();
