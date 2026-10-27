@@ -2605,16 +2605,15 @@ public class MainActivity extends Activity {
     private boolean areSignalNotificationsEnabled() {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (manager == null) return false;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !manager.areNotificationsEnabled()) return false;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            String[] channels = new String[]{"diablo_pulse_lock_signal_ready",
-                    "diablo_kronos_signal_ready", "diablo_guided_signal_ready"};
-            for (String id : channels) {
-                NotificationChannel channel = manager.getNotificationChannel(id);
-                if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return false;
-            }
-        }
-        return true;
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.N || manager.areNotificationsEnabled();
+    }
+
+    private boolean isSignalChannelBlocked(String channelId) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) return true;
+        NotificationChannel channel = manager.getNotificationChannel(channelId);
+        return channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE;
     }
 
     private JSONObject signalNotificationStatus() {
@@ -2716,6 +2715,11 @@ public class MainActivity extends Activity {
             title = "DIABLO — GUIDE SCALPING TEST";
             body = "Test alert only. Real alerts require completed 4H / 15M / 1M stages plus entry / SL / TP.";
             channelId = "diablo_guided_signal_ready"; id = 7291;
+        }
+        if (isSignalChannelBlocked(channelId)) {
+            Toast.makeText(this, "This alert channel is blocked. Open Android notification settings and enable the " + name + " signal channel, then test again.", Toast.LENGTH_LONG).show();
+            openAppNotificationSettings();
+            return;
         }
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (manager == null) { Toast.makeText(this, "Notification service unavailable.", Toast.LENGTH_LONG).show(); return; }
