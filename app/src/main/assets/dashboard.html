@@ -209,7 +209,7 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <div class="settingrow"><div><b>1 · Pulse-Lock</b><span>Only when a locked setup has direction, entry, SL and TP</span></div><input type="checkbox" id="notifyPulseLock" checked onchange="saveSignalNotifications()"></div>
 <div class="settingrow"><div><b>2 · Kronos</b><span>Only after higher / middle / entry forecasts agree and entry validation passes</span></div><input type="checkbox" id="notifyKronos" checked onchange="saveSignalNotifications()"></div>
 <div class="settingrow"><div><b>3 · Guide Scalping</b><span>Only after the 4H → 15M → 1M guide finishes with entry, SL and TP</span></div><input type="checkbox" id="notifyGuideScalping" checked onchange="saveSignalNotifications()"></div>
-<button class="btn primary full" onclick="openSignalNotificationPermission()">ALLOW / OPEN ANDROID NOTIFICATION PERMISSION</button>
+<button class="btn primary full" onclick="openSignalNotificationPermission()">ALLOW NOTIFICATIONS IN ANDROID / HUAWEI PHONE MANAGER</button>
 <div class="label" style="margin-top:12px">TEST EACH NOTIFICATION PATH</div>
 <div class="btnrow"><button class="btn" onclick="testSignalNotification('pulselock')">TEST PULSE-LOCK</button><button class="btn" onclick="testSignalNotification('kronos')">TEST KRONOS</button></div>
 <button class="btn full" onclick="testSignalNotification('guided')">TEST GUIDE SCALPING</button>
@@ -515,6 +515,24 @@ document.addEventListener('DOMContentLoaded',function(){let saved={};try{saved=J
 })();
 
 // Signal notification controls use Android SharedPreferences, not browser-only state.
+window.refreshSignalNotificationStatus=function(){
+ try{
+  var el=document.getElementById('notificationSettingsStatus');if(!el)return;
+  if(!window.DiabloAndroid||typeof DiabloAndroid.getSignalNotificationStatus!=='function'){
+   el.textContent='Native notification status bridge unavailable. Test delivery on the phone.';return;
+  }
+  var s=JSON.parse(DiabloAndroid.getSignalNotificationStatus());
+  if(s.permissionRequired&&s.runtimePermissionGranted===false){
+   el.textContent='🔴 Android notification permission is NOT granted. Tap the permission button and choose Allow, then test each alert.';
+  }else if(s.enabled===false){
+   el.textContent=s.huawei
+    ?'🔴 Notifications are blocked. Enable Allow notifications for DIABLO SCANNER in Huawei app notification settings. Also check Phone Manager → App launch for background delivery.'
+    :'🔴 Notifications are blocked for DIABLO SCANNER. Open Android app notification settings and enable Allow notifications.';
+  }else{
+   el.textContent='🟢 Android reports app notifications enabled. Tap each TEST button to verify delivery; Huawei may also require Phone Manager background-app permission.';
+  }
+ }catch(e){var el=document.getElementById('notificationSettingsStatus');if(el)el.textContent='Could not read Android notification status: '+e.message;}
+};
 window.loadSignalNotificationSettings=function(){
  try{
   if(!window.DiabloAndroid||typeof DiabloAndroid.getSignalNotificationSettings!=='function'){
@@ -524,8 +542,7 @@ window.loadSignalNotificationSettings=function(){
   document.getElementById('notifyPulseLock').checked=s.pulseLock!==false;
   document.getElementById('notifyKronos').checked=s.kronos!==false;
   document.getElementById('notifyGuideScalping').checked=s.guidedScalping!==false;
-  var status=document.getElementById('notificationSettingsStatus');
-  if(status)status.textContent='Preferences saved on this phone. Use the three TEST buttons to verify Android delivery.';
+  window.refreshSignalNotificationStatus();
  }catch(e){var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Could not load notification preferences: '+e.message;}
 };
 window.saveSignalNotifications=function(){
@@ -533,7 +550,7 @@ window.saveSignalNotifications=function(){
   var s={pulseLock:document.getElementById('notifyPulseLock').checked,kronos:document.getElementById('notifyKronos').checked,guidedScalping:document.getElementById('notifyGuideScalping').checked};
   if(window.DiabloAndroid&&typeof DiabloAndroid.saveSignalNotificationSettings==='function'){
    DiabloAndroid.saveSignalNotificationSettings(JSON.stringify(s));
-   var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Saved on this phone. Android notification permission must also be allowed.';
+   var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Saved on this phone. Android notification permission must also be allowed. On Huawei, check Phone Manager if background alerts are blocked.';
   }
  }catch(e){var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Save failed: '+e.message;}
 };
