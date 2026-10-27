@@ -2362,18 +2362,18 @@ public class MainActivity extends Activity {
         @Override public void run() {
             if (!kronosLiveWatchRunning) return;
             refreshKronosMarketDataOnly();
-            kronosMonitorHandler.postDelayed(this, 15000L);
+            kronosMonitorHandler.postDelayed(this, 5000L);
         }
     };
 
     private void startKronosLiveWatch() {
         kronosLiveWatchRunning = true;
         prefs.edit().putBoolean("kronos_live_watch_active", true)
-                .putString("kronos_feed_note", "Live market watch enabled: refreshing the real BigQuote feed every 15 seconds.")
+                .putString("kronos_feed_note", "Live market watch enabled: polling the real BigQuote feed every 5 seconds. The provider may return completed candles only.")
                 .apply();
         kronosMonitorHandler.removeCallbacks(kronosLiveWatchRunnable);
         refreshKronosMarketDataOnly();
-        kronosMonitorHandler.postDelayed(kronosLiveWatchRunnable, 15000L);
+        kronosMonitorHandler.postDelayed(kronosLiveWatchRunnable, 5000L);
         refreshDashboardWebView();
         Toast.makeText(this, "Live market updates started. No synthetic prices are used.", Toast.LENGTH_LONG).show();
     }
