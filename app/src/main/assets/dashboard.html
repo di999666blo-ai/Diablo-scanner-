@@ -83,8 +83,8 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <div class="cardhead"><span class="label">PULSE-LOCK MARKET DESK</span><span id="plMarketStatus" class="badge">WAIT · FEED NOT CONNECTED</span></div>
 <p class="tiny">Independent Pulse-Lock view. This panel only reports live market data when the Android bridge supplies Pulse-Lock-specific candles; it will not borrow Kronos results and pretend they are Pulse-Lock analysis.</p>
 <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
-<div><label class="tiny" for="plPair">MARKET PAIR</label><select id="plPair" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:11px"><option value="EURUSD">EURUSD</option><option value="GBPUSD">GBPUSD</option><option value="USDJPY">USDJPY</option><option value="AUDUSD">AUDUSD</option><option value="USDCAD">USDCAD</option><option value="USDCHF">USDCHF</option><option value="NZDUSD">NZDUSD</option><option value="XAUUSD">XAUUSD</option></select></div>
-<div><label class="tiny" for="plWatchTf">WATCH CHART</label><select id="plWatchTf" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:11px"><option>30s</option><option>1m</option><option>2m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+<div><label class="tiny" for="plPairSearch">SEARCH ALL API MARKETS</label><input id="plPairSearch" type="search" placeholder="Search pair, crypto, gold, index…" autocomplete="off" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px;margin:4px 0"><label class="tiny" for="plPair">SELECT MARKET PAIR</label><select id="plPair" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:11px"><option value="EURUSD">Loading API markets…</option></select><div class="tiny" id="plPairCount">Loading Biquote symbol catalogue…</div></div>
+<div><label class="tiny" for="plWatchTf">WATCH CHART</label><select id="plWatchTf" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:11px"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
 </div>
 <div class="chart" style="height:205px;margin-top:10px"><svg id="plMarketChart" viewBox="0 0 360 205" preserveAspectRatio="none" role="img" aria-label="Pulse-Lock live market candles"><text x="180" y="90" text-anchor="middle" fill="#FFD166" font-size="11">WAIT · NO PULSE-LOCK FEED</text><text x="180" y="110" text-anchor="middle" fill="#6D80A0" font-size="9">Awaiting dedicated market bridge</text></svg></div>
 <div class="tiny" id="plMarketUpdated">Last update: not received</div>
@@ -92,7 +92,7 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
 <div><label class="tiny" for="plTfHigh">HIGHER</label><select id="plTfHigh" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px"><option>4h</option><option>1d</option><option>1h</option><option>30m</option></select></div>
 <div><label class="tiny" for="plTfMiddle">SETUP</label><select id="plTfMiddle" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px"><option>15m</option><option>5m</option><option>30m</option><option>1h</option></select></div>
-<div><label class="tiny" for="plTfEntry">ENTRY</label><select id="plTfEntry" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px"><option>1m</option><option>30s</option><option>2m</option><option>5m</option></select></div>
+<div><label class="tiny" for="plTfEntry">ENTRY</label><select id="plTfEntry" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px"><option>1m</option><option>5m</option><option>15m</option></select></div>
 </div>
 <div class="settingrow"><div><b>Auto-refresh request</b><span>Every 5 seconds while Pulse-Lock is open</span></div><input id="plAutoRefresh" type="checkbox" style="width:20px;height:20px;accent-color:var(--red)"></div>
 <div class="btnrow"><button class="btn primary" id="plMarketRefresh">REFRESH PULSE-LOCK FEED</button><button class="btn" id="plMarketStop">STOP AUTO-REFRESH</button></div>
@@ -340,33 +340,87 @@ function $pl(id){return document.getElementById(id)}
 function plCfg(){return {profile:($pl('plProfile')||{}).value||'B',target:Math.max(1,Math.min(10000,parseInt($pl('plTarget').value||'10',10))),maxDuration:parseInt($pl('plMaxDuration').value||'300',10),requireMtf:!!$pl('plRequireMtf').checked,rejectStale:true}}
 function plMarketPrefs(){return {pair:$pl('plPair').value||'EURUSD',watchTf:$pl('plWatchTf').value||'1m',high:$pl('plTfHigh').value||'4h',middle:$pl('plTfMiddle').value||'15m',entry:$pl('plTfEntry').value||'1m',auto:!!$pl('plAutoRefresh').checked}}
 function plMarketSave(){try{localStorage.setItem('diabloPulseLockMarketV1',JSON.stringify(plMarketPrefs()))}catch(e){}}
+const PL_API='https://biquote.io/api';
+const PL_TFS=['1m','5m','15m','30m','1h','4h','1d'];
+let plSymbols=[],plBars=[],plRequest=0,plAutoTimer=null,plSearchTimer=null;
+function plEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function plMarketStatus(s){if($pl('plMarketStatus'))$pl('plMarketStatus').textContent=s}
 function plMarketRender(){
- let d={};try{if(typeof safeData==='function')d=safeData()}catch(e){}
- let payload=d.pulseLockMarket||null,has=!!(payload&&Array.isArray(payload.candles)&&payload.candles.length>=5);
- let status=$pl('plMarketStatus'),chart=$pl('plMarketChart');
- if(status)status.textContent=has?'PULSE-LOCK OHLC RECEIVED':'WAIT · FEED NOT CONNECTED';
- if(!has){if(chart)chart.innerHTML='<text x="180" y="90" text-anchor="middle" fill="#FFD166" font-size="11">WAIT · NO PULSE-LOCK FEED</text><text x="180" y="110" text-anchor="middle" fill="#6D80A0" font-size="9">Dedicated pulseLockMarket payload required</text>'; $pl('plMarketUpdated').textContent='Last update: not received';$pl('plBridgeNote').textContent=(window.DiabloAndroid&&typeof DiabloAndroid.refreshPulseLockMarket==='function')?'Pulse-Lock bridge exists; waiting for valid candles.':'Native Pulse-Lock market-data bridge is not exposed by this APK build. Selectors are saved locally; refresh cannot fetch candles yet.';$pl('plTfWorkflow').innerHTML=['01 · HIGHER TREND — WAIT · NO '+plMarketPrefs().high+' CANDLES','02 · SETUP CONFIRMATION — WAIT · NO '+plMarketPrefs().middle+' CANDLES','03 · ENTRY TRIGGER — WAIT · NO '+plMarketPrefs().entry+' CANDLES','04 · ENTRY / SL / TP — WAIT · VALID SETUP REQUIRED'].map(x=>'<p>'+x+'</p>').join('');return}
- let bars=payload.candles.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>Number.isFinite(Number(v))));if(bars.length<5)return;
+ let bars=plBars.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>Number.isFinite(Number(v))));
+ let chart=$pl('plMarketChart'),p=plMarketPrefs();
+ if(!bars.length){if(chart)chart.innerHTML='<text x="180" y="90" text-anchor="middle" fill="#FFD166" font-size="11">WAIT · NO CANDLES RECEIVED</text><text x="180" y="110" text-anchor="middle" fill="#6D80A0" font-size="9">Refresh to fetch real Biquote OHLC</text>';return}
  let lo=Math.min.apply(null,bars.map(b=>+b.low)),hi=Math.max.apply(null,bars.map(b=>+b.high)),span=hi-lo||Math.abs(hi)*.001||1;
- function y(v){return 12+(hi-v)/span*175}let step=344/bars.length,out='';
- bars.forEach((b,i)=>{let x=8+i*step+step/2,col=+b.close>=+b.open?'#00FF7A':'#FF0A1F';out+='<line x1="'+x+'" y1="'+y(+b.high)+'" x2="'+x+'" y2="'+y(+b.low)+'" stroke="'+col+'"/><rect x="'+(x-step*.25)+'" y="'+Math.min(y(+b.open),y(+b.close))+'" width="'+Math.max(1,step*.5)+'" height="'+Math.max(1,Math.abs(y(+b.close)-y(+b.open)))+'" fill="'+col+'"/>'});
- if(chart)chart.innerHTML=out;$pl('plMarketUpdated').textContent='Last update: '+(payload.updatedAt||'timestamp not supplied')+' · '+bars.length+' valid candles';
- $pl('plBridgeNote').textContent='Dedicated Pulse-Lock candle payload received. Multi-timeframe analysis is still separately required before a signal can be verified.';
- let t=payload.timeframes||{},p=plMarketPrefs();$pl('plTfWorkflow').innerHTML=[
- '01 · HIGHER TREND ('+p.high+') — '+(t[p.high]&&t[p.high].trend||'WAIT · NOT REPORTED'),
- '02 · SETUP CONFIRMATION ('+p.middle+') — '+(t[p.middle]&&t[p.middle].trend||'WAIT · NOT REPORTED'),
- '03 · ENTRY TRIGGER ('+p.entry+') — '+(t[p.entry]&&t[p.entry].trigger||'WAIT · NOT REPORTED'),
- '04 · ENTRY / SL / TP — '+(payload.entry&&payload.stopLoss&&payload.takeProfit?'LEVELS PROVIDED BY ANALYZER':'WAIT · VALID LEVELS NOT PROVIDED')
- ].map(x=>'<p>'+x+'</p>').join('');
+ function y(v){return 10+(hi-v)/span*178}
+ let step=344/bars.length,out='';
+ bars.forEach(function(b,i){let x=8+i*step+step/2,col=+b.close>=+b.open?'#00FF7A':'#FF0A1F';out+='<line x1="'+x.toFixed(2)+'" y1="'+y(+b.high).toFixed(2)+'" x2="'+x.toFixed(2)+'" y2="'+y(+b.low).toFixed(2)+'" stroke="'+col+'" stroke-width="1.2"/><rect x="'+(x-step*.28).toFixed(2)+'" y="'+Math.min(y(+b.open),y(+b.close)).toFixed(2)+'" width="'+Math.max(1,step*.56).toFixed(2)+'" height="'+Math.max(1,Math.abs(y(+b.close)-y(+b.open))).toFixed(2)+'" fill="'+col+'"/>'});
+ if(chart)chart.innerHTML=out;
+ let first=bars[0],last=bars[bars.length-1];
+ $pl('plMarketUpdated').textContent='Updated '+new Date().toLocaleTimeString()+' · '+p.pair+' · '+p.watchTf+' · '+bars.length+' bars'+(first.openTime?' · newest '+first.openTime:'');
+ $pl('plBridgeNote').textContent='LIVE API DATA RECEIVED from Biquote public OHLC endpoint. This confirms the selected market feed only; it does not claim Pulse-Lock inference or a trade setup is verified.';
 }
-function plMarketInit(){let p={};try{p=JSON.parse(localStorage.getItem('diabloPulseLockMarketV1')||'{}')}catch(e){}
- ['plPair','plWatchTf','plTfHigh','plTfMiddle','plTfEntry'].forEach((id,i)=>{if(p[['pair','watchTf','high','middle','entry'][i]&&$pl(id))$pl(id).value=p[['pair','watchTf','high','middle','entry'][i]]});
+async function plLoadSymbols(){
+ let select=$pl('plPair'),note=$pl('plPairCount');
+ try{
+  if(note)note.textContent='Loading available Biquote markets…';
+  let res=await fetch(PL_API+'/symbols?quotedWithinDays=7',{headers:{Accept:'application/json'},cache:'no-store'});
+  if(!res.ok)throw new Error('Symbol catalogue HTTP '+res.status);
+  let data=await res.json(),items=Array.isArray(data)?data:(data.symbols||data.items||data.data||[]);
+  plSymbols=items.map(function(x){if(typeof x==='string')return {name:x,description:''};return {name:String(x.name||x.symbol||x.ticker||x.instrument||'').trim(),description:String(x.description||x.displayName||x.type||'').trim(),type:String(x.type||'').trim()}}).filter(x=>x.name);
+  let unique={};plSymbols=plSymbols.filter(x=>{let k=x.name.toUpperCase();if(unique[k])return false;unique[k]=true;return true}).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!plSymbols.length)throw new Error('API returned no readable symbols');
+  plRenderSymbolOptions($pl('plPairSearch')?$pl('plPairSearch').value:'');
+  if(note)note.textContent=plSymbols.length+' API markets available · Biquote public catalogue';
+  $pl('plBridgeNote').textContent='Biquote symbol catalogue connected. Select any listed API instrument; candles are fetched for that exact symbol.';
+ }catch(e){if(note)note.textContent='Catalogue unavailable · tap refresh to retry';plMarketStatus('WAIT · SYMBOL API ERROR');$pl('plBridgeNote').textContent='Could not load Biquote symbols: '+(e&&e.message?e.message:'network error')+'. No hard-coded market list is being treated as the API catalogue.'}
+}
+function plRenderSymbolOptions(query){
+ let sel=$pl('plPair');if(!sel)return;
+ let q=String(query||'').trim().toLowerCase(),current=sel.value||plMarketPrefs().pair||'EURUSD';
+ let filtered=plSymbols.filter(x=>!q||(x.name+' '+x.description+' '+x.type).toLowerCase().includes(q));
+ sel.innerHTML='';
+ if(!filtered.length){sel.innerHTML='<option value="">No matching API markets</option>';return}
+ filtered.forEach(x=>{let op=document.createElement('option');op.value=x.name;op.textContent=x.name+(x.description&&x.description.toUpperCase()!==x.name.toUpperCase()?' — '+x.description:'');sel.appendChild(op)});
+ if(filtered.some(x=>x.name===current))sel.value=current;
+ else if(filtered.some(x=>x.name==='EURUSD')&&!q)sel.value='EURUSD';
+ else sel.selectedIndex=0;
+}
+async function plFetchCandles(){
+ let p=plMarketPrefs(),token=++plRequest;
+ if(!p.pair){plMarketStatus('WAIT · SELECT A VALID MARKET');return}
+ if(!PL_TFS.includes(p.watchTf)){p.watchTf='1m';if($pl('plWatchTf'))$pl('plWatchTf').value='1m';plMarketSave()}
+ plMarketStatus('CONNECTING · '+p.pair+' '+p.watchTf);
+ $pl('plBridgeNote').textContent='Requesting live OHLC candles from Biquote public API…';
+ try{
+  let url=PL_API+'/'+encodeURIComponent(p.pair)+'/ohlc?interval='+encodeURIComponent(p.watchTf)+'&limit=100';
+  let res=await fetch(url,{headers:{Accept:'application/json'},cache:'no-store'});
+  let data=await res.json();
+  if(!res.ok)throw new Error((data&&data.message)||('OHLC HTTP '+res.status));
+  let bars=Array.isArray(data)?data:(data.bars||data.candles||data.items||[]);
+  bars=bars.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>Number.isFinite(Number(v))));
+  if(token!==plRequest)return;
+  if(!bars.length)throw new Error('API returned no valid OHLC bars for '+p.pair);
+  plBars=bars;plMarketStatus('CONNECTED · '+p.pair+' · '+bars.length+' BARS');
+  plMarketRender();
+  let t=plMarketPrefs();
+  $pl('plTfWorkflow').innerHTML=[
+   '01 · HIGHER TREND ('+plEsc(t.high)+') — WAIT · CANDLES NOT YET ANALYSED',
+   '02 · SETUP CONFIRMATION ('+plEsc(t.middle)+') — WAIT · CANDLES NOT YET ANALYSED',
+   '03 · ENTRY TRIGGER ('+plEsc(t.entry)+') — WAIT · CANDLES NOT YET ANALYSED',
+   '04 · ENTRY / SL / TP — WAIT · NO VERIFIED PULSE-LOCK ANALYSIS'
+  ].map(x=>'<p>'+x+'</p>').join('');
+ }catch(e){if(token!==plRequest)return;plBars=[];plMarketStatus('WAIT · API REQUEST FAILED');plMarketRender();$pl('plBridgeNote').textContent='Biquote feed request failed: '+(e&&e.message?e.message:'network error')+'. Check connection, market availability and selected symbol.'}
+}
+function plMarketInit(){
+ let p={};try{p=JSON.parse(localStorage.getItem('diabloPulseLockMarketV1')||'{}')}catch(e){}
+ ['plWatchTf','plTfHigh','plTfMiddle','plTfEntry'].forEach(function(id,i){let key=['watchTf','high','middle','entry'][i],el=$pl(id);if(el&&p[key]&&Array.from(el.options).some(o=>o.value===p[key]||o.text===p[key]))el.value=p[key]});
  if($pl('plAutoRefresh'))$pl('plAutoRefresh').checked=!!p.auto;
- ['plPair','plWatchTf','plTfHigh','plTfMiddle','plTfEntry','plAutoRefresh'].forEach(id=>{if($pl(id))$pl(id).addEventListener('change',function(){plMarketSave();plMarketRender()})});
- if($pl('plMarketRefresh'))$pl('plMarketRefresh').addEventListener('click',function(){plMarketSave();try{if(window.DiabloAndroid&&typeof DiabloAndroid.refreshPulseLockMarket==='function'){DiabloAndroid.refreshPulseLockMarket(JSON.stringify(plMarketPrefs()));$pl('plBridgeNote').textContent='Refresh request sent to Pulse-Lock native bridge; waiting for response.'}else{$pl('plBridgeNote').textContent='Cannot refresh: this APK does not expose refreshPulseLockMarket. No Kronos action was called.'}}catch(e){$pl('plBridgeNote').textContent='Pulse-Lock refresh failed: '+e.message}plMarketRender()});
- if($pl('plMarketStop'))$pl('plMarketStop').addEventListener('click',function(){if($pl('plAutoRefresh'))$pl('plAutoRefresh').checked=false;plMarketSave();if(window.plMarketTimer){clearInterval(window.plMarketTimer);window.plMarketTimer=null} $pl('plBridgeNote').textContent='Pulse-Lock auto-refresh stopped.'});
- if(p.auto){window.plMarketTimer=setInterval(function(){if(document.getElementById('pulseLock')&&document.getElementById('pulseLock').classList.contains('active')){try{if(window.DiabloAndroid&&typeof DiabloAndroid.refreshPulseLockMarket==='function')DiabloAndroid.refreshPulseLockMarket(JSON.stringify(plMarketPrefs()))}catch(e){}plMarketRender()}},5000)}
- plMarketRender();
+ ['plWatchTf','plTfHigh','plTfMiddle','plTfEntry'].forEach(function(id){if($pl(id))$pl(id).addEventListener('change',function(){plMarketSave();if(id==='plWatchTf')plFetchCandles();else plMarketRender()})});
+ if($pl('plPair'))$pl('plPair').addEventListener('change',function(){plMarketSave();plFetchCandles()});
+ if($pl('plPairSearch'))$pl('plPairSearch').addEventListener('input',function(){clearTimeout(plSearchTimer);plSearchTimer=setTimeout(function(){let old=$pl('plPair').value;plRenderSymbolOptions($pl('plPairSearch').value);if($pl('plPair').value!==old){plMarketSave();plFetchCandles()}},120)});
+ if($pl('plMarketRefresh'))$pl('plMarketRefresh').addEventListener('click',function(){plMarketSave();plLoadSymbols().then(plFetchCandles)});
+ if($pl('plMarketStop'))$pl('plMarketStop').addEventListener('click',function(){if($pl('plAutoRefresh'))$pl('plAutoRefresh').checked=false;plMarketSave();if(plAutoTimer){clearInterval(plAutoTimer);plAutoTimer=null}if(window.plMarketTimer){clearInterval(window.plMarketTimer);window.plMarketTimer=null}$pl('plBridgeNote').textContent='Pulse-Lock auto-refresh stopped.'});
+ if($pl('plAutoRefresh'))$pl('plAutoRefresh').addEventListener('change',function(){plMarketSave();if(plAutoTimer){clearInterval(plAutoTimer);plAutoTimer=null}if(this.checked)plAutoTimer=setInterval(function(){if($pl('pulseLock')&&$pl('pulseLock').classList.contains('active'))plFetchCandles()},5000)});
+ plLoadSymbols().then(function(){let saved=p.pair||'EURUSD';if(plSymbols.some(x=>x.name===saved)){$pl('plPair').value=saved}else if(plSymbols.some(x=>x.name==='EURUSD')){$pl('plPair').value='EURUSD'}plMarketSave();plFetchCandles()});
 }
 function plLoad(){let c={profile:'B',target:10,maxDuration:300,requireMtf:true};try{if(window.DiabloAndroid&&typeof DiabloAndroid.getPulseLockSettings==='function')c=Object.assign(c,JSON.parse(DiabloAndroid.getPulseLockSettings()||'{}'));else c=Object.assign(c,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){try{c=Object.assign(c,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(ignored){}};$pl('plTarget').value=c.target;$pl('plMaxDuration').value=String(c.maxDuration);$pl('plRequireMtf').checked=!!c.requireMtf;window.plProfileValue=c.profile;plPaintProfile();$pl('plTargetRead').textContent=c.target+' pips / '+plDuration(c.maxDuration);$pl('plProfileRead').textContent=c.profile+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[c.profile]||'BALANCED');}
 function plDuration(s){return s<60?s+'s':s%3600===0?(s/3600)+'h':s%60===0?(s/60)+'m':s+'s'}
