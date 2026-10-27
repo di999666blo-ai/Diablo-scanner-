@@ -355,7 +355,7 @@ function plMarketRender(){
  bars.forEach(function(b,i){let x=8+i*step+step/2,col=+b.close>=+b.open?'#00FF7A':'#FF0A1F';out+='<line x1="'+x.toFixed(2)+'" y1="'+y(+b.high).toFixed(2)+'" x2="'+x.toFixed(2)+'" y2="'+y(+b.low).toFixed(2)+'" stroke="'+col+'" stroke-width="1.2"/><rect x="'+(x-step*.28).toFixed(2)+'" y="'+Math.min(y(+b.open),y(+b.close)).toFixed(2)+'" width="'+Math.max(1,step*.56).toFixed(2)+'" height="'+Math.max(1,Math.abs(y(+b.close)-y(+b.open))).toFixed(2)+'" fill="'+col+'"/>'});
  if(chart)chart.innerHTML=out;
  let first=bars[0],last=bars[bars.length-1];
- $pl('plMarketUpdated').textContent='Updated '+new Date().toLocaleTimeString()+' · '+p.pair+' · '+p.watchTf+' · '+bars.length+' bars'+(first.openTime?' · newest '+first.openTime:'');
+ $pl('plMarketUpdated').textContent='Updated '+new Date().toLocaleTimeString()+' · '+p.pair+' · '+p.watchTf+' · '+bars.length+' bars'+(last.openTime?' · newest '+last.openTime:'');
  $pl('plBridgeNote').textContent='LIVE API DATA RECEIVED from Biquote public OHLC endpoint. This confirms the selected market feed only; it does not claim Pulse-Lock inference or a trade setup is verified.';
 }
 async function plLoadSymbols(){
@@ -399,7 +399,7 @@ async function plFetchCandles(){
   bars=bars.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>Number.isFinite(Number(v))));
   if(token!==plRequest)return;
   if(!bars.length)throw new Error('API returned no valid OHLC bars for '+p.pair);
-  plBars=bars;plMarketStatus('CONNECTED · '+p.pair+' · '+bars.length+' BARS');
+  plBars=bars.slice().reverse();plMarketStatus('CONNECTED · '+p.pair+' · '+bars.length+' BARS');
   plMarketRender();
   let t=plMarketPrefs();
   $pl('plTfWorkflow').innerHTML=[
@@ -420,7 +420,7 @@ function plMarketInit(){
  if($pl('plMarketRefresh'))$pl('plMarketRefresh').addEventListener('click',function(){plMarketSave();plLoadSymbols().then(plFetchCandles)});
  if($pl('plMarketStop'))$pl('plMarketStop').addEventListener('click',function(){if($pl('plAutoRefresh'))$pl('plAutoRefresh').checked=false;plMarketSave();if(plAutoTimer){clearInterval(plAutoTimer);plAutoTimer=null}if(window.plMarketTimer){clearInterval(window.plMarketTimer);window.plMarketTimer=null}$pl('plBridgeNote').textContent='Pulse-Lock auto-refresh stopped.'});
  if($pl('plAutoRefresh'))$pl('plAutoRefresh').addEventListener('change',function(){plMarketSave();if(plAutoTimer){clearInterval(plAutoTimer);plAutoTimer=null}if(this.checked)plAutoTimer=setInterval(function(){if($pl('pulseLock')&&$pl('pulseLock').classList.contains('active'))plFetchCandles()},5000)});
- plLoadSymbols().then(function(){let saved=p.pair||'EURUSD';if(plSymbols.some(x=>x.name===saved)){$pl('plPair').value=saved}else if(plSymbols.some(x=>x.name==='EURUSD')){$pl('plPair').value='EURUSD'}plMarketSave();plFetchCandles()});
+ plLoadSymbols().then(function(){let saved=p.pair||'EURUSD';if(plSymbols.some(x=>x.name===saved)){$pl('plPair').value=saved}else if(plSymbols.some(x=>x.name==='EURUSD')){$pl('plPair').value='EURUSD'}plMarketSave();plFetchCandles();if($pl('plAutoRefresh')&&$pl('plAutoRefresh').checked&&!plAutoTimer)plAutoTimer=setInterval(function(){if($pl('pulseLock')&&$pl('pulseLock').classList.contains('active'))plFetchCandles()},5000)});
 }
 function plLoad(){let c={profile:'B',target:10,maxDuration:300,requireMtf:true};try{if(window.DiabloAndroid&&typeof DiabloAndroid.getPulseLockSettings==='function')c=Object.assign(c,JSON.parse(DiabloAndroid.getPulseLockSettings()||'{}'));else c=Object.assign(c,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){try{c=Object.assign(c,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(ignored){}};$pl('plTarget').value=c.target;$pl('plMaxDuration').value=String(c.maxDuration);$pl('plRequireMtf').checked=!!c.requireMtf;window.plProfileValue=c.profile;plPaintProfile();$pl('plTargetRead').textContent=c.target+' pips / '+plDuration(c.maxDuration);$pl('plProfileRead').textContent=c.profile+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[c.profile]||'BALANCED');}
 function plDuration(s){return s<60?s+'s':s%3600===0?(s/3600)+'h':s%60===0?(s/60)+'m':s+'s'}
