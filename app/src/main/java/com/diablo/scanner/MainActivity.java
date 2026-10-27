@@ -1539,9 +1539,13 @@ public class MainActivity extends Activity {
         if (!path.trim().isEmpty()) {
             try { new File(path).delete(); } catch (Exception ignored) { }
         }
+        // Clearing is allowed even while inference is running. The worker's completion
+        // callback checks the selected path before publishing any result.
         prefs.edit().remove("saved_chart_path").remove("saved_chart_preview_data")
-                .putString("scan_status", "READY")
-                .putString("scan_message", "Saved chart cleared. Choose another image when ready.")
+                .putString("scan_status", "SAVED_IMAGE_MISSING")
+                .putString("scan_message", "WAIT · image removed during/after scanning. Upload a screenshot again to interpret it.")
+                .putString("latest_ai_signal", "WAIT")
+                .putString("latest_ai_details", "IMAGE MISSING — screenshot was removed. WAIT. Upload an image again to interpret it.")
                 .apply();
         refreshDashboardWebView();
         Toast.makeText(this, "Saved chart cleared.", Toast.LENGTH_SHORT).show();
@@ -1612,8 +1616,8 @@ public class MainActivity extends Activity {
         signalText.setTextColor(Color.CYAN);
         statusText.setText("Preparing " +
                 (scalpingMode ? "Scalping Setup" : "Timed Signal") + " analysis...");
-        // Explicit state prevents the dashboard from mistaking an unfinished workflow
-        // for a completed signal. The selected preview is cleared only after analysis ends.
+        // Keep the selected preview until the user explicitly clears it. CLEAR IMAGE
+        // remains enabled during inference; completion validates that this image still exists.
         prefs.edit().putString("scan_status", "SAVED_ANALYZING")
                 .putString("scan_message", "Saved chart analysis is running. Required checks are being evaluated.")
                 .apply();
@@ -1641,29 +1645,18 @@ public class MainActivity extends Activity {
                 savedProgressHandler.postDelayed(this, 700L);
             }
         };
-        prefs.edit().putString("scan_message", "Preparing shared SmolVLM vision analysis for " +
+        prefs.edit().putString("scan_message", "Preparing image-only on-device analysis for " +
                 (scalpingMode ? "Scalping Setup" : "Timed Signal") + "...").apply();
         savedProgressHandler.post(savedProgressUpdater);
         final long savedScanStartedAt = System.currentTimeMillis();
         new Thread(() -> {
             LocalVisionAI.Result result;
             try {
-                // Keep saved-chart routing identical to live scanning.
+                // Saved screenshots are image-only. Kronos/BigQuote belongs to its
+                // separate live-market dashboard and must never substitute market candles
+                // for the screenshot currently being interpreted.
                 if (scalpingMode) {
-                    String selectedEngine = prefs.getString("scalping_engine", "SMOLVLM");
-                    if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                        try {
-                            JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
-                            result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
-                        } catch (Exception feedError) {
-                            result = new LocalVisionAI.Result("WAIT", "KRONOS LOCAL MARKET FEED ERROR: "
-                                    + feedError.getClass().getSimpleName() + " — "
-                                    + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
-                                    + ". No hosted service or substitute model was used.");
-                        }
-                    } else {
-                        result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
-                    }
+                    result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                 } else {
                     result = ChartAnalyzer.analyze(getApplicationContext(), analysisBitmap);
                     if (prefs.getBoolean("timed_smolvlm_enabled", false) && result != null) {
@@ -1688,6 +1681,25 @@ public class MainActivity extends Activity {
                 int colour = "UP".equals(direction) ? Color.rgb(50,220,120) :
                         "DOWN".equals(direction) ? red : Color.YELLOW;
                 String details = finalResult == null ? "No result returned." : finalResult.details;
+                // If the user pressed CLEAR IMAGE while the worker was running, discard
+                // its stale answer. Never publish a signal for an image that is no longer selected.
+                String selectedPath = prefs.getString("saved_chart_path", "");
+                String selectedPreview = prefs.getString("saved_chart_preview_data", "");
+                boolean imageStillSelected = !selectedPath.trim().isEmpty()
+                        && new File(selectedPath).isFile() && !selectedPreview.trim().isEmpty();
+                if (!imageStillSelected) {
+                    String missing = "IMAGE MISSING — screenshot was removed during scanning. WAIT. Upload an image again to interpret it.";
+                    signalText.setText("WAIT");
+                    signalText.setTextColor(Color.YELLOW);
+                    statusText.setText(missing);
+                    prefs.edit().putString("scan_status", "SAVED_IMAGE_MISSING")
+                            .putString("scan_message", "WAIT · image removed during scanning. Upload a screenshot again to interpret it.")
+                            .putString("latest_ai_signal", "WAIT")
+                            .putString("latest_ai_details", missing)
+                            .apply();
+                    refreshDashboardWebView();
+                    return;
+                }
                 int confidence = 0;
                 if (details != null) {
                     java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("CONFIDENCE:\\s*(\\d+)").matcher(details);
@@ -1695,23 +1707,18 @@ public class MainActivity extends Activity {
                 }
                 signalText.setText(display);
                 signalText.setTextColor(colour);
-                statusText.setText((scalpingMode ? "SAVED CHART • SMOLVLM AI SCALPING\n" : "SAVED CHART • SMOLVLM AI TIMED SIGNAL\n") + (details == null ? "" : details));
+                statusText.setText((scalpingMode ? "SAVED SCREENSHOT • LOCAL IMAGE ANALYSIS\n" : "SAVED SCREENSHOT • TIMED IMAGE ANALYSIS\n") + (details == null ? "" : details));
                 boolean analysisError = details != null && (
                         details.toUpperCase(Locale.ROOT).contains("ANALYSIS FAILED")
-                        || details.toUpperCase(Locale.ROOT).contains("MARKET FEED ERROR")
                         || details.toUpperCase(Locale.ROOT).contains("MODEL ERROR"));
                 // A saved screenshot is static: it cannot prove candle closure.
-                // ChartAnalyzer enforces WAIT in candle-close mode; never override that here.
+                // Keep both the selected image and its preview until explicit CLEAR IMAGE.
                 String finalStatus = analysisError ? "SAVED_ERROR" : "SAVED_READY";
-                String selectedPath = prefs.getString("saved_chart_path", "");
-                if (!selectedPath.trim().isEmpty()) {
-                    try { new File(selectedPath).delete(); } catch (Exception ignored) { }
-                }
-                prefs.edit().remove("saved_chart_path").remove("saved_chart_preview_data")
+                prefs.edit()
                         .putString("scan_status", finalStatus)
                         .putString("scan_message", analysisError
-                                ? "Saved chart analysis ended with an error. Preview cleared; original gallery image is untouched."
-                                : "SCAN COMPLETE. Preview cleared; original gallery image is untouched.")
+                                ? "Screenshot analysis ended with an error. Image retained; tap CLEAR IMAGE or upload another."
+                                : "SCAN COMPLETE. Screenshot retained until you tap CLEAR IMAGE or choose another image.")
                         .apply();
                 saveHistory(display, confidence, 0, 0, scalpingMode ? "SAVED_AI" : "SAVED_TIMED");
                 publishSavedChartResult(display, details, confidence);
