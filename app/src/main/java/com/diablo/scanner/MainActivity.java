@@ -2208,55 +2208,13 @@ public class MainActivity extends Activity {
     }
 
     private void runKronosForecast() {
-        prefs.edit().putString("scalping_engine", "KRONOS")
-                .putString("kronos_status", "FETCHING DATA")
-                .putString("kronos_feed_note", "Fetching completed BigQuote candles on this phone; the independent local Kronos runtime is checked next. No hosted inference service is used.")
-                .apply();
-        refreshDashboardWebView();
-        new Thread(() -> {
-            LocalVisionAI.Result result;
-            try {
-                // Fetch genuine BigQuote candles first so the dashboard can render the actual
-                // market data even when the independent Kronos inference runtime returns WAIT.
-                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
-                prefs.edit().putString("kronos_chart_candles", candleInput.toString())
-                        .putString("kronos_chart_updated_at", java.time.Instant.now().toString())
-                        .putString("kronos_candles_json", candleInput.toString())
-                        .putString("kronos_status", "LOCAL INFERENCE RUNNING")
-                        .putString("kronos_feed_note", "BigQuote candles loaded and chart updated. Validating input and running the separate on-device Kronos inference now; no hosted inference or fallback engine.")
-                        .apply();
-                runOnUiThread(this::refreshDashboardWebView);
-                // The phone-only Kronos engine must never silently route inference to a host.
-                // BigQuote supplies market data; only the dedicated local runtime may forecast.
-                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
-            } catch (Exception feedError) {
-                result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
-                        + feedError.getClass().getSimpleName() + " — "
-                        + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
-                        + ". No fallback engine was used.");
-            }
-            String signal = result == null || result.signal == null ? "WAIT" : result.signal.trim().toUpperCase(Locale.ROOT);
-            if (!("UP".equals(signal) || "DOWN".equals(signal))) signal = "WAIT";
-            String details = result == null || result.details == null ? "No Kronos result returned." : result.details;
-            final String finalSignal = signal;
-            final String finalDetails = details;
-            runOnUiThread(() -> {
-                prefs.edit()
-                        .putString("kronos_latest_signal", finalSignal)
-                        .putString("kronos_latest_details", finalDetails)
-                        .putString("kronos_status", "UP".equals(finalSignal) || "DOWN".equals(finalSignal) ? "FORECAST READY" : "WAIT / CHECK FEED")
-                        .putString("kronos_feed_note", finalDetails)
-                        .putString("latest_ai_signal", finalSignal)
-                        .putString("latest_ai_details", finalDetails)
-                        .putString("scan_status", "KRONOS " + finalSignal)
-                        .putString("scan_message", finalDetails)
-                        .apply();
-                saveHistory(finalSignal, 0, 0, 0, "KRONOS_MARKET_FORECAST");
-                refreshLatestResult();
-                refreshDashboardWebView();
-                Toast.makeText(this, "Kronos forecast finished: " + finalSignal, Toast.LENGTH_LONG).show();
-            });
-        }).start();
+        // The dashboard's final Kronos result must come from the full independent
+        // higher / middle / entry timeframe workflow, never a single-view forecast.
+        // Starting this workflow immediately resets the displayed signal to WAIT;
+        // it can only become UP/DOWN after all three local forecasts and the
+        // separate technical entry validation agree inside runKronosMonitorCycle().
+        prefs.edit().putString("scalping_engine", "KRONOS").apply();
+        startKronosContinuousMonitor();
     }
     private void showScalpingEngineSettings() {
         final String[] engineValues = {"SMOLVLM", "KRONOS", "HYBRID"};
