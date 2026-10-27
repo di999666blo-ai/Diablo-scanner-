@@ -276,14 +276,14 @@ function updateSavedChartPreview(d){
    if(badge)badge.textContent=running?'ANALYZING IMAGE':done?'SCAN COMPLETE':'IMAGE READY · NOT STARTED';
  }else{
    stage.classList.remove('scanning');
-   stage.innerHTML=done?'<div class="empty" style="padding:26px 12px;text-align:center"><strong style="color:'+(failed?'#FF5B68':'#00FF7A')+'">'+(failed?'✕ ANALYSIS ERROR':'✓ CHART COMPLETE')+'</strong><br>Analysis finished. Choose another image when ready.</div>':'<div class="empty" id="savedChartPlaceholder">Choose an image from storage. The image stays here until you press START ANALYSIS.</div>';
+   stage.innerHTML=status==='SAVED_IMAGE_MISSING'?'<div class="empty" style="padding:26px 12px;text-align:center"><strong style="color:#FFD166">WAIT · IMAGE MISSING</strong><br>Upload a screenshot again to interpret it.</div>':done?'<div class="empty" style="padding:26px 12px;text-align:center"><strong style="color:'+(failed?'#FF5B68':'#00FF7A')+'">'+(failed?'✕ ANALYSIS ERROR':'✓ CHART COMPLETE')+'</strong><br>Screenshot retained until you clear it or choose another.</div>':'<div class="empty" id="savedChartPlaceholder">Choose an image from storage. The image stays here until you press START ANALYSIS.</div>';
    if(badge)badge.textContent=done?(failed?'ANALYSIS ERROR':'CHART COMPLETE'):'NO IMAGE';
  }
  var startBtn=document.querySelector("button[onclick=\"act('start_saved_chart_scan')\"]");
  if(startBtn){startBtn.disabled=!preview||running;startBtn.style.opacity=startBtn.disabled?'.45':'1';}
  var clearBtn=document.querySelector("button[onclick=\"act('clear_saved_chart')\"]");
- if(clearBtn){clearBtn.disabled=!preview||running;clearBtn.style.opacity=clearBtn.disabled?'.45':'1';}
- if(progress)progress.textContent=running?(message||'Analyzer is working on the selected image…'):done?(message||'Scan finished. Preview cleared; original gallery image untouched.'):'Waiting for a saved chart image.';
+ if(clearBtn){clearBtn.disabled=!preview;clearBtn.style.opacity=clearBtn.disabled?'.45':'1';}
+ if(progress)progress.textContent=running?(message||'Analyzer is working on the selected image…'):status==='SAVED_IMAGE_MISSING'?(message||'WAIT · Image missing. Upload again to interpret it.'):done?(message||'Scan finished. Screenshot retained until you clear it.'):'Waiting for a saved chart image.';
  if(findings)findings.textContent=dt|| (done?'No detailed findings were returned.':'Findings will appear when analysis finishes.');
  if(pipe){
    var has=function(re){return re.test(dt)};
