@@ -482,7 +482,44 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getSignalNotificationSettings() {
+            JSONObject settings = new JSONObject();
+            try {
+                settings.put("pulseLock", prefs.getBoolean("notify_pulse_lock", true));
+                settings.put("kronos", prefs.getBoolean("notify_kronos", true));
+                settings.put("guidedScalping", prefs.getBoolean("notify_guided_scalping", true));
+            } catch (Exception ignored) { }
+            return settings.toString();
+        }
+
+        @JavascriptInterface
+        public void saveSignalNotificationSettings(String json) {
+            if (json == null || json.length() > 2000) return;
+            try {
+                JSONObject settings = new JSONObject(json);
+                prefs.edit()
+                        .putBoolean("notify_pulse_lock", settings.optBoolean("pulseLock", true))
+                        .putBoolean("notify_kronos", settings.optBoolean("kronos", true))
+                        .putBoolean("notify_guided_scalping", settings.optBoolean("guidedScalping", true))
+                        .apply();
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                        "Signal notification preferences saved.", Toast.LENGTH_SHORT).show());
+            } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public void openSignalNotificationPermission() {
+            runOnUiThread(() -> openSignalNotificationPermissionSettings());
+        }
+
+        @JavascriptInterface
+        public void testSignalNotification(String source) {
+            runOnUiThread(() -> sendSignalNotificationTest(source));
+        }
+
+        @JavascriptInterface
         public void notifyPulseLockSignal(String json) {
+            if (!prefs.getBoolean("notify_pulse_lock", true)) return;
             if (json == null || json.length() > 4000) return;
             try {
                 JSONObject signal = new JSONObject(json);
@@ -2480,6 +2517,7 @@ public class MainActivity extends Activity {
     private void notifyKronosSignalReady(String symbol, String direction, KronosMonitor.Snapshot snapshot,
                                          String higherTf, String middleTf, String entryTf) {
         if (snapshot == null || !snapshot.validSetup) return;
+        if (!prefs.getBoolean("notify_kronos", true)) return;
         long now = System.currentTimeMillis();
         String directionKey = symbol + "|" + direction + "|" + higherTf + "|" + middleTf + "|" + entryTf;
         String previousKey = prefs.getString("kronos_last_notified_direction_key", "");
@@ -2528,6 +2566,7 @@ public class MainActivity extends Activity {
     private void postPulseLockSignalNotification(String symbol, String direction, String entry,
                                                    String sl, String tp, String reason) {
         long now = System.currentTimeMillis();
+        if (!prefs.getBoolean("notify_pulse_lock", true)) return;
         String key = symbol + "|" + direction + "|" + entry + "|" + sl + "|" + tp;
         if (key.equals(prefs.getString("pulse_lock_last_alert_key", ""))
                 && now - prefs.getLong("pulse_lock_last_alert_at", 0L) < 30L * 60L * 1000L) return;
@@ -2556,6 +2595,79 @@ public class MainActivity extends Activity {
                 .setCategory(Notification.CATEGORY_STATUS).setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(true).build();
         manager.notify(7301, notification);
+    }
+
+    private void openSignalNotificationPermissionSettings() {
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7102);
+            return;
+        }
+        try {
+            Intent intent;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                intent = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+            } else {
+                intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName()));
+            }
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Open Android Settings → Apps → DIABLO SCANNER → Notifications.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void sendSignalNotificationTest(String source) {
+        String name = source == null ? "" : source.trim().toLowerCase(Locale.ROOT);
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7102);
+            Toast.makeText(this, "Allow notifications, then tap the test button again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String title;
+        String body;
+        String channelId;
+        int id;
+        if ("pulselock".equals(name)) {
+            if (!prefs.getBoolean("notify_pulse_lock", true)) { Toast.makeText(this, "Pulse-Lock alerts are switched off.", Toast.LENGTH_SHORT).show(); return; }
+            title = "DIABLO — PULSE-LOCK TEST";
+            body = "Test alert only. Real alerts require a validated lock and entry / SL / TP.";
+            channelId = "diablo_pulse_lock_signal_ready"; id = 7391;
+        } else if ("kronos".equals(name)) {
+            if (!prefs.getBoolean("notify_kronos", true)) { Toast.makeText(this, "Kronos alerts are switched off.", Toast.LENGTH_SHORT).show(); return; }
+            title = "DIABLO — KRONOS TEST";
+            body = "Test alert only. Real alerts require three aligned timeframe forecasts and a valid entry.";
+            channelId = "diablo_kronos_signal_ready"; id = 7191;
+        } else {
+            if (!prefs.getBoolean("notify_guided_scalping", true)) { Toast.makeText(this, "Guide Scalping alerts are switched off.", Toast.LENGTH_SHORT).show(); return; }
+            title = "DIABLO — GUIDE SCALPING TEST";
+            body = "Test alert only. Real alerts require completed 4H / 15M / 1M stages plus entry / SL / TP.";
+            channelId = "diablo_guided_signal_ready"; id = 7291;
+        }
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) { Toast.makeText(this, "Notification service unavailable.", Toast.LENGTH_LONG).show(); return; }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(channelId,
+                    "Pulse-Lock".equals(title) ? "Pulse-Lock confirmed signals" :
+                    (name.equals("pulselock") ? "Pulse-Lock confirmed signals" :
+                    name.equals("kronos") ? "Kronos signal alerts" : "Guided Scalping signal alerts"),
+                    NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("DIABLO Scanner signal alerts and explicit test notifications.");
+            channel.enableVibration(true);
+            manager.createNotificationChannel(channel);
+        }
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, channelId) : new Notification.Builder(this);
+        manager.notify(id, builder.setSmallIcon(R.drawable.ic_diablo_launcher_vector)
+                .setContentTitle(title).setContentText(body)
+                .setStyle(new Notification.BigTextStyle().bigText(body))
+                .setCategory(Notification.CATEGORY_STATUS).setPriority(Notification.PRIORITY_HIGH)
+                .setAutoCancel(true).build());
+        Toast.makeText(this, "Test notification sent for " + name + ".", Toast.LENGTH_SHORT).show();
     }
 
     private String safeKronosDirection(LocalVisionAI.Result result) {
