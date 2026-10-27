@@ -182,7 +182,8 @@ public class ScreenCaptureService extends Service {
                         .putString("scan_message", "New scan started. Previous entry, stop loss and take profit cleared.")
                         .apply();
                 SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
-                boolean timedMode = "TIMED".equalsIgnoreCase(state.getString("trading_mode", "TIMED"));
+                boolean timedMode = "TIMED".equalsIgnoreCase(state.getString("trading_mode", "TIMED"))
+                        && !state.getBoolean("auto_scan_enabled", false);
                 if (timedMode && timedScanActive) return START_NOT_STICKY;
                 if (timedMode && workerHandler != null) {
                     String timedEngine = state.getString("timed_engine", "HYBRID");
