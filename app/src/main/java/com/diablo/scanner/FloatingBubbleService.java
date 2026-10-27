@@ -856,12 +856,19 @@ public class FloatingBubbleService extends Service {
                 return;
             }
             String key = signal + "|" + entry + "|" + sl + "|" + tp;
-            if (!key.equals(prefs.getString("guided_scalping_last_alert_key", ""))) {
+            boolean notificationEnabled = prefs.getBoolean("notify_guided_scalping", true);
+            boolean permissionAvailable = Build.VERSION.SDK_INT < 33
+                    || checkSelfPermission("android.permission.POST_NOTIFICATIONS") == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            boolean alertSentOrPreviouslySent = key.equals(prefs.getString("guided_scalping_last_alert_key", ""));
+            if (!alertSentOrPreviouslySent && notificationEnabled && permissionAvailable) {
                 postGuidedSignalNotification(signal, entry, sl, tp, details);
                 prefs.edit().putString("guided_scalping_last_alert_key", key).apply();
             }
+            String alertStatus = !notificationEnabled ? "Notification is switched off in Settings."
+                    : !permissionAvailable ? "Android notification permission is not granted; enable it in Settings."
+                    : "Signal notification sent or this exact setup was already alerted.";
             prefs.edit().putString("guided_scalping_status", "COMPLETE")
-                    .putString("scan_message", "GUIDED SCALPING COMPLETE • 1M entry details found. Signal notification issued.\nSaved 4H / 15M context: " + guidedContextSummary(prefs))
+                    .putString("scan_message", "GUIDED SCALPING COMPLETE • 1M entry details found. " + alertStatus + "\\nSaved 4H / 15M context: " + guidedContextSummary(prefs))
                     .apply();
             return;
         }
