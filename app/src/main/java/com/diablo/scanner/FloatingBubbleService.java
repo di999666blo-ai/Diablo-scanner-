@@ -868,7 +868,7 @@ public class FloatingBubbleService extends Service {
                     : !permissionAvailable ? "Android notification permission is not granted; enable it in Settings."
                     : "Signal notification sent or this exact setup was already alerted.";
             prefs.edit().putString("guided_scalping_status", "COMPLETE")
-                    .putString("scan_message", "GUIDED SCALPING COMPLETE • 1M entry details found. " + alertStatus + "\\nSaved 4H / 15M context: " + guidedContextSummary(prefs))
+                    .putString("scan_message", "GUIDED SCALPING COMPLETE • 1M entry details found. " + alertStatus + "\nSaved 4H / 15M context: " + guidedContextSummary(prefs))
                     .apply();
             return;
         }
