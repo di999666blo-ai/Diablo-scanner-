@@ -493,6 +493,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getSignalNotificationStatus() {
+            return signalNotificationStatus().toString();
+        }
+
+        @JavascriptInterface
         public void saveSignalNotificationSettings(String json) {
             if (json == null || json.length() > 2000) return;
             try {
@@ -2597,6 +2602,63 @@ public class MainActivity extends Activity {
         manager.notify(7301, notification);
     }
 
+    private boolean areSignalNotificationsEnabled() {
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !manager.areNotificationsEnabled()) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            String[] channels = new String[]{"diablo_pulse_lock_signal_ready",
+                    "diablo_kronos_signal_ready", "diablo_guided_signal_ready"};
+            for (String id : channels) {
+                NotificationChannel channel = manager.getNotificationChannel(id);
+                if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return false;
+            }
+        }
+        return true;
+    }
+
+    private JSONObject signalNotificationStatus() {
+        JSONObject status = new JSONObject();
+        try {
+            boolean enabled = areSignalNotificationsEnabled();
+            status.put("enabled", enabled);
+            status.put("permissionRequired", Build.VERSION.SDK_INT >= 33);
+            status.put("runtimePermissionGranted", Build.VERSION.SDK_INT < 33
+                    || checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED);
+            status.put("manufacturer", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER);
+            status.put("androidVersion", Build.VERSION.RELEASE == null ? "" : Build.VERSION.RELEASE);
+            status.put("huawei", Build.MANUFACTURER != null
+                    && (Build.MANUFACTURER.toLowerCase(Locale.ROOT).contains("huawei")
+                    || Build.BRAND != null && Build.BRAND.toLowerCase(Locale.ROOT).contains("huawei")));
+        } catch (Exception ignored) { }
+        return status;
+    }
+
+    private void openAppNotificationSettings() {
+        try {
+            Intent intent;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                intent = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                intent.putExtra("app_package", getPackageName());
+                intent.putExtra("app_uid", getApplicationInfo().uid);
+            } else {
+                intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName()));
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) {
+                Toast.makeText(this, "Open Settings → Apps → DIABLO SCANNER → Notifications and enable Allow notifications.", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
     private void openSignalNotificationPermissionSettings() {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
@@ -2604,19 +2666,21 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7102);
             return;
         }
-        try {
-            Intent intent;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                intent = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-                intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
-            } else {
-                intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:" + getPackageName()));
-            }
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(this, "Open Android Settings → Apps → DIABLO SCANNER → Notifications.", Toast.LENGTH_LONG).show();
+        if (!areSignalNotificationsEnabled()) {
+            String maker = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.toLowerCase(Locale.ROOT);
+            String message = (maker.contains("huawei") || (Build.BRAND != null
+                    && Build.BRAND.toLowerCase(Locale.ROOT).contains("huawei")))
+                    ? "Allow notifications for DIABLO SCANNER in the next screen. On Huawei/EMUI, enable Allow notifications under Settings → Apps & notifications → Notifications management → DIABLO SCANNER. If Phone Manager asks for notification or app-launch permission, choose Allow; also permit background activity if you want alerts while the app is closed."
+                    : "Enable Allow notifications for DIABLO SCANNER in the next screen. If Android asks for notification permission, choose Allow. Also check that the three signal notification channels are not blocked.";
+            new AlertDialog.Builder(this)
+                    .setTitle("Allow DIABLO SCANNER notifications")
+                    .setMessage(message)
+                    .setNegativeButton("CANCEL", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("OPEN SETTINGS", (dialog, which) -> openAppNotificationSettings())
+                    .show();
+            return;
         }
+        openAppNotificationSettings();
     }
 
     private void sendSignalNotificationTest(String source) {
@@ -2625,7 +2689,12 @@ public class MainActivity extends Activity {
                 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7102);
-            Toast.makeText(this, "Allow notifications, then tap the test button again.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Allow notifications in the Android prompt, then tap the test button again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!areSignalNotificationsEnabled()) {
+            Toast.makeText(this, "Notifications are blocked. Open ALLOW / OPEN NOTIFICATION PERMISSION and enable DIABLO SCANNER notifications in Android/Huawei settings, then test again.", Toast.LENGTH_LONG).show();
+            openSignalNotificationPermissionSettings();
             return;
         }
         String title;
