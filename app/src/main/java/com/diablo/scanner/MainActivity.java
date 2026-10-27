@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
     private void refreshDashboardWebView() {
         if (dashboardWebView == null) return;
         dashboardWebView.post(() -> dashboardWebView.evaluateJavascript(
-                "if (window.refreshDashboard) window.refreshDashboard();", null));
+                "if (window.refreshDashboard) window.refreshDashboard(); if (window.refreshSignalNotificationStatus) window.refreshSignalNotificationStatus();", null));
     }
 
     private void runDashboardAction(String action) {
@@ -2659,6 +2659,18 @@ public class MainActivity extends Activity {
     }
 
     private void openSignalNotificationPermissionSettings() {
+        boolean isHuawei = (Build.MANUFACTURER != null
+                && Build.MANUFACTURER.toLowerCase(Locale.ROOT).contains("huawei"))
+                || (Build.BRAND != null && Build.BRAND.toLowerCase(Locale.ROOT).contains("huawei"));
+        if (isHuawei && Build.VERSION.SDK_INT < 33) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Allow DIABLO Scanner in Huawei Phone Manager")
+                    .setMessage("On your Huawei phone, tap OPEN NOTIFICATION SETTINGS and switch on Allow notifications for DIABLO SCANNER. If Huawei Phone Manager shows an Allow prompt, choose Allow. For alerts while the app is in the background, also open Phone Manager → App launch → DIABLO SCANNER and allow background activity / auto-launch where available.")
+                    .setNegativeButton("CANCEL", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("OPEN NOTIFICATION SETTINGS", (dialog, which) -> openAppNotificationSettings())
+                    .show();
+            return;
+        }
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
