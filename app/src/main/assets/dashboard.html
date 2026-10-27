@@ -243,7 +243,7 @@ var kfs=document.getElementById('kronosFeedStatus');if(kfs)kfs.textContent=(d.kr
 var kfn=document.getElementById('kronosFeedNote');if(kfn)kfn.textContent=d.kronosFeedNote||'BigQuote completed candles are fetched on this phone and passed to the bundled Kronos-mini ONNX runtime.';
 var ksig=document.getElementById('kronosSignal');if(ksig)setSignal(ksig,d.kronosSignal||'WAIT');
 var kss=document.getElementById('kronosSignalStatus');if(kss)kss.textContent=d.kronosStatus||'WAIT';
-var kdet=document.getElementById('kronosForecastDetails');if(kdet)kdet.textContent=d.kronosDetails||'No validated local Kronos forecast has run.';
+var kdet=document.getElementById('kronosForecastDetails');if(kdet){var kdText=d.kronosDetails||'No validated local Kronos forecast has run.';if(d.kronosMonitorActive&&String(d.kronosSignal||'WAIT').toUpperCase()==='WAIT')kdText+='\n\nMONITOR STATUS: ACTIVE — WAIT means Kronos is still checking the selected higher, middle and entry timeframes for a valid setup. It does not mean monitoring has stopped.';kdet.textContent=kdText;}
 var runtimeBadge=document.getElementById('kronosRuntimeBadge');if(runtimeBadge)runtimeBadge.textContent=d.kronosLocalReady?'LOCAL INFERENCE READY':'LOCAL · WAIT';
 var runtimeFeed=document.getElementById('kronosRuntimeFeed');if(runtimeFeed)runtimeFeed.textContent=(d.kronosCandles&&d.kronosCandles.length>=32)?'READY':'WAIT';
 var runtimeBars=document.getElementById('kronosRuntimeBars');if(runtimeBars)runtimeBars.textContent=(d.kronosCandles||[]).length;
