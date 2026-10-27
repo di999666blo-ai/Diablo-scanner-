@@ -205,6 +205,16 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 </section>
 <section id="settings" class="view">
 <div class="kicker">DASHBOARD 09 / CONTROL DECK</div><h2 class="heading">Settings</h2><p class="sub">Change scan mode, timing, timeframe, visual sensitivity and trade duration. Settings are stored on this phone.</p>
+<div class="card"><div class="label">SIGNAL NOTIFICATIONS</div><p class="tiny">Choose which confirmed setup types can alert you. WAIT states and unvalidated setups never send real signal alerts.</p>
+<div class="settingrow"><div><b>1 · Pulse-Lock</b><span>Only when a locked setup has direction, entry, SL and TP</span></div><input type="checkbox" id="notifyPulseLock" checked onchange="saveSignalNotifications()"></div>
+<div class="settingrow"><div><b>2 · Kronos</b><span>Only after higher / middle / entry forecasts agree and entry validation passes</span></div><input type="checkbox" id="notifyKronos" checked onchange="saveSignalNotifications()"></div>
+<div class="settingrow"><div><b>3 · Guide Scalping</b><span>Only after the 4H → 15M → 1M guide finishes with entry, SL and TP</span></div><input type="checkbox" id="notifyGuideScalping" checked onchange="saveSignalNotifications()"></div>
+<button class="btn primary full" onclick="openSignalNotificationPermission()">ALLOW / OPEN ANDROID NOTIFICATION PERMISSION</button>
+<div class="label" style="margin-top:12px">TEST EACH NOTIFICATION PATH</div>
+<div class="btnrow"><button class="btn" onclick="testSignalNotification('pulselock')">TEST PULSE-LOCK</button><button class="btn" onclick="testSignalNotification('kronos')">TEST KRONOS</button></div>
+<button class="btn full" onclick="testSignalNotification('guided')">TEST GUIDE SCALPING</button>
+<p id="notificationSettingsStatus" class="tiny">Loading notification preferences…</p>
+</div>
 <div class="card"><div class="settingrow"><div><b>Trade duration</b><span id="settingTrade">1 minute</span></div><button class="btn" onclick="act('trade_duration')">CHANGE</button></div><div class="settingrow"><div><b>Timed observation window</b><span id="settingWindow">30 seconds</span></div><button class="btn" onclick="act('scan_window')">CHANGE</button></div><div class="settingrow"><div><b>Chart timeframe</b><span id="settingTf">1m</span></div><button class="btn" onclick="act('timeframe')">CHANGE</button></div><div class="settingrow"><div><b>Trading mode</b><span id="settingMode">TIMED</span></div><button class="btn" onclick="act('trading_mode')">CHANGE</button></div><div class="settingrow"><div><b>Analysis profile</b><span id="settingProfile">BALANCED</span></div><button class="btn" onclick="act('analysis_profile')">CHANGE</button></div><div class="settingrow"><div><b>Visual sensitivity</b><span>Image-analysis setting</span></div><button class="btn" onclick="act('sensitivity')">CHANGE</button></div><div class="settingrow"><div><b>Candle timing</b><span>Forming candle / candle close</span></div><button class="btn" onclick="act('candle_timing')">CHANGE</button></div><div class="settingrow"><div><b>Timed Signal AI assist</b><span id="timedSmolStatus">Fast hybrid only</span></div><button class="btn" id="timedSmolButton" onclick="act('timed_smolvlm')">ENABLE SMOLVLM</button></div><div class="settingrow"><div><b>Scalping engine</b><span id="scalpingEngineStatus">SmolVLM visual engine • Kronos phone-only needs a validated local model/tokenizer and real OHLCV candles</span></div><button class="btn" onclick="act('scalping_engine')">CHOOSE</button></div></div>
 <button class="btn full" onclick="act('all_settings')">OPEN ALL SETTINGS</button><button class="btn full" onclick="act('overlay_permission')">FLOATING BUBBLE PERMISSION</button>
 <div class="card"><div class="label">SAFETY</div><p class="sub">Manual trading only. No automatic trade placement. Signals are experimental and can be wrong.</p></div>
@@ -449,6 +459,39 @@ document.addEventListener('DOMContentLoaded',function(){let saved={};try{saved=J
  document.addEventListener('DOMContentLoaded',function(){var t=byId('liveRefreshToggle');if(t){try{t.checked=localStorage.getItem('diabloVisualRefresh5s')==='1'}catch(e){}if(t.checked)window.diabloToggleRefresh(true)}});
  var oldRefresh=window.refreshDashboard;window.refreshDashboard=function(){if(typeof oldRefresh==='function')oldRefresh();try{window.diabloRenderLiveChart()}catch(e){}};
 })();
+
+// Signal notification controls use Android SharedPreferences, not browser-only state.
+window.loadSignalNotificationSettings=function(){
+ try{
+  if(!window.DiabloAndroid||typeof DiabloAndroid.getSignalNotificationSettings!=='function'){
+   var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Native notification bridge unavailable.';return;
+  }
+  var s=JSON.parse(DiabloAndroid.getSignalNotificationSettings());
+  document.getElementById('notifyPulseLock').checked=s.pulseLock!==false;
+  document.getElementById('notifyKronos').checked=s.kronos!==false;
+  document.getElementById('notifyGuideScalping').checked=s.guidedScalping!==false;
+  var status=document.getElementById('notificationSettingsStatus');
+  if(status)status.textContent='Preferences saved on this phone. Use the three TEST buttons to verify Android delivery.';
+ }catch(e){var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Could not load notification preferences: '+e.message;}
+};
+window.saveSignalNotifications=function(){
+ try{
+  var s={pulseLock:document.getElementById('notifyPulseLock').checked,kronos:document.getElementById('notifyKronos').checked,guidedScalping:document.getElementById('notifyGuideScalping').checked};
+  if(window.DiabloAndroid&&typeof DiabloAndroid.saveSignalNotificationSettings==='function'){
+   DiabloAndroid.saveSignalNotificationSettings(JSON.stringify(s));
+   var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Saved on this phone. Android notification permission must also be allowed.';
+  }
+ }catch(e){var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Save failed: '+e.message;}
+};
+window.openSignalNotificationPermission=function(){
+ if(window.DiabloAndroid&&typeof DiabloAndroid.openSignalNotificationPermission==='function')DiabloAndroid.openSignalNotificationPermission();
+ else {var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Android permission bridge unavailable.';}
+};
+window.testSignalNotification=function(source){
+ if(window.DiabloAndroid&&typeof DiabloAndroid.testSignalNotification==='function')DiabloAndroid.testSignalNotification(source);
+ else {var status=document.getElementById('notificationSettingsStatus');if(status)status.textContent='Cannot test: Android bridge unavailable.';}
+};
+document.addEventListener('DOMContentLoaded',function(){window.loadSignalNotificationSettings();});
 </script>
 </body>
 </html>
