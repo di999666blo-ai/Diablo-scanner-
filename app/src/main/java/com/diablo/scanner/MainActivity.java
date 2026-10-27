@@ -368,6 +368,10 @@ public class MainActivity extends Activity {
             data.put("kronosHigherTimeframe", prefs.getString("kronos_tf_higher", "4h"));
             data.put("kronosMiddleTimeframe", prefs.getString("kronos_tf_middle", "15m"));
             data.put("kronosEntryTimeframe", prefs.getString("kronos_tf_entry", "1m"));
+            data.put("kronosHigherTrend", prefs.getString("kronos_higher_trend", "WAIT / NOT RUN"));
+            data.put("kronosMiddleTrend", prefs.getString("kronos_middle_trend", "WAIT / NOT RUN"));
+            data.put("kronosEntryTrend", prefs.getString("kronos_entry_trend", "WAIT / NOT RUN"));
+            data.put("kronosMonitorActive", prefs.getBoolean("kronos_monitor_active", false));
             data.put("kronosFeedNote", prefs.getString("kronos_feed_note", "BigQuote completed candles are fetched on this phone; Kronos-mini inference runs locally without a host."));
             KronosLocalRuntime.Status localKronos = KronosLocalRuntime.inspect(this);
             data.put("kronosLocalReady", localKronos.isReady());
