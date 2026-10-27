@@ -923,6 +923,7 @@ public class FloatingBubbleService extends Service {
     }
 
     private void postGuidedSignalNotification(String signal, String entry, String sl, String tp, String details) {
+        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("notify_guided_scalping", true)) return;
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (manager == null) return;
         String channelId = "diablo_guided_signal_ready";
