@@ -365,6 +365,32 @@ function plRenderSymbolOptions(query){
  else if(filtered.some(x=>x.name==='EURUSD')&&!q)sel.value='EURUSD';
  else sel.selectedIndex=0;
 }
+async function plAnalyzeWorkflow(){
+ let p=plMarketPrefs(),steps=$pl('plTfWorkflow');if(!steps)return;
+ steps.innerHTML=['01 · HIGHER TREND ('+plEsc(p.high)+') — FETCHING REAL OHLC','02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — FETCHING REAL OHLC','03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — FETCHING REAL OHLC','04 · ENTRY / SL / TP — WAIT · VALIDATION PENDING'].map(x=>'<p>'+x+'</p>').join('');
+ async function getBars(tf){let r=await fetch(PL_API+'/'+encodeURIComponent(p.pair)+'/ohlc?interval='+encodeURIComponent(tf)+'&limit=60',{headers:{Accept:'application/json'},cache:'no-store'});let d=await r.json();if(!r.ok)throw new Error('HTTP '+r.status+' for '+tf);let a=Array.isArray(d)?d:(d.bars||d.candles||d.items||[]);return a.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>Number.isFinite(Number(v)))).slice().reverse()}
+ function trend(a){if(a.length<10)throw new Error('Not enough candles');let first=+a[Math.max(0,a.length-10)].close,last=+a[a.length-1].close,prev=+a[a.length-2].close;let pct=first?(last-first)/Math.abs(first)*100:0;return {dir:pct>0.015?'UP':pct< -0.015?'DOWN':'SIDEWAYS',pct:pct,bar:+a[a.length-1].close>=+a[a.length-1].open?'BULLISH':'BEARISH',last:last,prev:prev,bars:a}}
+ try{
+  let all=await Promise.all([getBars(p.high),getBars(p.middle),getBars(p.entry)]),h=trend(all[0]),m=trend(all[1]),e=trend(all[2]),agree=h.dir===m.dir&&m.dir===e.dir&&h.dir!=='SIDEWAYS';
+  let recent=e.bars.slice(-12),lo=Math.min.apply(null,recent.map(b=>+b.low)),hi=Math.max.apply(null,recent.map(b=>+b.high));
+  let trigger=(e.dir==='UP'&&e.bar==='BULLISH'&&e.last>e.prev)||(e.dir==='DOWN'&&e.bar==='BEARISH'&&e.last<e.prev);
+  let final=agree&&trigger?'SETUP ALIGNED · VERIFY RISK MANUALLY':'WAIT · TIMEFRAMES OR ENTRY NOT ALIGNED';
+  steps.innerHTML=[
+   '01 · HIGHER TREND ('+plEsc(p.high)+') — '+h.dir+' · '+h.pct.toFixed(3)+'% · '+all[0].length+' candles',
+   '02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — '+m.dir+' · '+m.pct.toFixed(3)+'% · '+all[1].length+' candles',
+   '03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — '+e.dir+' / '+e.bar+' candle'+(trigger?' · TRIGGER CANDIDATE':' · NO TRIGGER'),
+   '04 · ENTRY / SL / TP — '+final+(agree?' · Entry '+e.last.toPrecision(7)+' · range '+lo.toPrecision(7)+'–'+hi.toPrecision(7):'')
+  ].map(x=>'<p>'+x+'</p>').join('');
+  $pl('plStrategyExplain').textContent='Workflow evaluated real OHLC independently for the three selected intervals. Trend alignment is a simple close-to-close heuristic, not a trained model or guaranteed trade signal. Entry/SL/TP remain candidates requiring spread, pip-size and risk validation.';
+  $pl('plReason').textContent=agree&&trigger?'Timeframes align and the latest entry candle supports the direction; confirm spread, pip conversion and risk before any manual trade.':'WAIT: the three timeframe directions and latest candle do not all confirm one another.';
+  $pl('plEngine').textContent='Engine: OHLC multi-timeframe heuristic · not Kronos inference';
+  $pl('plFresh').textContent='LIVE OHLC';
+  $pl('plScore').textContent=agree&&trigger?'MTF OK':'WAIT';
+  $pl('plState').textContent=agree&&trigger?'CANDIDATE · MANUAL CHECK':'WAIT · NOT LOCKED';
+  $pl('plWord').textContent=agree&&trigger?e.dir:'WAIT';$pl('plWord').classList.remove('greenText','redText','waitText');$pl('plWord').classList.add(agree&&trigger?(e.dir==='UP'?'greenText':'redText'):'waitText');
+  $pl('plChecks').innerHTML=['01 · Data source — REAL OHLC received','02 · Candle freshness — latest API response received','03 · Trend / momentum — '+h.dir+' / '+m.dir+' / '+e.dir,'04 · Multi-timeframe agreement — '+(agree?'ALIGNED':'NOT ALIGNED'),'05 · Entry candle — '+(trigger?'TRIGGER CANDIDATE':'WAIT'),'06 · Risk levels — manual validation required'].map(x=>'<p>'+plEsc(x)+'</p>').join('');
+ }catch(err){steps.innerHTML=['01 · HIGHER TREND — WAIT · '+plEsc(err.message),'02 · SETUP CONFIRMATION — WAIT · DATA ERROR','03 · ENTRY TRIGGER — WAIT · DATA ERROR','04 · ENTRY / SL / TP — WAIT · NO VERIFIED SETUP'].map(x=>'<p>'+x+'</p>').join('');$pl('plReason').textContent='Workflow could not complete: '+err.message+'. No signal is issued.';$pl('plState').textContent='WAIT · WORKFLOW ERROR';$pl('plWord').textContent='WAIT';}
+}
 async function plFetchCandles(){
  let p=plMarketPrefs(),token=++plRequest;
  if(!p.pair){plMarketStatus('WAIT · SELECT A VALID MARKET');return}
@@ -381,14 +407,7 @@ async function plFetchCandles(){
   if(token!==plRequest)return;
   if(!bars.length)throw new Error('API returned no valid OHLC bars for '+p.pair);
   plBars=bars.slice().reverse();plMarketStatus('CONNECTED · '+p.pair+' · '+bars.length+' BARS');
-  plMarketRender();
-  let t=plMarketPrefs();
-  $pl('plTfWorkflow').innerHTML=[
-   '01 · HIGHER TREND ('+plEsc(t.high)+') — WAIT · CANDLES NOT YET ANALYSED',
-   '02 · SETUP CONFIRMATION ('+plEsc(t.middle)+') — WAIT · CANDLES NOT YET ANALYSED',
-   '03 · ENTRY TRIGGER ('+plEsc(t.entry)+') — WAIT · CANDLES NOT YET ANALYSED',
-   '04 · ENTRY / SL / TP — WAIT · NO VERIFIED PULSE-LOCK ANALYSIS'
-  ].map(x=>'<p>'+x+'</p>').join('');
+  plMarketRender();plAnalyzeWorkflow();
  }catch(e){if(token!==plRequest)return;plBars=[];plMarketStatus('WAIT · API REQUEST FAILED');plMarketRender();$pl('plBridgeNote').textContent='Biquote feed request failed: '+(e&&e.message?e.message:'network error')+'. Check connection, market availability and selected symbol.'}
 }
 function plMarketInit(){
