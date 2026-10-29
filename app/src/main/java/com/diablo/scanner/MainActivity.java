@@ -2225,7 +2225,7 @@ public class MainActivity extends Activity {
     private void showSignalTimingSettings() {
         String[] labels = {"Analyse the forming candle", "Wait until candle close"};
         String[] values = {"FORMING", "CLOSE"};
-        String current = prefs.getString("signal_timing", "CLOSE");
+        String current = prefs.getString("signal_timing", "FORMING");
         int selected = "FORMING".equalsIgnoreCase(current) ? 0 : 1;
         new AlertDialog.Builder(this)
                 .setTitle("Mode 1 candle timing")
