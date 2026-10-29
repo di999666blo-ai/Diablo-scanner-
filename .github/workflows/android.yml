@@ -208,7 +208,8 @@ jobs:
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
-          grep -q 'KronosLocalRuntime.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'GuidedScalpingAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          test -s app/src/main/java/com/diablo/scanner/GuidedScalpingAnalyzer.java
           grep -q 'KronosLocalRuntime.forecast' app/src/main/java/com/diablo/scanner/MainActivity.java
           ! grep -q 'KronosRuntimeClient.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           ! grep -q 'KronosRuntimeClient.forecast' app/src/main/java/com/diablo/scanner/MainActivity.java
