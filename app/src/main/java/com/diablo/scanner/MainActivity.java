@@ -183,8 +183,17 @@ public class MainActivity extends Activity {
                         .remove("guided_scalping_last_stage")
                         .remove("guided_scalping_last_updated")
                         .apply();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                    startFloatingBubble();
+                    Toast.makeText(this, "Allow the floating overlay, return to Diablo Scanner, then tap Guide Scalping again.",
+                            Toast.LENGTH_LONG).show();
+                    break;
+                }
                 startFloatingBubble();
-                Toast.makeText(this, "Guided scalping selected. Keep the chart visible and follow 4H → 15M → 1M.",
+                if (!prefs.getBoolean("screen_capture_active", false)) {
+                    requestScreenCapture();
+                }
+                Toast.makeText(this, "Guide Scalping uses SmolVLM on screen captures. Keep the broker chart visible and follow 4H → 15M → 1M by changing the chart timeframe and scanning each view.",
                         Toast.LENGTH_LONG).show();
                 break;
             case "stop_live_scan":
