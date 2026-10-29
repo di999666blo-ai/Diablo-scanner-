@@ -349,13 +349,23 @@ async function plAnalyzeWorkflow(){
  }
  try{
   const all=await Promise.all([getBars(p.high),getBars(p.middle),getBars(p.entry)]);
-  const h=trend(all[0]),m=trend(all[1]),e=trend(all[2]),agree=h.dir===m.dir&&m.dir===e.dir&&h.dir!=='SIDEWAYS';
+  const h=trend(all[0]),m=trend(all[1]),e=trend(all[2]);
+  const agree=h.dir===m.dir&&m.dir===e.dir&&h.dir!=='SIDEWAYS';
+  const highRecent=h.bars.slice(-20),highSupport=Math.min(...highRecent.map(b=>b.low)),highResistance=Math.max(...highRecent.map(b=>b.high));
+  const middleLast=m.bars[m.bars.length-1],middlePrev=m.bars[m.bars.length-2];
+  const zoneTolerance=Math.max(m.atr*1.5,Math.abs(h.last)*0.0005);
+  const supportReject=h.dir==='UP'&&middleLast.low<=highSupport+zoneTolerance&&middleLast.close>middleLast.open;
+  const resistanceReject=h.dir==='DOWN'&&middleLast.high>=highResistance-zoneTolerance&&middleLast.close<middleLast.open;
+  const breakoutUp=h.dir==='UP'&&middleLast.close>highResistance&&middlePrev.close<=highResistance;
+  const breakoutDown=h.dir==='DOWN'&&middleLast.close<highSupport&&middlePrev.close>=highSupport;
+  const setupOk=h.dir!=='SIDEWAYS'&&(m.dir===h.dir||supportReject||resistanceReject||breakoutUp||breakoutDown);
+  const setupDir=h.dir;
   const last=e.bars[e.bars.length-1],now=Date.now(),tfMs={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000};
-  const maxAge=Math.max(120000,(tfMs[p.entry]||60000)*2);
   const timestampKnown=all.every(a=>a[a.length-1]._ts!==null);
-  const newestTs=Math.min(...all.map(a=>a[a.length-1]._ts===null?now:a[a.length-1]._ts));
-  const ageMs=now-newestTs, fresh=timestampKnown&&ageMs>=-60000&&ageMs<=maxAge;
-  const trigger=(e.dir==='UP'&&e.bar==='BULLISH'&&e.last>e.prev)||(e.dir==='DOWN'&&e.bar==='BEARISH'&&e.last<e.prev);
+  const candleAges=all.map((a,i)=>({tf:[p.high,p.middle,p.entry][i],age:now-a[a.length-1]._ts}));
+  const fresh=timestampKnown&&candleAges.every(x=>x.age>=-60000&&x.age<=Math.max(120000,(tfMs[x.tf]||60000)*2));
+  const ageMs=candleAges.length?candleAges[candleAges.length-1].age:Infinity;
+  const trigger=(setupDir==='UP'&&e.bar==='BULLISH'&&e.last>e.prev)||(setupDir==='DOWN'&&e.bar==='BEARISH'&&e.last<e.prev);
   const recent=e.bars.slice(-12),swingLow=Math.min(...recent.map(b=>b.low)),swingHigh=Math.max(...recent.map(b=>b.high));
   const pair=p.pair.toUpperCase().replace(/[^A-Z0-9]/g,'');
   const fx= /^[A-Z]{6}$/.test(pair);
@@ -372,22 +382,22 @@ async function plAnalyzeWorkflow(){
   const risk=quotePip?Math.abs(e.last-stop)/quotePip:null;
   const rr=quotePip&&risk>0?target/risk:0;
   const riskOk=!!quotePip&&Number.isFinite(stop)&&Number.isFinite(take)&&risk>0&&rr>=1;
-  const aligned=agree&&trigger&&structureOk&&movePct>=minMove;
+  const aligned=setupOk&&e.dir===setupDir&&trigger&&structureOk&&movePct>=minMove&&(!$pl('plRequireMtf').checked||m.dir===h.dir);
   const checks=[
    '01 · Data source — '+(all.every(a=>a.length>=10)?'REAL OHLC · 3 TIMEFRAMES':'WAIT'),
    '02 · Candle freshness — '+(!timestampKnown?'UNKNOWN · API HAS NO USABLE CANDLE TIMESTAMPS':fresh?'FRESH · '+Math.round(ageMs/1000)+'s':'STALE / FUTURE TIMESTAMP · '+Math.round(ageMs/1000)+'s'),
    '03 · Trend / momentum — '+h.dir+' / '+m.dir+' / '+e.dir,
-   '04 · Multi-timeframe agreement — '+(agree?'ALIGNED':'NOT ALIGNED'),
+   '04 · 4H → 15M setup — '+(setupOk?'CONFIRMED · '+setupDir:'WAIT · NO HIGHER-TF ZONE / SETUP'),
    '05 · Entry / structure — '+(trigger&&structureOk?'CANDIDATE CONFIRMED':'WAIT · NO VALID TRIGGER'),
    '06 · Risk levels — '+(riskOk?'CALCULATED · '+rr.toFixed(2)+'R':'WAIT · PIP SIZE / RISK NOT VERIFIED')
   ];
-  const eligible=aligned&&fresh&&riskOk&&(!$pl('plRequireMtf').checked||agree);
+  const eligible=aligned&&fresh&&riskOk;
   const fmt=v=>Number(v).toPrecision(7).replace(/0+$/,'').replace(/\.$/,'');
   const final=eligible?'PULSE-LOCK PASSED · MANUAL CONFIRMATION REQUIRED':'WAIT · ONE OR MORE GATES FAILED';
   steps.innerHTML=[
-   '01 · HIGHER TREND ('+plEsc(p.high)+') — '+h.dir+' · '+h.pct.toFixed(3)+'% · '+all[0].length+' bars',
-   '02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — '+m.dir+' · '+m.pct.toFixed(3)+'% · '+all[1].length+' bars',
-   '03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — '+e.dir+' / '+e.bar+' · '+(trigger?'TRIGGER':'NO TRIGGER'),
+   '01 · HIGHER TREND ('+plEsc(p.high)+') — '+h.dir+' · '+h.pct.toFixed(3)+'% · S '+fmt(highSupport)+' / R '+fmt(highResistance),
+   '02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — '+m.dir+' · '+(setupOk?'SETUP CONFIRMED':'WAIT · NO 4H-LEVEL SETUP')+' · '+all[1].length+' bars',
+   '03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — '+e.dir+' / '+e.bar+' · '+(trigger&&e.dir===setupDir?'TRIGGER':'WAIT · NO MATCHING TRIGGER'),
    '04 · ENTRY / SL / TP — '+final,
    'ENTRY CANDIDATE: '+(eligible?fmt(e.last):'N/A')+' · STOP: '+(eligible?fmt(stop):'N/A')+' · TARGET: '+(eligible?fmt(take):'N/A')+
     (eligible?' · '+target+' pip target · '+rr.toFixed(2)+'R':'')
@@ -398,11 +408,11 @@ async function plAnalyzeWorkflow(){
   $pl('plScore').textContent=eligible?'GATES PASS':'WAIT';
   $pl('plState').textContent=eligible?'GATES PASS · MANUAL CHECK':'WAIT · NOT LOCKED';
   $pl('plWord').textContent=eligible?e.dir:'WAIT';$pl('plWord').className='signalword '+(eligible?(e.dir==='UP'?'greenText':'redText'):'waitText');
-  $pl('plReason').textContent=eligible?'All software checks passed for this snapshot. This is not a guaranteed win: confirm current spread, broker price, position size and execution manually.':!timestampKnown?'WAIT: BigQuote candles do not expose a usable timestamp, so freshness cannot be verified and Pulse-Lock will not pass.':!fresh?'WAIT: at least one selected timeframe has stale or future-dated candles.':!agree&&$pl('plRequireMtf').checked?'WAIT: selected timeframes do not agree.':!trigger?'WAIT: the latest entry candle does not confirm momentum.':!structureOk?'WAIT: no usable nearby swing invalidation level.':!riskOk?'WAIT: this market does not have a verified pip convention or valid risk/reward calculation.':'WAIT: entry momentum does not meet the selected profile threshold.';
+  $pl('plReason').textContent=eligible?'All software checks passed for this snapshot. This is not a guaranteed win: confirm current spread, broker price, position size and execution manually.':!timestampKnown?'WAIT: BigQuote candles do not expose a usable timestamp, so freshness cannot be verified and Pulse-Lock will not pass.':!fresh?'WAIT: at least one selected timeframe has stale or future-dated candles.':!setupOk?'WAIT: the 15M setup has not confirmed the 4H trend or a 4H support/resistance reaction.':$pl('plRequireMtf').checked&&m.dir!==h.dir?'WAIT: strict multi-timeframe agreement is enabled and the setup timeframe differs from the higher-timeframe trend.':!trigger||e.dir!==setupDir?'WAIT: the 1M entry candle has no trigger in the higher-timeframe direction.':!structureOk?'WAIT: no usable nearby swing invalidation level.':!riskOk?'WAIT: this market does not have a verified pip convention or valid risk/reward calculation.':'WAIT: entry momentum does not meet the selected profile threshold.';
   $pl('plChecks').innerHTML=checks.map(x=>'<p>'+plEsc(x)+'</p>').join('');
-  $pl('plTargetRead').textContent=target+' pips / '+plDuration(maxDuration);
+  $pl('plTargetRead').textContent=target+' pips / '+(typeof plDuration==='function'?plDuration(maxDuration):(maxDuration>=3600?Math.round(maxDuration/3600)+'h':Math.round(maxDuration/60)+'m'));
   $pl('plTrace').textContent='Last validation '+new Date().toLocaleTimeString()+' · '+p.pair+' · '+(eligible?'GATES PASSED; manual confirmation still required.':'WAIT; failed checks are listed above.');
-  if(eligible)window.plPublishLockedNotification({locked:true,direction:e.dir,entry:fmt(e.last),stopLoss:fmt(stop),takeProfit:fmt(take),pair:p.pair,source:'Pulse-Lock independent OHLC gate',timestamp:new Date().toISOString(),riskReward:rr});
+  if(eligible&&typeof window.plPublishLockedNotification==='function')window.plPublishLockedNotification({locked:true,direction:e.dir,entry:fmt(e.last),stopLoss:fmt(stop),takeProfit:fmt(take),pair:p.pair,source:'Pulse-Lock independent OHLC gate',timestamp:new Date().toISOString(),riskReward:rr});
  }catch(err){
   setWait('Workflow could not complete: '+(err&&err.message?err.message:'unknown data error')+'. No signal is issued.');
   $pl('plChecks').innerHTML=['01 · Data source — WAIT / ERROR','02 · Candle freshness — NOT VERIFIED','03 · Trend / momentum — NOT VERIFIED','04 · Multi-timeframe agreement — NOT VERIFIED','05 · Entry / structure — NOT VERIFIED','06 · Risk levels — NOT VERIFIED'].map(x=>'<p>'+x+'</p>').join('');
