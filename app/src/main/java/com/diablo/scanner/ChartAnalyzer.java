@@ -157,12 +157,11 @@ public final class ChartAnalyzer {
                 && "CLOSE".equalsIgnoreCase(timing);
         if (candleCloseUnverified) signal = "WAIT";
 
-        // Safety gate: pixel-only screenshots do not provide verified OHLC prices,
-        // so this analyzer cannot confirm an order block/FVG or structured ATR.
-        // Never allow a directional signal to pass as if those checks had passed.
-        // The market-data/Kronos route must perform those structured checks itself.
-        boolean structuredObAndMomentumVerified = false;
-        if (!structuredObAndMomentumVerified) signal = "WAIT";
+        // This is a screen-only preliminary visual analyzer. It cannot verify
+        // OHLC-derived order blocks/FVG/ATR, but those market-data-only checks must
+        // not silently suppress every valid visual direction in Timed Signal.
+        // Direction is released only when the independent visual momentum gates above
+        // agree. Never describe this as a verified OB/FVG or a measured win probability.
 
         int confidence=(int)Math.round(Math.max(0,Math.min(79, 42+strength*48)));
         if("WAIT".equals(signal)) confidence=Math.min(confidence,49);
@@ -185,8 +184,12 @@ public final class ChartAnalyzer {
         details.append("Confidence is an experimental image-strength score, not a measured win probability. No broker feed or OCR price reading is available.");
         details.append("\nMandatory visual checks: candle-like structure, recent direction and price-path agreement.");
         details.append("\nMomentum gate: visual slope and recent candle-colour agreement were calculated and used as preliminary evidence; structured OHLC momentum is NOT VERIFIED.");
-        details.append("\nOrder block / FVG gate: NOT VERIFIED — pixel-only analysis cannot reliably extract OHLC zones. A directional signal is blocked until the selected market-data engine validates the required zone checks.");
-        details.append("\nFinal safety gate: WAIT because this image-only route cannot verify structured OHLC, order block/FVG, or ATR. No directional signal is released from unverified evidence.");
+        details.append("\nOrder block / FVG / ATR: NOT VERIFIED — this screen-only analyzer cannot reliably extract structured OHLC zones or ATR. Do not treat the visual read as a confirmed institutional setup.");
+        if ("UP".equals(signal) || "DOWN".equals(signal)) {
+            details.append("\\nSignal status: PRELIMINARY VISUAL DIRECTION only; confirm price levels and setup manually before any trade.");
+        } else {
+            details.append("\\nSignal status: WAIT because the visible direction/momentum evidence did not pass the analyzer's confirmation gates.");
+        }
         if (candleCloseUnverified) details.append("\nCANDLE CLOSE UNVERIFIED: a static screenshot cannot prove candle closure. Final decision forced to WAIT.");
         details.append("\nSpeed/precision profile changes sampling and confirmation threshold; it does not make this pixel-based analyzer a trained AI model.");
         if("SCALPING".equalsIgnoreCase(mode)) {
