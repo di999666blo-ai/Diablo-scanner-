@@ -140,6 +140,17 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <div class="card"><div class="cardhead"><span class="label">LATEST MODEL OUTPUT</span><span class="badge" id="analysisStatus">NO RESULT</span></div><p id="analysisDetails" class="sub">No analysis recorded yet. Run a scan first.</p></div>
 <button class="btn primary full" onclick="act('start_guided_scalping')">START GUIDED SCALPING</button><button class="btn full" onclick="act('start_bubble')">OPEN FLOATING D BUBBLE</button><button class="btn full" onclick="go('model')">CHECK AI MODEL</button>
 </section>
+<section id="gallery" class="view">
+<div class="kicker">DASHBOARD / SAVED CHART ANALYSIS</div><h2 class="heading">GALLERY <span class="redAccent">SCANNER</span></h2>
+<p class="sub">Choose a screenshot, inspect it with the on-device analyzer, and remove it at any time. Removing the image clears its preview and invalidates any result from that selected image.</p>
+<div class="card"><div class="cardhead"><span class="label">SELECTED CHART IMAGE</span><span class="badge" id="savedChartStatus">IMAGE MISSING</span></div>
+<div id="savedChartEmpty" class="empty">No screenshot selected. Choose a chart image from your phone to begin.</div>
+<img id="savedChartPreview" alt="Selected chart screenshot preview" style="display:none;width:100%;max-height:340px;object-fit:contain;background:#05070c;border:1px solid #1E345A;border-radius:10px;margin:8px 0">
+<div class="btnrow"><button class="btn primary" onclick="act('choose_chart')">UPLOAD / CHANGE IMAGE</button><button class="btn" onclick="act('clear_saved_chart')">REMOVE IMAGE</button></div>
+<button class="btn green full" onclick="act('start_saved_chart_scan')">START IMAGE ANALYSIS</button>
+<p class="tiny" id="savedChartScanMessage">Image analysis runs separately from live broker screen capture.</p></div>
+<div class="card"><div class="label">LATEST IMAGE RESULT</div><div class="signal"><strong class="signalword waitText" id="savedChartSignal">WAIT</strong><span class="badge" id="savedChartResultStatus">WAIT</span></div><p class="scanSteps" id="savedChartDetails">Upload a screenshot to begin. If the image is removed during analysis, the result must remain WAIT until another image is uploaded.</p></div>
+</section>
 <section id="market" class="view"><div class="kicker">DASHBOARD 05 / PULSE-LOCK EXTENSION</div><h2 class="heading"><span class="redAccent">PULSE-LOCK™</span> EXTENSION</h2><p class="sub">Saved-chart analysis has been removed. Use Pulse-Lock to validate live market setups; no image upload or saved screenshot is required.</p><div class="hero"><div class="orb">🔒</div><strong>PULSE-LOCK DECISION GATE</strong><small>Live market validation · Multi-timeframe checks · Manual execution only</small></div><div class="card"><div class="cardhead"><span class="label">PULSE-LOCK EXTENSION</span><span class="badge">LIVE SETUPS</span></div><p class="sub">Open the dedicated Pulse-Lock dashboard to select a market, inspect available candle data, review higher/setup/entry timeframe checks and see whether the setup is LOCKED or WAIT.</p><button class="btn primary full" onclick="go('pulseLock')">🔒 OPEN PULSE-LOCK</button><button class="btn full" onclick="go('history')">VIEW SIGNAL HISTORY</button></div><p class="foot">No saved-chart image analyzer is available on this dashboard. A LOCKED state is not a guaranteed outcome.</p></section>
 <section id="kronos" class="view">
 <div class="kicker">DASHBOARD / KRONOS LIVE MARKET</div><h2 class="heading">Kronos <span class="redAccent">Market Desk</span></h2><p class="sub">Choose a real BigQuote market and visible candle interval here. This chart is separate from the timeframes Kronos uses to analyse the market.</p>
@@ -231,6 +242,7 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <button class="navitem" data-view="performance" onclick="go('performance')"><span class="navicon">◒</span>STATS</button>
 <button class="navitem" data-view="model" onclick="go('model')"><span class="navicon">✦</span>AI MODEL</button>
 <button class="navitem" data-view="settings" onclick="go('settings')"><span class="navicon">⚙</span>SETTINGS</button>
+<button class="navitem" data-view="gallery" onclick="go('gallery')"><span class="navicon">▧</span>GALLERY</button>
 </nav>
 <script>
 function go(id){var target=document.getElementById(id);if(!target){showUiError('Page not found: '+id);return}document.querySelectorAll('.view').forEach(function(v){v.classList.toggle('active',v.id===id)});document.querySelectorAll('.navitem').forEach(function(n){n.classList.toggle('active',n.dataset.view===id)});window.scrollTo(0,0);var nav=document.querySelector('.bottomnav');if(nav){nav.setAttribute('aria-label','Dashboard navigation. Current page: '+id);nav.querySelectorAll('.navitem').forEach(function(n){if(n.dataset.view===id)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')})}try{refreshDashboard()}catch(e){showUiError('Dashboard refresh error: '+(e&&e.message?e.message:e))}}
@@ -240,7 +252,17 @@ var kronosFiveSecondTimer=null;function startKronosFiveSecondRefresh(){if(kronos
 function act(name){try{if(window.DiabloAndroid&&typeof window.DiabloAndroid.action==='function'){window.DiabloAndroid.action(name)}else{showUiError('Android action bridge is unavailable. Please restart Diablo Scanner.')}}catch(e){showUiError('Action '+name+' failed: '+(e&&e.message?e.message:e))}setTimeout(function(){try{refreshDashboard()}catch(e){showUiError('Refresh failed: '+(e&&e.message?e.message:e))}},450)}
 function safeData(){try{if(window.DiabloAndroid&&DiabloAndroid.getDashboardData)return JSON.parse(DiabloAndroid.getDashboardData())}catch(e){}return {}}
 function setSignal(el,value){if(!el)return;el.textContent=value||'WAIT';el.classList.remove('greenText','redText','waitText');var s=String(value||'WAIT').toUpperCase();el.classList.add(s.indexOf('UP')>=0||s.indexOf('BUY')>=0?'greenText':s.indexOf('DOWN')>=0||s.indexOf('SELL')>=0?'redText':'waitText')}
-function refreshDashboard(){var d=safeData();renderKronosChart(d.kronosCandles||[],d);renderKronosTechnical(d.kronosCandles||[]);var kh=document.getElementById('kronosHigherTimeframe');if(kh)kh.textContent=d.kronosHigherTimeframe||'4h';var km=document.getElementById('kronosMiddleTimeframe');if(km)km.textContent=d.kronosMiddleTimeframe||'15m';var ke=document.getElementById('kronosEntryTimeframe');if(ke)ke.textContent=d.kronosEntryTimeframe||'1m';var kl=document.getElementById('kronosLiveState');if(kl)kl.textContent=d.kronosLiveWatchActive?'LIVE WATCH ON · polls every 15 seconds':'Live watch stopped';
+function refreshDashboard(){var d=safeData();
+var gp=document.getElementById('savedChartPreview'),ge=document.getElementById('savedChartEmpty'),gs=document.getElementById('savedChartStatus'),gmsg=document.getElementById('savedChartScanMessage'),gSig=document.getElementById('savedChartSignal'),gRs=document.getElementById('savedChartResultStatus'),gDet=document.getElementById('savedChartDetails');
+var hasImage=!!(d.savedChartPreview&&String(d.savedChartPreview).length>40);
+if(gp){if(hasImage){gp.src=d.savedChartPreview;gp.style.display='block'}else{gp.removeAttribute('src');gp.style.display='none'}}
+if(ge)ge.style.display=hasImage?'none':'block';
+if(gs)gs.textContent=hasImage?'IMAGE LOADED':'IMAGE MISSING';
+if(gmsg)gmsg.textContent=d.scanMessage||(hasImage?'Ready to analyse the selected screenshot.':'Upload a screenshot to begin.');
+if(gSig)setSignal(gSig,hasImage?(d.signal||'WAIT'):'WAIT');
+if(gRs)gRs.textContent=hasImage?(d.scanStatus||'READY'):'IMAGE MISSING';
+if(gDet)gDet.textContent=hasImage?(d.details||'Image loaded. Tap START IMAGE ANALYSIS.'):'IMAGE MISSING — WAIT. Upload an image again to interpret it.';
+renderKronosChart(d.kronosCandles||[],d);renderKronosTechnical(d.kronosCandles||[]);var kh=document.getElementById('kronosHigherTimeframe');if(kh)kh.textContent=d.kronosHigherTimeframe||'4h';var km=document.getElementById('kronosMiddleTimeframe');if(km)km.textContent=d.kronosMiddleTimeframe||'15m';var ke=document.getElementById('kronosEntryTimeframe');if(ke)ke.textContent=d.kronosEntryTimeframe||'1m';var kl=document.getElementById('kronosLiveState');if(kl)kl.textContent=d.kronosLiveWatchActive?'LIVE WATCH ON · polls every 15 seconds':'Live watch stopped';
 var ks=document.getElementById('kronosSymbol');if(ks)ks.textContent=d.kronosSymbol||'EURUSD';
 var ki=document.getElementById('kronosInterval');if(ki)ki.textContent=d.kronosInterval||'1m';
 var kfs=document.getElementById('kronosFeedStatus');if(kfs)kfs.textContent=(d.kronosCandles&&d.kronosCandles.length>=32)?'BIGQUOTE DATA LOADED':'BIGQUOTE PUBLIC API · NO KEY';
