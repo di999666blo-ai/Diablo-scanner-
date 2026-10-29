@@ -585,8 +585,7 @@ public class ScreenCaptureService extends Service {
                             // Phone-only contract: fetch structured BigQuote candles locally,
                             // then invoke only the dedicated local Kronos runtime. Never route to a host.
                             try {
-                                JSONObject candleInput = KronosRuntimeClient.fetchLocalCandleInput(getApplicationContext());
-                                result = KronosLocalRuntime.forecast(getApplicationContext(), candleInput.toString());
+                                result = GuidedScalpingAnalyzer.analyze(getApplicationContext());
                             } catch (Exception feedError) {
                                 result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
                                         + feedError.getClass().getSimpleName() + " — "
