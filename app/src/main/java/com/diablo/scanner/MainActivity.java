@@ -105,6 +105,28 @@ public class MainActivity extends Activity {
         });
         setContentView(dashboardWebView);
         loadDashboardAsset();
+        // Ask once on first launch so notification permission is not silently skipped.
+        new Handler(Looper.getMainLooper()).postDelayed(this::promptForNotificationPermissionIfNeeded, 900L);
+    }
+
+    private void promptForNotificationPermissionIfNeeded() {
+        if (prefs == null || prefs.getBoolean("notification_permission_prompted", false)) return;
+        prefs.edit().putBoolean("notification_permission_prompted", true).apply();
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7102);
+            }
+            return;
+        }
+        // Android 8 / EMUI has no runtime POST_NOTIFICATIONS prompt; explain and open app settings on consent.
+        new AlertDialog.Builder(this)
+                .setTitle("Allow DIABLO SCANNER notifications")
+                .setMessage("Allow notifications so Pulse-Lock and signal alerts can reach this phone. Android "
+                        + Build.VERSION.RELEASE + " does not show a system runtime notification prompt; tap OPEN SETTINGS and enable Allow notifications for DIABLO SCANNER.")
+                .setNegativeButton("NOT NOW", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("OPEN SETTINGS", (dialog, which) -> openAppNotificationSettings())
+                .show();
     }
 
     @Override
