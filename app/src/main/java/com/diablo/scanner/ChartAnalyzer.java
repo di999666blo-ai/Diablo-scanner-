@@ -186,7 +186,7 @@ public final class ChartAnalyzer {
         details.append("\nMomentum gate: visual slope and recent candle-colour agreement were calculated and used as preliminary evidence; structured OHLC momentum is NOT VERIFIED.");
         details.append("\nOrder block / FVG / ATR: NOT VERIFIED — this screen-only analyzer cannot reliably extract structured OHLC zones or ATR. Do not treat the visual read as a confirmed institutional setup.");
         if ("UP".equals(signal) || "DOWN".equals(signal)) {
-            details.append("\\nSignal status: PRELIMINARY VISUAL DIRECTION only; confirm price levels and setup manually before any trade.");
+            details.append("\nSignal status: PRELIMINARY VISUAL DIRECTION only; confirm price levels and setup manually before any trade.");
         } else {
             details.append("\\nSignal status: WAIT because the visible direction/momentum evidence did not pass the analyzer's confirmation gates.");
         }
