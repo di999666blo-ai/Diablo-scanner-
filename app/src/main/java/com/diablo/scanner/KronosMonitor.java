@@ -58,45 +58,81 @@ public final class KronosMonitor {
     }
 
     public static Snapshot evaluate(String symbol, String higherTf, String middleTf, String entryTf) throws Exception {
+        // Top-down workflow: 4H bias + levels -> 15M setup around those levels -> 1M trigger.
         List<Bar> higher=fetch(symbol, higherTf), middle=fetch(symbol, middleTf), entryBars=fetch(symbol, entryTf);
         String ht=trend(higher), mt=trend(middle), et=trend(entryBars);
-        Bar last=entryBars.get(entryBars.size()-1);
-        double atr=atr(entryBars);
-        boolean aligned=(ht.equals("BULLISH") && mt.equals("BULLISH")) ||
-                        (ht.equals("BEARISH") && mt.equals("BEARISH"));
-        Bar previous=entryBars.get(entryBars.size()-2);
-        boolean entryAligned=(ht.equals("BULLISH") && mt.equals("BULLISH") && et.equals("BULLISH")) ||
-                              (ht.equals("BEARISH") && mt.equals("BEARISH") && et.equals("BEARISH"));
-        boolean entryTrigger=(ht.equals("BULLISH") && last.close>previous.high) ||
-                             (ht.equals("BEARISH") && last.close<previous.low);
-        String direction=ht.equals("BULLISH") ? "UP" : ht.equals("BEARISH") ? "DOWN" : "WAIT";
+        Bar hLast=higher.get(higher.size()-1), mLast=middle.get(middle.size()-1), mPrev=middle.get(middle.size()-2);
+        Bar last=entryBars.get(entryBars.size()-1), prev=entryBars.get(entryBars.size()-2), prev2=entryBars.get(entryBars.size()-3);
+        double hAtr=atr(higher), mAtr=atr(middle), eAtr=atr(entryBars);
+
+        // Recent closed 4H structure plus the latest closed 4H candle's extremes.
+        int hFrom=Math.max(0,higher.size()-21);
+        double structureHigh=Double.NEGATIVE_INFINITY, structureLow=Double.POSITIVE_INFINITY;
+        for(int i=hFrom;i<higher.size();i++) {
+            structureHigh=Math.max(structureHigh,higher.get(i).high);
+            structureLow=Math.min(structureLow,higher.get(i).low);
+        }
+        double resistance=Math.max(structureHigh,hLast.high), support=Math.min(structureLow,hLast.low);
+        double current=mLast.close;
+        double zoneTol=Math.max(Math.max(mAtr*0.65, hAtr*0.12), current*0.00015);
+        boolean bullish="BULLISH".equals(ht), bearish="BEARISH".equals(ht), trendKnown=bullish||bearish;
+
+        // 15M setup: a pullback/rejection at a 4H zone OR a breakout/retest.
+        boolean nearSupport=Math.abs(current-support)<=zoneTol || (mLast.low<=support+zoneTol && current>=support-zoneTol);
+        boolean nearResistance=Math.abs(current-resistance)<=zoneTol || (mLast.high>=resistance-zoneTol && current<=resistance+zoneTol);
+        boolean bullish15Reject=nearSupport && mLast.close>=mLast.open && mLast.close>=mPrev.close;
+        boolean bearish15Reject=nearResistance && mLast.close<=mLast.open && mLast.close<=mPrev.close;
+        boolean bullish15Break=mLast.close>resistance && (mPrev.close>resistance || mLast.low<=resistance+zoneTol);
+        boolean bearish15Break=mLast.close<support && (mPrev.close<support || mLast.high>=support-zoneTol);
+        boolean setup15=bullish ? (bullish15Reject||bullish15Break) : bearish ? (bearish15Reject||bearish15Break) : false;
+
+        // Flexible 1M trigger: rejection, engulfing, or micro-structure break; no strict EMA alignment gate.
+        double microTol=Math.max(eAtr*0.15,current*0.00003);
+        boolean bullReject=last.low<=Math.min(prev.low,prev2.low)+microTol && last.close>last.open && last.close>prev.close;
+        boolean bearReject=last.high>=Math.max(prev.high,prev2.high)-microTol && last.close<last.open && last.close<prev.close;
+        boolean bullEngulf=last.close>last.open && prev.close<prev.open && last.close>=prev.open && last.open<=prev.close;
+        boolean bearEngulf=last.close<last.open && prev.close>prev.open && last.close<=prev.open && last.open>=prev.close;
+        boolean bullBreak=last.close>Math.max(prev.high,prev2.high), bearBreak=last.close<Math.min(prev.low,prev2.low);
+        boolean entryTrigger=bullish ? (bullReject||bullEngulf||bullBreak) : bearish ? (bearReject||bearEngulf||bearBreak) : false;
+
+        String direction=bullish ? "UP" : bearish ? "DOWN" : "WAIT";
         double entry=0, sl=0, tp=0, rr=0;
         boolean valid=false;
-        String status="WAIT — MONITORING FOR ENTRY";
-        String reason="Trend alignment or entry conditions are not yet confirmed. Monitoring remains active.";
-        if (entryAligned && entryTrigger && atr>0 && last.close>0) {
+        String status="WAIT — MONITORING FOR ENTRY", reason;
+        if(!trendKnown) {
+            reason="4H trend is neutral/ranging. No direction is forced; monitoring continues.";
+        } else if(!setup15) {
+            reason="4H bias established. Waiting for 15M price action to reach/reject a 4H structure zone or confirm a breakout/retest.";
+        } else if(!entryTrigger) {
+            reason="15M setup detected around 4H structure. Waiting for a 1M rejection, engulfing candle, or micro-structure break.";
+        } else if(eAtr<=0 || last.close<=0) {
+            reason="Entry trigger seen but valid volatility/risk data is unavailable; no levels issued.";
+        } else {
             entry=last.close;
-            double risk=Math.max(atr*1.5, entry*0.0002);
-            double reward=risk*2.0;
-            if ("UP".equals(direction)) { sl=entry-risk; tp=entry+reward; }
-            else { sl=entry+risk; tp=entry-reward; }
-            valid=sl>0 && tp>0 && ("UP".equals(direction) ? sl<entry && tp>entry : sl>entry && tp<entry);
-            if (valid) { rr=reward/risk; status="ENTRY SETUP DETECTED"; reason="All three timeframe trends align. Entry/SL/TP calculated from the latest completed entry-timeframe close and ATR-based risk rules; not a guarantee of outcome."; }
-        } else if (!aligned) {
-            reason="Higher and middle timeframe trends disagree. Monitoring continues; no entry levels are issued.";
-        } else if (!entryAligned) {
-            reason="Higher and middle timeframes agree, but the entry timeframe has not confirmed. Monitoring continues.";
-        } else if (!entryTrigger) {
-            reason="All three trends align, but the entry-timeframe breakout trigger has not occurred. Monitoring continues; no premature entry is issued.";
+            double riskFloor=Math.max(eAtr*1.35,entry*0.00015);
+            double structuralStop=bullish ? Math.min(last.low,Math.min(prev.low,prev2.low)) : Math.max(last.high,Math.max(prev.high,prev2.high));
+            double stopPad=Math.max(eAtr*0.10,entry*0.00003);
+            sl=bullish ? Math.min(entry-riskFloor,structuralStop-stopPad) : Math.max(entry+riskFloor,structuralStop+stopPad);
+            double actualRisk=Math.abs(entry-sl), reward=actualRisk*2.0;
+            tp=bullish ? entry+reward : entry-reward;
+            valid=actualRisk>0 && sl>0 && tp>0 && (bullish ? sl<entry && tp>entry : sl>entry && tp<entry);
+            if(valid) {
+                rr=Math.abs(tp-entry)/actualRisk;
+                status="ENTRY SETUP DETECTED";
+                reason="4H directional bias + 15M structure setup + 1M trigger confirmed. Levels are rule-based estimates; verify spread and live price.";
+            } else reason="Entry pattern detected, but calculated risk levels failed validation. Monitoring continues.";
         }
-        String details="KRONOS MULTI-TIMEFRAME MONITOR (rules-based)\n"
-                +"Market: "+symbol+"\n"
-                +higherTf+" trend: "+ht+"\n"+middleTf+" trend: "+mt+"\n"+entryTf+" entry trend: "+et+"\n"
+        String details="KRONOS TOP-DOWN MARKET MONITOR (rules-based)\n"
+                +"Market: "+symbol+"\n"+higherTf+" trend: "+ht+"\n"
+                +"Last closed "+higherTf+" candle: O "+fmt(hLast.open)+" / H "+fmt(hLast.high)+" / L "+fmt(hLast.low)+" / C "+fmt(hLast.close)+"\n"
+                +"4H structure support: "+fmt(support)+"\n4H structure resistance: "+fmt(resistance)+"\n"
+                +middleTf+" context: "+mt+" — "+(setup15?"SETUP DEVELOPING/CONFIRMED":"WATCHING 4H ZONES")+"\n"
+                +entryTf+" entry trigger: "+(entryTrigger?"CONFIRMED":"WAITING")+" ("+(bullReject||bullEngulf||bullBreak?"bullish pattern":bearReject||bearEngulf||bearBreak?"bearish pattern":"no trigger yet")+")\n"
                 +"Monitor: ACTIVE — "+status+"\n"+reason+"\n"
                 +(valid ? "Direction: "+direction+"\nEntry: "+fmt(entry)+"\nStop-loss: "+fmt(sl)+"\nTake-profit: "+fmt(tp)+"\nRisk/reward: 1:"+String.format(Locale.US,"%.2f",rr)+"\n"
                          : "Entry / SL / TP: WAITING FOR A VALID SETUP\n")
                 +"Data source: BigQuote completed candles. Updated: "+java.time.Instant.now()+"\n"
-                +"Note: this is a transparent technical rules layer, not verified Kronos neural-model inference.";
+                +"Note: transparent technical rules layer; this output alone does not prove neural Kronos inference.";
         return new Snapshot(symbol,higherTf,middleTf,entryTf,ht,mt,et,status,details,entry,sl,tp,rr,valid,System.currentTimeMillis());
     }
 
