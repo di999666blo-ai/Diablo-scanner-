@@ -189,8 +189,12 @@ public class ScreenCaptureService extends Service {
                     String timedEngine = state.getString("timed_engine", "HYBRID");
                     boolean fastObservation = !"SMOLVLM".equalsIgnoreCase(timedEngine)
                             && !"COMBINED".equalsIgnoreCase(timedEngine);
-                    timedScanDurationMs = Math.max(5000L, Math.min(300000L,
-                            state.getLong("timed_scan_duration_ms", 30000L)));
+                    // Hybrid Fast gets a fixed maximum 10-second observation window.
+                    // This is independent of the user's trade expiry (trade_duration_ms).
+                    // SmolVLM/Combined retain their existing configured observation behavior.
+                    timedScanDurationMs = fastObservation ? 10000L
+                            : Math.max(5000L, Math.min(300000L,
+                                    state.getLong("timed_scan_duration_ms", 30000L)));
                     timedScanStartedAt = System.currentTimeMillis();
                     timedScanActive = fastObservation;
                     workerHandler.removeCallbacks(timedScanRunnable);
@@ -471,7 +475,21 @@ public class ScreenCaptureService extends Service {
             Bitmap chartOnly = null;
             try {
                 chartOnly = Bitmap.createBitmap(bitmap, left, top, right-left, bottom-top);
-                startAIAnalysis(chartOnly);
+                SharedPreferences prefs = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
+                boolean hybridTimed = "TIMED".equalsIgnoreCase(
+                        prefs.getString("trading_mode", "TIMED"))
+                        && !"SMOLVLM".equalsIgnoreCase(prefs.getString("timed_engine", "HYBRID"))
+                        && !"COMBINED".equalsIgnoreCase(prefs.getString("timed_engine", "HYBRID"));
+                if (hybridTimed) {
+                    Bitmap normalized = prepareHybridFastBitmap(chartOnly);
+                    try {
+                        startAIAnalysis(normalized);
+                    } finally {
+                        if (normalized != chartOnly && !normalized.isRecycled()) normalized.recycle();
+                    }
+                } else {
+                    startAIAnalysis(chartOnly);
+                }
             } finally {
                 if (chartOnly != null && !chartOnly.isRecycled()) chartOnly.recycle();
             }
@@ -483,6 +501,26 @@ public class ScreenCaptureService extends Service {
                     .putString("scan_message", "Chart analysis could not start. Tap D to retry.")
                     .apply();
         }
+    }
+
+    /**
+     * Keeps Hybrid Fast image processing within a 720p-class frame budget.
+     * Android screen capture cannot increase the physical display resolution;
+     * this only downsizes oversized captures and never upscales or invents detail.
+     * Portrait target: 720x1280. Landscape target: 1280x720.
+     */
+    private Bitmap prepareHybridFastBitmap(Bitmap source) {
+        if (source == null || source.isRecycled()) return source;
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width <= 0 || height <= 0) return source;
+        int maxWidth = width >= height ? 1280 : 720;
+        int maxHeight = width >= height ? 720 : 1280;
+        if (width <= maxWidth && height <= maxHeight) return source;
+        double scale = Math.min(maxWidth / (double) width, maxHeight / (double) height);
+        int targetWidth = Math.max(1, (int) Math.round(width * scale));
+        int targetHeight = Math.max(1, (int) Math.round(height * scale));
+        return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
     }
 
     // ================================================
