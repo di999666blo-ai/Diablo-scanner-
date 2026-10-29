@@ -68,12 +68,18 @@ public final class KronosMonitor {
         // Recent closed 4H structure plus the latest closed 4H candle's extremes.
         int hFrom=Math.max(0,higher.size()-21);
         double structureHigh=Double.NEGATIVE_INFINITY, structureLow=Double.POSITIVE_INFINITY;
-        for(int i=hFrom;i<higher.size();i++) {
-            structureHigh=Math.max(structureHigh,higher.get(i).high);
-            structureLow=Math.min(structureLow,higher.get(i).low);
-        }
-        double resistance=Math.max(structureHigh,hLast.high), support=Math.min(structureLow,hLast.low);
         double current=mLast.close;
+        double nearestSupport=Double.NEGATIVE_INFINITY, nearestResistance=Double.POSITIVE_INFINITY;
+        for(int i=hFrom;i<higher.size();i++) {
+            Bar b=higher.get(i);
+            structureHigh=Math.max(structureHigh,b.high);
+            structureLow=Math.min(structureLow,b.low);
+            if(b.low<=current) nearestSupport=Math.max(nearestSupport,b.low);
+            if(b.high>=current) nearestResistance=Math.min(nearestResistance,b.high);
+        }
+        // Use nearby 4H candle levels for actionable zones; retain wider swing extremes as fallback.
+        double support=Double.isFinite(nearestSupport)?nearestSupport:structureLow;
+        double resistance=Double.isFinite(nearestResistance)?nearestResistance:structureHigh;
         double zoneTol=Math.max(Math.max(mAtr*0.65, hAtr*0.12), current*0.00015);
         boolean bullish="BULLISH".equals(ht), bearish="BEARISH".equals(ht), trendKnown=bullish||bearish;
 
