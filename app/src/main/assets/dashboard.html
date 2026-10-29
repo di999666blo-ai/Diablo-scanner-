@@ -88,7 +88,7 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 <p class="sub">A visible decision gate above the selected analyzer. It can reject weak, stale or conflicting setups; LOCKED means checks passed at that moment, never a guaranteed win.</p>
 <div class="card" id="plMarketDesk">
 <div class="cardhead"><span class="label">PULSE-LOCK MARKET DESK</span><span id="plMarketStatus" class="badge">WAIT · FEED NOT CONNECTED</span></div>
-<p class="tiny">Independent Pulse-Lock view. This panel only reports live market data when the Android bridge supplies Pulse-Lock-specific candles; it will not borrow Kronos results and pretend they are Pulse-Lock analysis.</p>
+<p class="tiny">Independent Pulse-Lock market feed from BigQuote public OHLC endpoints. It does not borrow Kronos results; its own multi-timeframe gate must pass before showing a directional candidate.</p>
 <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
 <div><label class="tiny" for="plPairSearch">SEARCH ALL API MARKETS</label><input id="plPairSearch" type="search" placeholder="Search pair, crypto, gold, index…" autocomplete="off" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:10px;margin:4px 0"><label class="tiny" for="plPair">SELECT MARKET PAIR</label><select id="plPair" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:11px"><option value="EURUSD">Loading API markets…</option></select><div class="tiny" id="plPairCount">Loading Biquote symbol catalogue…</div></div>
 <div><label class="tiny" for="plWatchTf">WATCH CHART</label><select id="plWatchTf" style="width:100%;background:#02040A;color:#E6EEFB;border:1px solid #1E345A;border-radius:8px;padding:11px"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
@@ -103,7 +103,7 @@ body.csExpanded .card{padding:17px}body.csNoMotion *,body.csNoMotion *:before,bo
 </div>
 <div class="settingrow"><div><b>Auto-refresh request</b><span>Every 5 seconds while Pulse-Lock is open</span></div><input id="plAutoRefresh" type="checkbox" style="width:20px;height:20px;accent-color:var(--red)"></div>
 <div class="btnrow"><button class="btn primary" id="plMarketRefresh">REFRESH PULSE-LOCK FEED</button><button class="btn" id="plMarketStop">STOP AUTO-REFRESH</button></div>
-<p class="tiny" id="plBridgeNote">Native feed bridge not yet verified. Controls are saved locally; no candle or signal will be fabricated.</p>
+<p class="tiny" id="plBridgeNote">Pulse-Lock fetches BigQuote directly. If the API or network fails, it stays WAIT and shows the error; no candle or signal is fabricated.</p>
 </div>
 <div class="card">
 <div class="label">THREE-TIMEFRAME STRATEGY WORKFLOW</div>
@@ -361,30 +361,93 @@ function plRenderSymbolOptions(query){
  else sel.selectedIndex=0;
 }
 async function plAnalyzeWorkflow(){
- let p=plMarketPrefs(),steps=$pl('plTfWorkflow');if(!steps)return;
- steps.innerHTML=['01 · HIGHER TREND ('+plEsc(p.high)+') — FETCHING REAL OHLC','02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — FETCHING REAL OHLC','03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — FETCHING REAL OHLC','04 · ENTRY / SL / TP — WAIT · VALIDATION PENDING'].map(x=>'<p>'+x+'</p>').join('');
- async function getBars(tf){let r=await fetch(PL_API+'/'+encodeURIComponent(p.pair)+'/ohlc?interval='+encodeURIComponent(tf)+'&limit=60',{headers:{Accept:'application/json'},cache:'no-store'});let d=await r.json();if(!r.ok)throw new Error('HTTP '+r.status+' for '+tf);let a=Array.isArray(d)?d:(d.bars||d.candles||d.items||[]);return a.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>Number.isFinite(Number(v)))).slice().reverse()}
- function trend(a){if(a.length<10)throw new Error('Not enough candles');let first=+a[Math.max(0,a.length-10)].close,last=+a[a.length-1].close,prev=+a[a.length-2].close;let pct=first?(last-first)/Math.abs(first)*100:0;return {dir:pct>0.015?'UP':pct< -0.015?'DOWN':'SIDEWAYS',pct:pct,bar:+a[a.length-1].close>=+a[a.length-1].open?'BULLISH':'BEARISH',last:last,prev:prev,bars:a}}
+ const p=plMarketPrefs(),steps=$pl('plTfWorkflow');
+ if(!steps)return;
+ const setWait=function(reason){
+  steps.innerHTML=['01 · HIGHER TREND — WAIT','02 · SETUP CONFIRMATION — WAIT','03 · ENTRY TRIGGER — WAIT','04 · ENTRY / SL / TP — WAIT · NO VERIFIED SETUP'].map(x=>'<p>'+plEsc(x)+'</p>').join('');
+  $pl('plReason').textContent=reason||'Pulse-Lock cannot verify the setup. No signal is issued.';
+  $pl('plState').textContent='WAIT · NOT LOCKED';$pl('plWord').textContent='WAIT';
+  $pl('plWord').className='signalword waitText';$pl('plScore').textContent='WAIT';
+  $pl('plFresh').textContent='UNKNOWN';
+ };
+ steps.innerHTML=['01 · HIGHER TREND ('+plEsc(p.high)+') — FETCHING','02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — FETCHING','03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — FETCHING','04 · ENTRY / SL / TP — WAIT · VALIDATION PENDING'].map(x=>'<p>'+x+'</p>').join('');
+ function stamp(b){let v=b.timestamp??b.time??b.datetime??b.date??b.openTime??b.open_time??b.t; if(v==null)return null; if(typeof v==='number')return v<1e12?v*1000:v;let n=Date.parse(v);return Number.isFinite(n)?n:null}
+ async function getBars(tf){
+  const r=await fetch(PL_API+'/'+encodeURIComponent(p.pair)+'/ohlc?interval='+encodeURIComponent(tf)+'&limit=60',{headers:{Accept:'application/json'},cache:'no-store'});
+  const d=await r.json();if(!r.ok)throw new Error('HTTP '+r.status+' for '+tf);
+  const raw=Array.isArray(d)?d:(d.bars||d.candles||d.items||d.data||[]);
+  const a=raw.filter(b=>b&&[b.open,b.high,b.low,b.close].every(v=>v!==''&&v!=null&&Number.isFinite(Number(v)))&&Number(b.high)>=Math.max(Number(b.open),Number(b.close),Number(b.low))&&Number(b.low)<=Math.min(Number(b.open),Number(b.close),Number(b.high)));
+  if(a.length<10)throw new Error('Only '+a.length+' valid candles for '+tf+'; at least 10 are required');
+  if(a.every(b=>stamp(b)!==null))a.sort((x,y)=>stamp(x)-stamp(y));else a.reverse();
+  return a.map(b=>Object.assign({},b,{open:Number(b.open),high:Number(b.high),low:Number(b.low),close:Number(b.close),_ts:stamp(b)}));
+ }
+ function trend(a){
+  const first=+a[Math.max(0,a.length-10)].close,last=+a[a.length-1].close,prev=+a[a.length-2].close;
+  const pct=first?(last-first)/Math.abs(first)*100:0;
+  const avgRange=a.slice(-14).reduce((n,b)=>n+(b.high-b.low),0)/Math.min(14,a.length);
+  return {dir:pct>0.015?'UP':pct< -0.015?'DOWN':'SIDEWAYS',pct,bar:last>=+a[a.length-1].open?'BULLISH':'BEARISH',last,prev,bars:a,atr:avgRange};
+ }
  try{
-  let all=await Promise.all([getBars(p.high),getBars(p.middle),getBars(p.entry)]),h=trend(all[0]),m=trend(all[1]),e=trend(all[2]),agree=h.dir===m.dir&&m.dir===e.dir&&h.dir!=='SIDEWAYS';
-  let recent=e.bars.slice(-12),lo=Math.min.apply(null,recent.map(b=>+b.low)),hi=Math.max.apply(null,recent.map(b=>+b.high));
-  let trigger=(e.dir==='UP'&&e.bar==='BULLISH'&&e.last>e.prev)||(e.dir==='DOWN'&&e.bar==='BEARISH'&&e.last<e.prev);
-  let final=agree&&trigger?'SETUP ALIGNED · VERIFY RISK MANUALLY':'WAIT · TIMEFRAMES OR ENTRY NOT ALIGNED';
+  const all=await Promise.all([getBars(p.high),getBars(p.middle),getBars(p.entry)]);
+  const h=trend(all[0]),m=trend(all[1]),e=trend(all[2]),agree=h.dir===m.dir&&m.dir===e.dir&&h.dir!=='SIDEWAYS';
+  const last=e.bars[e.bars.length-1],now=Date.now(),tfMs={'1m':60000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000};
+  const maxAge=Math.max(120000,(tfMs[p.entry]||60000)*2);
+  const timestampKnown=all.every(a=>a[a.length-1]._ts!==null);
+  const newestTs=Math.min(...all.map(a=>a[a.length-1]._ts===null?now:a[a.length-1]._ts));
+  const ageMs=now-newestTs, fresh=timestampKnown&&ageMs>=-60000&&ageMs<=maxAge;
+  const trigger=(e.dir==='UP'&&e.bar==='BULLISH'&&e.last>e.prev)||(e.dir==='DOWN'&&e.bar==='BEARISH'&&e.last<e.prev);
+  const recent=e.bars.slice(-12),swingLow=Math.min(...recent.map(b=>b.low)),swingHigh=Math.max(...recent.map(b=>b.high));
+  const pair=p.pair.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const fx= /^[A-Z]{6}$/.test(pair);
+  const quotePip=fx?(pair.endsWith('JPY')?0.01:0.0001):null;
+  const target=Math.max(1,Math.min(10000,Number($pl('plTarget').value)||10));
+  const maxDuration=Math.max(60,Number($pl('plMaxDuration').value)||300);
+  const profile=window.plProfileValue||'B';
+  const minMove=profile==='A'?0.04:profile==='C'?0.01:0.02;
+  const movePct=Math.abs(e.pct);
+  const structureOk=e.dir==='UP'?swingLow<e.last&&swingLow<e.prev:e.dir==='DOWN'?swingHigh>e.last&&swingHigh>e.prev:false;
+  const stop=e.dir==='UP'?Math.min(swingLow,e.last-Math.max(e.atr,Math.abs(e.last)*0.0001)):Math.max(swingHigh,e.last+Math.max(e.atr,Math.abs(e.last)*0.0001));
+  const targetDistance=quotePip?target*quotePip:null;
+  const take=e.dir==='UP'?e.last+targetDistance:e.last-targetDistance;
+  const risk=quotePip?Math.abs(e.last-stop)/quotePip:null;
+  const rr=quotePip&&risk>0?target/risk:0;
+  const riskOk=!!quotePip&&Number.isFinite(stop)&&Number.isFinite(take)&&risk>0&&rr>=1;
+  const aligned=agree&&trigger&&structureOk&&movePct>=minMove;
+  const checks=[
+   '01 · Data source — '+(all.every(a=>a.length>=10)?'REAL OHLC · 3 TIMEFRAMES':'WAIT'),
+   '02 · Candle freshness — '+(!timestampKnown?'UNKNOWN · API HAS NO USABLE CANDLE TIMESTAMPS':fresh?'FRESH · '+Math.round(ageMs/1000)+'s':'STALE / FUTURE TIMESTAMP · '+Math.round(ageMs/1000)+'s'),
+   '03 · Trend / momentum — '+h.dir+' / '+m.dir+' / '+e.dir,
+   '04 · Multi-timeframe agreement — '+(agree?'ALIGNED':'NOT ALIGNED'),
+   '05 · Entry / structure — '+(trigger&&structureOk?'CANDIDATE CONFIRMED':'WAIT · NO VALID TRIGGER'),
+   '06 · Risk levels — '+(riskOk?'CALCULATED · '+rr.toFixed(2)+'R':'WAIT · PIP SIZE / RISK NOT VERIFIED')
+  ];
+  const eligible=aligned&&fresh&&riskOk&&(!$pl('plRequireMtf').checked||agree);
+  const fmt=v=>Number(v).toPrecision(7).replace(/0+$/,'').replace(/\.$/,'');
+  const final=eligible?'PULSE-LOCK PASSED · MANUAL CONFIRMATION REQUIRED':'WAIT · ONE OR MORE GATES FAILED';
   steps.innerHTML=[
-   '01 · HIGHER TREND ('+plEsc(p.high)+') — '+h.dir+' · '+h.pct.toFixed(3)+'% · '+all[0].length+' candles',
-   '02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — '+m.dir+' · '+m.pct.toFixed(3)+'% · '+all[1].length+' candles',
-   '03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — '+e.dir+' / '+e.bar+' candle'+(trigger?' · TRIGGER CANDIDATE':' · NO TRIGGER'),
-   '04 · ENTRY / SL / TP — '+final+(agree?' · Entry '+e.last.toPrecision(7)+' · range '+lo.toPrecision(7)+'–'+hi.toPrecision(7):'')
-  ].map(x=>'<p>'+x+'</p>').join('');
-  $pl('plStrategyExplain').textContent='Workflow evaluated real OHLC independently for the three selected intervals. Trend alignment is a simple close-to-close heuristic, not a trained model or guaranteed trade signal. Entry/SL/TP remain candidates requiring spread, pip-size and risk validation.';
-  $pl('plReason').textContent=agree&&trigger?'Timeframes align and the latest entry candle supports the direction; confirm spread, pip conversion and risk before any manual trade.':'WAIT: the three timeframe directions and latest candle do not all confirm one another.';
-  $pl('plEngine').textContent='Engine: OHLC multi-timeframe heuristic · not Kronos inference';
-  $pl('plFresh').textContent='LIVE OHLC';
-  $pl('plScore').textContent=agree&&trigger?'MTF OK':'WAIT';
-  $pl('plState').textContent=agree&&trigger?'CANDIDATE · MANUAL CHECK':'WAIT · NOT LOCKED';
-  $pl('plWord').textContent=agree&&trigger?e.dir:'WAIT';$pl('plWord').classList.remove('greenText','redText','waitText');$pl('plWord').classList.add(agree&&trigger?(e.dir==='UP'?'greenText':'redText'):'waitText');
-  $pl('plChecks').innerHTML=['01 · Data source — REAL OHLC received','02 · Candle freshness — latest API response received','03 · Trend / momentum — '+h.dir+' / '+m.dir+' / '+e.dir,'04 · Multi-timeframe agreement — '+(agree?'ALIGNED':'NOT ALIGNED'),'05 · Entry candle — '+(trigger?'TRIGGER CANDIDATE':'WAIT'),'06 · Risk levels — manual validation required'].map(x=>'<p>'+plEsc(x)+'</p>').join('');
- }catch(err){steps.innerHTML=['01 · HIGHER TREND — WAIT · '+plEsc(err.message),'02 · SETUP CONFIRMATION — WAIT · DATA ERROR','03 · ENTRY TRIGGER — WAIT · DATA ERROR','04 · ENTRY / SL / TP — WAIT · NO VERIFIED SETUP'].map(x=>'<p>'+x+'</p>').join('');$pl('plReason').textContent='Workflow could not complete: '+err.message+'. No signal is issued.';$pl('plState').textContent='WAIT · WORKFLOW ERROR';$pl('plWord').textContent='WAIT';}
+   '01 · HIGHER TREND ('+plEsc(p.high)+') — '+h.dir+' · '+h.pct.toFixed(3)+'% · '+all[0].length+' bars',
+   '02 · SETUP CONFIRMATION ('+plEsc(p.middle)+') — '+m.dir+' · '+m.pct.toFixed(3)+'% · '+all[1].length+' bars',
+   '03 · ENTRY TRIGGER ('+plEsc(p.entry)+') — '+e.dir+' / '+e.bar+' · '+(trigger?'TRIGGER':'NO TRIGGER'),
+   '04 · ENTRY / SL / TP — '+final,
+   'ENTRY CANDIDATE: '+(eligible?fmt(e.last):'N/A')+' · STOP: '+(eligible?fmt(stop):'N/A')+' · TARGET: '+(eligible?fmt(take):'N/A')+
+    (eligible?' · '+target+' pip target · '+rr.toFixed(2)+'R':'')
+  ].map(x=>'<p>'+plEsc(x)+'</p>').join('');
+  $pl('plStrategyExplain').textContent='Pulse-Lock independently evaluates three BigQuote OHLC timeframes. It requires timestamped fresh candles, aligned direction, a matching entry candle, a structure-based stop and a supported FX pip size. This is a transparent heuristic, not Kronos inference or a trained prediction.';
+  $pl('plEngine').textContent='Engine: independent OHLC risk gate · not Kronos inference';
+  $pl('plFresh').textContent=!timestampKnown?'UNKNOWN':fresh?'FRESH':'STALE';
+  $pl('plScore').textContent=eligible?'GATES PASS':'WAIT';
+  $pl('plState').textContent=eligible?'GATES PASS · MANUAL CHECK':'WAIT · NOT LOCKED';
+  $pl('plWord').textContent=eligible?e.dir:'WAIT';$pl('plWord').className='signalword '+(eligible?(e.dir==='UP'?'greenText':'redText'):'waitText');
+  $pl('plReason').textContent=eligible?'All software checks passed for this snapshot. This is not a guaranteed win: confirm current spread, broker price, position size and execution manually.':!timestampKnown?'WAIT: BigQuote candles do not expose a usable timestamp, so freshness cannot be verified and Pulse-Lock will not pass.':!fresh?'WAIT: at least one selected timeframe has stale or future-dated candles.':!agree&&$pl('plRequireMtf').checked?'WAIT: selected timeframes do not agree.':!trigger?'WAIT: the latest entry candle does not confirm momentum.':!structureOk?'WAIT: no usable nearby swing invalidation level.':!riskOk?'WAIT: this market does not have a verified pip convention or valid risk/reward calculation.':'WAIT: entry momentum does not meet the selected profile threshold.';
+  $pl('plChecks').innerHTML=checks.map(x=>'<p>'+plEsc(x)+'</p>').join('');
+  $pl('plTargetRead').textContent=target+' pips / '+plDuration(maxDuration);
+  $pl('plTrace').textContent='Last validation '+new Date().toLocaleTimeString()+' · '+p.pair+' · '+(eligible?'GATES PASSED; manual confirmation still required.':'WAIT; failed checks are listed above.');
+  if(eligible)window.plPublishLockedNotification({locked:true,direction:e.dir,entry:fmt(e.last),stopLoss:fmt(stop),takeProfit:fmt(take),pair:p.pair,source:'Pulse-Lock independent OHLC gate',timestamp:new Date().toISOString(),riskReward:rr});
+ }catch(err){
+  setWait('Workflow could not complete: '+(err&&err.message?err.message:'unknown data error')+'. No signal is issued.');
+  $pl('plChecks').innerHTML=['01 · Data source — WAIT / ERROR','02 · Candle freshness — NOT VERIFIED','03 · Trend / momentum — NOT VERIFIED','04 · Multi-timeframe agreement — NOT VERIFIED','05 · Entry / structure — NOT VERIFIED','06 · Risk levels — NOT VERIFIED'].map(x=>'<p>'+x+'</p>').join('');
+  $pl('plTrace').textContent='Pulse-Lock rejected the analysis: '+(err&&err.message?err.message:'unknown error');
+ }
 }
 async function plFetchCandles(){
  let p=plMarketPrefs(),token=++plRequest;
@@ -423,7 +486,7 @@ function plPaintProfile(){['A','B','C'].forEach(k=>{let b=$pl('pl'+k);if(b)b.cla
 window.plSetProfile=function(p){window.plProfileValue=p;plPaintProfile();$pl('plProfileRead').textContent=p+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[p]);};
 window.plSave=function(){let c=plCfg();c.profile=window.plProfileValue||'B';try{localStorage.setItem(KEY,JSON.stringify(c));if(window.DiabloAndroid&&typeof DiabloAndroid.savePulseLockSettings==='function')DiabloAndroid.savePulseLockSettings(JSON.stringify(c));$pl('plSaveStatus').textContent='Saved on this device. Target '+c.target+' pips; maximum '+plDuration(c.maxDuration)+'. No target reduction or duration extension is allowed.';$pl('plTargetRead').textContent=c.target+' pips / '+plDuration(c.maxDuration);$pl('plProfileRead').textContent=c.profile+' · '+({A:'PRECISION',B:'BALANCED',C:'RAPID'}[c.profile])}catch(e){$pl('plSaveStatus').textContent='Save failed in local storage.'}};
 window.plPublishLockedNotification=function(payload){try{if(!payload||payload.locked!==true||!payload.direction||!payload.entry||!payload.stopLoss||!payload.takeProfit){$pl('plTrace').textContent='Notification blocked: a Pulse-Lock alert requires LOCKED plus direction, entry, stop-loss and take-profit.';return false}if(window.DiabloAndroid&&typeof DiabloAndroid.notifyPulseLockSignal==='function'){DiabloAndroid.notifyPulseLockSignal(JSON.stringify(payload));$pl('plTrace').textContent='Pulse-Lock alert handed to Android notification service. Duplicate setups are rate-limited.';return true}$pl('plTrace').textContent='Android notification bridge is unavailable.';return false}catch(e){$pl('plTrace').textContent='Notification error: '+(e&&e.message?e.message:'unknown');return false}};
-window.plRefresh=function(){$pl('plState').textContent='WAIT · DATA NOT VERIFIED';$pl('plWord').textContent='WAIT';$pl('plWord').className='signalword waitText';$pl('plScore').textContent='—';$pl('plFresh').textContent='UNKNOWN';$pl('plReason').textContent='Safe default: the dashboard has not yet received a validated OHLC payload plus timestamps and a completed analyzer result. No lock is issued.';$pl('plChecks').innerHTML=['01 · Data source — NOT VERIFIED BY GATE','02 · Candle freshness — UNKNOWN','03 · Trend / momentum — NOT VERIFIED','04 · Multi-timeframe agreement — NOT VERIFIED','05 · Target fits maximum duration — NOT CALCULATED','06 · Invalidation / stop level — NOT VERIFIED'].map(x=>'<p>'+x+'</p>').join('');$pl('plTrace').textContent='Refresh checked the gate UI, not the market provider. A true live lock requires wiring validated candles and analyzer results into the decision engine; until then WAIT is intentional.'};
+window.plRefresh=function(){plMarketSave();plLoadSymbols().then(function(){return plFetchCandles()}).catch(function(e){$pl('plTrace').textContent='Pulse-Lock refresh failed: '+(e&&e.message?e.message:'network error');});};
 document.addEventListener('DOMContentLoaded',function(){if($pl('plTarget'))plLoad();plMarketInit()});
 })();
 </script>
