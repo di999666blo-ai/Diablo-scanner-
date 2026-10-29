@@ -188,7 +188,7 @@ public final class ChartAnalyzer {
         if ("UP".equals(signal) || "DOWN".equals(signal)) {
             details.append("\nSignal status: PRELIMINARY VISUAL DIRECTION only; confirm price levels and setup manually before any trade.");
         } else {
-            details.append("\\nSignal status: WAIT because the visible direction/momentum evidence did not pass the analyzer's confirmation gates.");
+            details.append("\nSignal status: WAIT because the visible direction/momentum evidence did not pass the analyzer's confirmation gates.");
         }
         if (candleCloseUnverified) details.append("\nCANDLE CLOSE UNVERIFIED: a static screenshot cannot prove candle closure. Final decision forced to WAIT.");
         details.append("\nSpeed/precision profile changes sampling and confirmation threshold; it does not make this pixel-based analyzer a trained AI model.");
