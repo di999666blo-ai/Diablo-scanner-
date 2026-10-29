@@ -44,7 +44,7 @@ public final class ChartAnalyzer {
         int threshold = prefs.getInt("threshold", 15);
         String timeframe = prefs.getString("chart_timeframe", "1m");
         String mode = prefs.getString("trading_mode", "TIMED");
-        String timing = prefs.getString("signal_timing", "CLOSE");
+        String timing = prefs.getString("signal_timing", "FORMING");
         String profile = prefs.getString("timed_analysis_profile", "BALANCED");
         long duration = prefs.getLong("trade_duration_ms", 60000L);
         int w = bitmap.getWidth(), h = bitmap.getHeight();
