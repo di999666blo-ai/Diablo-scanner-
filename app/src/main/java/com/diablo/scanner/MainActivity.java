@@ -173,8 +173,11 @@ public class MainActivity extends Activity {
                 requestScreenCapture();
                 break;
             case "start_guided_scalping":
-                // A new guided run must not inherit stale 4H/15M findings from an older session.
+                // Guide Scalping is screen-capture-first: select SmolVLM here so
+                // this workflow never silently starts on Kronos/market-feed mode.
+                // Kronos remains available from its separate dashboard/runtime.
                 prefs.edit().putString("trading_mode", "SCALPING")
+                        .putString("scalping_engine", "SMOLVLM")
                         .putString("guided_scalping_context", "{}")
                         .putString("guided_scalping_session_started", String.valueOf(System.currentTimeMillis()))
                         .remove("guided_scalping_last_stage")
