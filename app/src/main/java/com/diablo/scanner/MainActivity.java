@@ -2504,22 +2504,20 @@ public class MainActivity extends Activity {
                 String mSignal = safeKronosDirection(middleForecast);
                 String eSignal = safeKronosDirection(entryForecast);
                 KronosMonitor.Snapshot snapshot = KronosMonitor.evaluate(symbol, higher, middle, entry);
-                boolean modelAligned = ("UP".equals(hSignal) && "UP".equals(mSignal) && "UP".equals(eSignal))
-                        || ("DOWN".equals(hSignal) && "DOWN".equals(mSignal) && "DOWN".equals(eSignal));
-                boolean validSetup = modelAligned && snapshot.validSetup
-                        && (("UP".equals(hSignal) && snapshot.entryTrend.equals("BULLISH"))
-                        || ("DOWN".equals(hSignal) && snapshot.entryTrend.equals("BEARISH")));
-                String modelDirection = validSetup ? hSignal : "WAIT";
-                status = validSetup ? "ENTRY SETUP DETECTED — LOCAL KRONOS AGREEMENT"
-                        : "WAIT — LOCAL KRONOS TIMEFRAMES NOT ALIGNED OR ENTRY NOT CONFIRMED";
+                // Do not require three neural forecasts to agree: that can suppress valid entries indefinitely.
+                // The technical sequence uses 4H structure as bias, 15M as setup, and 1M as entry trigger.
+                boolean validSetup = snapshot.validSetup;
+                String modelDirection = validSetup ? ("BULLISH".equals(snapshot.higherTrend) ? "UP" : "DOWN") : "WAIT";
+                status = validSetup ? "ENTRY SETUP DETECTED — 4H/15M/1M RULES CONFIRMED"
+                        : "WAIT — MONITORING 4H STRUCTURE / 15M SETUP / 1M ENTRY";
                 details = "KRONOS LOCAL MULTI-TIMEFRAME SESSION\n"
                         + "Instrument: " + symbol + "\n"
                         + higher + " neural forecast: " + hSignal + "\n" + higherForecast.details + "\n\n"
                         + middle + " neural forecast: " + mSignal + "\n" + middleForecast.details + "\n\n"
                         + entry + " neural forecast: " + eSignal + "\n" + entryForecast.details + "\n\n"
                         + "Technical entry validation: " + snapshot.status + "\n" + snapshot.details + "\n"
-                        + (validSetup ? "MODEL AGREEMENT: all three local Kronos forecasts align; levels below come from the separate transparent technical validation layer.\n"
-                                      : "NO CONFIRMED ENTRY: local model forecasts or technical entry validation do not fully agree.\n")
+                        + (validSetup ? "ENTRY CONFIRMED: 4H bias and structure + 15M setup + 1M trigger. Neural forecasts are supporting context, not a mandatory three-way agreement gate.\n"
+                                      : "NO CONFIRMED ENTRY YET: monitoring 4H levels, 15M setup development, and 1M entry triggers.\n")
                         + "This is experimental forecasting, not a guarantee.";
                 prefs.edit().putString("kronos_monitor_details", details)
                         .putString("kronos_higher_trend", hSignal)
