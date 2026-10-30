@@ -104,6 +104,9 @@ public final class ChartVisionEngine {
             Mat redB = new Mat();
             Mat red = new Mat();
             Mat green = new Mat();
+            Mat blue = new Mat();
+            Mat yellow = new Mat();
+            Mat alternate = new Mat();
             Mat candleMask = new Mat();
             Mat gray = new Mat();
             Mat edges = new Mat();
@@ -134,9 +137,6 @@ public final class ChartVisionEngine {
                 Core.inRange(hsv, new Scalar(165, 55, 45), new Scalar(180, 255, 255), redB);
                 Core.bitwise_or(redA, redB, red);
                 Core.inRange(hsv, new Scalar(32, 40, 40), new Scalar(105, 255, 255), green);
-                Mat blue = new Mat();
-                Mat yellow = new Mat();
-                Mat alternate = new Mat();
                 Core.inRange(hsv, new Scalar(90, 45, 40), new Scalar(135, 255, 255), blue);
                 Core.inRange(hsv, new Scalar(15, 55, 55), new Scalar(35, 255, 255), yellow);
                 Core.bitwise_or(red, green, alternate);
@@ -272,8 +272,6 @@ public final class ChartVisionEngine {
 
         int[] fallback = fallbackColorScan(bitmap);
         boolean chart = fallback[0] >= 8 && fallback[1] >= 70;
-        String ocr = readText ? readOcr(context, bitmap) : "";
-        String tf = extractTimeframe(ocr);
         String summary = "OpenCV unavailable; basic colour/shape fallback only. "
                 + "Detected " + fallback[0] + " separated candle-colour columns and "
                 + fallback[1] + " coloured samples. "
