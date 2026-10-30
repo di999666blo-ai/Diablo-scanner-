@@ -75,6 +75,11 @@ public final class ChartVisionEngine {
             return empty("Image is missing or too small to inspect.");
         }
 
+        // OCR the original-resolution screenshot before CV downscaling. Broker
+        // timeframe and price labels are often only a few pixels high.
+        String ocr = readText ? readOcr(context, bitmap) : "";
+        String tf = extractTimeframe(ocr);
+
         int sourceWidth = bitmap.getWidth();
         int sourceHeight = bitmap.getHeight();
         Rect bounds = new Rect(
@@ -121,11 +126,22 @@ public final class ChartVisionEngine {
                 Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2RGB);
                 Imgproc.cvtColor(rgb, hsv, Imgproc.COLOR_RGB2HSV);
 
-                Core.inRange(hsv, new Scalar(0, 65, 55), new Scalar(13, 255, 255), redA);
-                Core.inRange(hsv, new Scalar(165, 65, 55), new Scalar(180, 255, 255), redB);
+                // Recognise common broker palettes, not only red/green.
+                // Direction classification remains restricted to conventional
+                // red/green candles in Hybrid Fast; alternate colours are chart
+                // evidence for SmolVLM, not a guessed bullish/bearish mapping.
+                Core.inRange(hsv, new Scalar(0, 55, 45), new Scalar(13, 255, 255), redA);
+                Core.inRange(hsv, new Scalar(165, 55, 45), new Scalar(180, 255, 255), redB);
                 Core.bitwise_or(redA, redB, red);
-                Core.inRange(hsv, new Scalar(32, 45, 45), new Scalar(105, 255, 255), green);
-                Core.bitwise_or(red, green, candleMask);
+                Core.inRange(hsv, new Scalar(32, 40, 40), new Scalar(105, 255, 255), green);
+                Mat blue = new Mat();
+                Mat yellow = new Mat();
+                Mat alternate = new Mat();
+                Core.inRange(hsv, new Scalar(90, 45, 40), new Scalar(135, 255, 255), blue);
+                Core.inRange(hsv, new Scalar(15, 55, 55), new Scalar(35, 255, 255), yellow);
+                Core.bitwise_or(red, green, alternate);
+                Core.bitwise_or(alternate, blue, alternate);
+                Core.bitwise_or(alternate, yellow, candleMask);
 
                 Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2, 3));
                 Imgproc.morphologyEx(candleMask, candleMask, Imgproc.MORPH_CLOSE, kernel);
@@ -168,13 +184,21 @@ public final class ChartVisionEngine {
                         Math.max(12, width / 45), Math.max(7, height / 65),
                         Math.max(3, height / 110));
                 Set<Integer> shortBodyBins = new HashSet<>();
+                Set<Integer> verticalBins = new HashSet<>();
+                Set<Integer> horizontalBins = new HashSet<>();
                 for (int i = 0; i < lines.rows(); i++) {
                     double[] line = lines.get(i, 0);
                     if (line == null || line.length < 4) continue;
                     double dx = Math.abs(line[2] - line[0]);
                     double dy = Math.abs(line[3] - line[1]);
-                    if (dx <= Math.max(3.0, width * 0.006) && dy >= height * 0.018) vertical++;
-                    if (dy <= Math.max(3.0, height * 0.006) && dx >= width * 0.08) horizontal++;
+                    if (dx <= Math.max(3.0, width * 0.006) && dy >= height * 0.018) {
+                        vertical++;
+                        verticalBins.add(Math.max(0, (int) (line[0] / Math.max(2.0, width / 90.0))));
+                    }
+                    if (dy <= Math.max(3.0, height * 0.006) && dx >= width * 0.08) {
+                        horizontal++;
+                        horizontalBins.add(Math.max(0, (int) (line[1] / Math.max(2.0, height / 60.0))));
+                    }
                     if (dy <= Math.max(3.0, height * 0.006)
                             && dx >= Math.max(4.0, width * 0.005)
                             && dx < width * 0.08) {
@@ -192,8 +216,11 @@ public final class ChartVisionEngine {
                         columns = Math.max(columns, fallback[0]);
                     }
                 }
-                boolean structuredChart = vertical >= 7
-                        && (horizontal >= 2 || shortBodyBins.size() >= 5)
+                // Require line evidence to be distributed across the image;
+                // isolated UI icons/borders must not qualify as a trading chart.
+                boolean structuredChart = vertical >= 7 && verticalBins.size() >= 5
+                        && (horizontal >= 2 && horizontalBins.size() >= 2
+                            || shortBodyBins.size() >= 5)
                         && edgeDensity >= 0.002 && edgeDensity <= 0.28;
                 if (coloredChart && maxCandX > minCandX && maxCandY > minCandY) {
                     int marginX = Math.max(width / 14, 12);
@@ -204,9 +231,29 @@ public final class ChartVisionEngine {
                             Math.min(height, maxCandY + marginY));
                     bounds = scaleBoundsToSource(scaledBounds, sourceWidth, sourceHeight,
                             width, height);
+                } else if (structuredChart) {
+                    // Monochrome/alternate-theme charts have no red-green candle
+                    // mask. Use the edge map's plotting extent instead of returning
+                    // a generic near-full-screen crop.
+                    org.opencv.core.MatOfPoint edgePoints = new org.opencv.core.MatOfPoint();
+                    try {
+                        Core.findNonZero(edges, edgePoints);
+                        if (!edgePoints.empty()) {
+                            org.opencv.core.Rect edgeRect = Imgproc.boundingRect(edgePoints);
+                            int mx = Math.max(width / 30, 8);
+                            int my = Math.max(height / 30, 8);
+                            Rect scaledBounds = new Rect(
+                                    Math.max(0, edgeRect.x - mx),
+                                    Math.max(0, edgeRect.y - my),
+                                    Math.min(width, edgeRect.x + edgeRect.width + mx),
+                                    Math.min(height, edgeRect.y + edgeRect.height + my));
+                            bounds = scaleBoundsToSource(scaledBounds, sourceWidth, sourceHeight,
+                                    width, height);
+                        }
+                    } finally {
+                        edgePoints.release();
+                    }
                 }
-                String ocr = readText ? readOcr(context, cvBitmap) : "";
-                String tf = extractTimeframe(ocr);
                 boolean chart = coloredChart || structuredChart;
                 String summary = buildSummary(chart, nativeReady, candidates, columns,
                         vertical, horizontal, edgeDensity, tf, ocr);
@@ -216,7 +263,8 @@ public final class ChartVisionEngine {
                 // Continue to the conservative pure-Bitmap fallback below.
             } finally {
                 rgba.release(); rgb.release(); hsv.release(); redA.release(); redB.release();
-                red.release(); green.release(); candleMask.release(); gray.release();
+                red.release(); green.release(); blue.release(); yellow.release(); alternate.release();
+                candleMask.release(); gray.release();
                 edges.release(); lines.release(); hierarchy.release();
                 if (cvBitmap != bitmap && !cvBitmap.isRecycled()) cvBitmap.recycle();
             }
@@ -292,17 +340,26 @@ public final class ChartVisionEngine {
     private static String readOcr(Context context, Bitmap bitmap) {
         if (context == null || bitmap == null || bitmap.isRecycled()) return "";
         TextRecognizer recognizer = null;
+        Bitmap ocrBitmap = bitmap;
         try {
+            // Preserve readable broker labels while bounding allocations on older phones.
+            int maxDimension = Math.max(bitmap.getWidth(), bitmap.getHeight());
+            if (maxDimension > 2000) {
+                float scale = 2000.0f / maxDimension;
+                ocrBitmap = Bitmap.createScaledBitmap(bitmap,
+                        Math.max(1, Math.round(bitmap.getWidth() * scale)),
+                        Math.max(1, Math.round(bitmap.getHeight() * scale)), true);
+            }
             recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
-            Text result = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)),
-                    5, TimeUnit.SECONDS);
+            Text result = Tasks.await(recognizer.process(InputImage.fromBitmap(ocrBitmap, 0)),
+                    7, TimeUnit.SECONDS);
             StringBuilder text = new StringBuilder();
             for (Text.TextBlock block : result.getTextBlocks()) {
                 String value = block.getText();
                 if (value != null && !value.trim().isEmpty()) {
                     if (text.length() > 0) text.append(" | ");
                     text.append(value.trim());
-                    if (text.length() >= 1200) break;
+                    if (text.length() >= 1600) break;
                 }
             }
             return text.toString();
@@ -312,6 +369,7 @@ public final class ChartVisionEngine {
             if (recognizer != null) {
                 try { recognizer.close(); } catch (Exception ignored) { }
             }
+            if (ocrBitmap != bitmap && !ocrBitmap.isRecycled()) ocrBitmap.recycle();
         }
     }
 
@@ -319,7 +377,14 @@ public final class ChartVisionEngine {
         if (text == null || text.isEmpty()) return "";
         Matcher broker = Pattern.compile("(?i)(?<![A-Z0-9])(MN1|M(?:1|2|3|5|10|15|30)|H(?:1|2|4)|D1|W1)(?![A-Z0-9])")
                 .matcher(text);
-        if (broker.find()) return broker.group(1).toUpperCase(Locale.ROOT);
+        if (broker.find()) {
+            String raw = broker.group(1).toUpperCase(Locale.ROOT);
+            if ("MN1".equals(raw)) return "1M";
+            if (raw.startsWith("M")) return raw.substring(1) + "m";
+            if (raw.startsWith("H")) return raw.substring(1) + "h";
+            if ("D1".equals(raw)) return "1d";
+            if ("W1".equals(raw)) return "1w";
+        }
         Matcher matcher = Pattern.compile("(?i)(?<![A-Z0-9])(1|2|3|5|10|15|30|45|60|120|240)\\s?(m|min|mins|h|hr|hrs)(?![A-Z])")
                 .matcher(text);
         if (!matcher.find()) return "";
