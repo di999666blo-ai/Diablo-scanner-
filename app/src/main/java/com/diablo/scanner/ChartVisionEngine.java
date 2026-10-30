@@ -163,13 +163,15 @@ public final class ChartVisionEngine {
                     if (dy <= Math.max(3.0, height * 0.006) && dx >= width * 0.08) horizontal++;
                 }
                 boolean coloredPixels = Core.countNonZero(candleMask) >= Math.max(35, width * height / 18000);
-                boolean coloredChart = coloredPixels && candidates >= 5 && columns >= 5;
+                boolean coloredChart = coloredPixels && candidates >= 5 && columns >= 5
+                        && maxCandX - minCandX >= width * 0.12
+                        && maxCandY - minCandY >= height * 0.008;
                 if (!coloredChart) {
                     // Some broker themes render thin/hollow candles that split into
                     // several tiny OpenCV contours. Retain a second independent
                     // sampled-pixel check before declaring that no coloured chart exists.
                     int[] fallback = fallbackColorScan(bitmap);
-                    if (fallback[0] >= 5 && fallback[1] >= 30) {
+                    if (fallback[0] >= 8 && fallback[1] >= 70) {
                         coloredChart = true;
                         columns = Math.max(columns, fallback[0]);
                     }
@@ -204,7 +206,7 @@ public final class ChartVisionEngine {
         }
 
         int[] fallback = fallbackColorScan(bitmap);
-        boolean chart = fallback[0] >= 5 && fallback[1] >= 30;
+        boolean chart = fallback[0] >= 8 && fallback[1] >= 70;
         String ocr = readText ? readOcr(context, bitmap) : "";
         String tf = extractTimeframe(ocr);
         String summary = "OpenCV unavailable; basic colour/shape fallback only. "
