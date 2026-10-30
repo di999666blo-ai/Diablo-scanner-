@@ -460,11 +460,13 @@ public class ScreenCaptureService extends Service {
                 return;
             }
 
-            // Crop the central chart area before passing it to the bundled local vision model.
-            int left = Math.max(0, (int)(width * 0.05));
-            int right = Math.min(width, (int)(width * 0.95));
-            int top = Math.max(0, (int)(height * 0.12));
-            int bottom = Math.min(height, (int)(height * 0.88));
+            // Preserve the broker's timeframe header, price scale and bottom time axis.
+            // ChartVisionEngine performs the actual plotting-region detection afterward;
+            // this light safety crop removes only the outermost status/navigation margins.
+            int left = Math.max(0, (int)(width * 0.02));
+            int right = Math.min(width, (int)(width * 0.98));
+            int top = Math.max(0, (int)(height * 0.04));
+            int bottom = Math.min(height, (int)(height * 0.96));
             if (right - left < 50 || bottom - top < 50) {
                 SharedPreferences state = getSharedPreferences("diablo_scanner", MODE_PRIVATE);
                 state.edit().putString("scan_status", "WAIT")
