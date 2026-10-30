@@ -127,7 +127,7 @@ public final class ChartVisionEngine {
                 int minCandX = width, minCandY = height, maxCandX = 0, maxCandY = 0;
                 int minWidth = Math.max(2, width / 500);
                 int maxWidth = Math.max(12, width / 22);
-                int minHeight = Math.max(3, height / 180);
+                int minHeight = Math.max(2, height / 300);
                 int maxHeight = Math.max(12, height / 3);
                 for (MatOfPoint contour : contours) {
                     org.opencv.core.Rect r = Imgproc.boundingRect(contour);
@@ -164,6 +164,16 @@ public final class ChartVisionEngine {
                 }
                 boolean coloredPixels = Core.countNonZero(candleMask) >= Math.max(35, width * height / 18000);
                 boolean coloredChart = coloredPixels && candidates >= 5 && columns >= 5;
+                if (!coloredChart) {
+                    // Some broker themes render thin/hollow candles that split into
+                    // several tiny OpenCV contours. Retain a second independent
+                    // sampled-pixel check before declaring that no coloured chart exists.
+                    int[] fallback = fallbackColorScan(bitmap);
+                    if (fallback[0] >= 5 && fallback[1] >= 30) {
+                        coloredChart = true;
+                        columns = Math.max(columns, fallback[0]);
+                    }
+                }
                 boolean structuredChart = vertical >= 7 && horizontal >= 2
                         && edgeDensity >= 0.002 && edgeDensity <= 0.28;
                 if (coloredChart && maxCandX > minCandX && maxCandY > minCandY) {
