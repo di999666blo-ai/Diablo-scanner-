@@ -698,7 +698,7 @@ public final class LocalVisionAI {
             stage.put("signal", signal);
             stage.put("summary", output.length() > 900 ? output.substring(0, 900) : output);
             stage.put("updatedAt", System.currentTimeMillis());
-            stage.put("engine", prefs.getString("scalping_engine", "SMOLVLM"));
+            stage.put("engine", "SMOLVLM");
             saved.put(timeframe, stage);
             prefs.edit().putString("guided_scalping_context", saved.toString())
                     .putString("guided_scalping_last_stage", timeframe)
