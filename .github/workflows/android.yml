@@ -208,7 +208,6 @@ jobs:
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
-          grep -q 'ChartVisionEngine.inspect' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           grep -q 'ChartVisionEngine.inspect' app/src/main/java/com/diablo/scanner/ChartAnalyzer.java
           grep -q 'ChartVisionEngine.inspect' app/src/main/java/com/diablo/scanner/LocalVisionAI.java
           grep -q 'OpenCVLoader.initLocal' app/src/main/java/com/diablo/scanner/ChartVisionEngine.java
@@ -232,27 +231,28 @@ jobs:
           grep -q 'biquote.io/api/' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'bar.optBoolean("isOpen", false)' app/src/main/java/com/diablo/scanner/KronosRuntimeClient.java
           grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
-          grep -q 'HYBRID_STANDALONE' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'ChartAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           python - <<'PY'
           from pathlib import Path
           source = Path("app/src/main/java/com/diablo/scanner/ScreenCaptureService.java").read_text()
-          start = source.index('} else if ("HYBRID".equalsIgnoreCase(selectedEngine))')
-          end = source.index('} else {', start + 10)
-          hybrid_branch = source[start:end]
           scalping_start = source.index('if (scalpingMode) {', source.index('private void startAIAnalysis'))
           scalping_end = source.index('} else if ("SMOLVLM".equalsIgnoreCase(selectedTimedEngine))', scalping_start)
           scalping_branch = source[scalping_start:scalping_end]
           assert "LocalVisionAI.analyze" in scalping_branch, "Guide Scalping must use SmolVLM screen vision"
           assert "GuidedScalpingAnalyzer.analyze" not in scalping_branch, "Guide Scalping must not use Kronos market feed"
-          assert "ChartAnalyzer.analyze" in hybrid_branch, "Hybrid must run its own analyzer"
-          assert "LocalVisionAI.analyze" not in hybrid_branch, "Hybrid must not depend on SmolVLM"
-          assert '"KRONOS"' not in hybrid_branch, "Hybrid must not invoke Kronos"
+          timed_start = scalping_end
+          hybrid_start = source.index('} else {', timed_start)
+          hybrid_end = source.index('if (optionalSmolAssist', hybrid_start)
+          hybrid_branch = source[hybrid_start:hybrid_end]
+          assert "ChartAnalyzer.analyze" in hybrid_branch, "Timed Hybrid Fast must run its own chart analyzer"
+          assert "LocalVisionAI.analyze" not in hybrid_branch, "Standalone Hybrid Fast must not depend on SmolVLM"
+          assert '"KRONOS"' not in hybrid_branch, "Timed Hybrid Fast must not invoke Kronos"
           print("Hybrid independence routing test passed.")
           PY
           test -s docs/KRONOS_ANDROID_INTEGRATION.md
           grep -q 'NeoQuasar/Kronos-mini' kronos-service/main.py
           grep -q 'NeoQuasar/Kronos-Tokenizer-2k' kronos-service/main.py
-          grep -q 'Running standalone Hybrid fast candle analysis' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'Running fast Timed Signal chart strategy' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
           echo "Hybrid controls and launcher icon resource are present."
           grep -q 'KronosEngine.Companion.create' app/src/main/java/com/diablo/scanner/KronosLocalRuntime.java
           grep -q 'active.predict' app/src/main/java/com/diablo/scanner/KronosLocalRuntime.java

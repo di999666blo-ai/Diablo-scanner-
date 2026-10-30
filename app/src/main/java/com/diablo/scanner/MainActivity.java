@@ -389,7 +389,7 @@ public class MainActivity extends Activity {
             data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
             data.put("timedSmolAssist", "COMBINED".equalsIgnoreCase(prefs.getString("timed_engine", "HYBRID")));
             data.put("timedEngine", prefs.getString("timed_engine", "HYBRID"));
-            data.put("scalpingEngine", prefs.getString("scalping_engine", "SMOLVLM"));
+            data.put("scalpingEngine", "SMOLVLM");
             data.put("kronosSymbol", prefs.getString("kronos_symbol", "EURUSD"));
             data.put("kronosInterval", prefs.getString("kronos_view_interval", "1m"));
             data.put("kronosServiceConfigured", !prefs.getString("kronos_service_url", "").trim().isEmpty());

@@ -558,7 +558,6 @@ public class ScreenCaptureService extends Service {
         final boolean optionalSmolAssist = "COMBINED".equalsIgnoreCase(selectedTimedEngine);
         // Guide Scalping is deliberately visual and screen-capture based. Kronos
         // remains a separate market-data dashboard; Hybrid Fast belongs to Timed Signal.
-        final String selectedScalpingEngine = "SMOLVLM";
         if (!scalpingMode && timedObservation && optionalSmolAssist) {
             Bitmap cached = analysisBitmap.copy(Bitmap.Config.ARGB_8888, false);
             Bitmap previous = latestTimedChart;
@@ -574,8 +573,8 @@ public class ScreenCaptureService extends Service {
         try {
             aiExecutor.execute(() -> {
                 try {
-                    // Timed Signal always uses the fast chart analyzer; optional SmolVLM
-                    // is a secondary visual check. Scalping engine selection is explicit.
+                    // Timed Signal uses Hybrid Fast (or the explicit SmolVLM option).
+                    // Guide Scalping is always the slower SmolVLM screen-vision workflow.
                     LocalVisionAI.Result result;
                     if (scalpingMode) {
                         // Guide Scalping uses SmolVLM on the actual captured broker chart.

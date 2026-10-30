@@ -119,9 +119,12 @@ public final class ChartVisionEngine {
                 kernel.release();
 
                 List<MatOfPoint> contours = new ArrayList<>();
-                Imgproc.findContours(candleMask.clone(), contours, hierarchy,
+                Mat contourInput = candleMask.clone();
+                Imgproc.findContours(contourInput, contours, hierarchy,
                         Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+                contourInput.release();
                 Set<Integer> xBins = new HashSet<>();
+                int minCandX = width, minCandY = height, maxCandX = 0, maxCandY = 0;
                 int minWidth = Math.max(2, width / 500);
                 int maxWidth = Math.max(12, width / 22);
                 int minHeight = Math.max(3, height / 180);
@@ -135,6 +138,10 @@ public final class ChartVisionEngine {
                             && r.y > height * 0.08 && r.y + r.height < height * 0.92) {
                         candidates++;
                         xBins.add(Math.max(0, r.x / Math.max(2, width / 90)));
+                        minCandX = Math.min(minCandX, r.x);
+                        minCandY = Math.min(minCandY, r.y);
+                        maxCandX = Math.max(maxCandX, r.x + r.width);
+                        maxCandY = Math.max(maxCandY, r.y + r.height);
                     }
                     contour.release();
                 }
@@ -159,6 +166,17 @@ public final class ChartVisionEngine {
                 boolean coloredChart = coloredPixels && candidates >= 5 && columns >= 5;
                 boolean structuredChart = vertical >= 7 && horizontal >= 2
                         && edgeDensity >= 0.002 && edgeDensity <= 0.28;
+                if (coloredChart && maxCandX > minCandX && maxCandY > minCandY) {
+                    // Locate the actual candle plotting region, then retain margins
+                    // for nearby chart structure. OCR still runs on the full screenshot
+                    // so price-axis labels outside the candle area are not lost.
+                    int marginX = Math.max(width / 14, 12);
+                    int marginY = Math.max(height / 12, 12);
+                    bounds = new Rect(Math.max(0, minCandX - marginX),
+                            Math.max(0, minCandY - marginY),
+                            Math.min(width, maxCandX + marginX),
+                            Math.min(height, maxCandY + marginY));
+                }
                 String ocr = readText ? readOcr(context, bitmap) : "";
                 String tf = extractTimeframe(ocr);
                 boolean chart = coloredChart || structuredChart;

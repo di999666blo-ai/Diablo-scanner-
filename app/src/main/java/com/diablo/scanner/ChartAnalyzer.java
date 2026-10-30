@@ -55,6 +55,22 @@ public final class ChartAnalyzer {
                     + chartReport.summary);
         }
 
+        Bitmap detectedChart = ChartVisionEngine.crop(bitmap, chartReport.chartBounds);
+        if (detectedChart == null || detectedChart.isRecycled()) {
+            return new LocalVisionAI.Result("WAIT", "Chart region was detected but could not be cropped safely.");
+        }
+        if (detectedChart != bitmap) {
+            try {
+                return analyzeDetectedChart(context, detectedChart, chartReport);
+            } finally {
+                if (!detectedChart.isRecycled()) detectedChart.recycle();
+            }
+        }
+        return analyzeDetectedChart(context, bitmap, chartReport);
+    }
+
+    private static LocalVisionAI.Result analyzeDetectedChart(Context context, Bitmap bitmap,
+                                                               ChartVisionEngine.Report chartReport) {
         SharedPreferences prefs = context.getSharedPreferences("diablo_scanner", Context.MODE_PRIVATE);
         int threshold = prefs.getInt("threshold", 15);
         String timeframe = prefs.getString("chart_timeframe", "1m");
