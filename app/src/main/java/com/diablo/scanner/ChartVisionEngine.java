@@ -154,6 +154,7 @@ public final class ChartVisionEngine {
                 Imgproc.HoughLinesP(edges, lines, 1, Math.PI / 180.0,
                         Math.max(12, width / 45), Math.max(7, height / 65),
                         Math.max(3, height / 110));
+                Set<Integer> shortBodyBins = new HashSet<>();
                 for (int i = 0; i < lines.rows(); i++) {
                     double[] line = lines.get(i, 0);
                     if (line == null || line.length < 4) continue;
@@ -161,6 +162,11 @@ public final class ChartVisionEngine {
                     double dy = Math.abs(line[3] - line[1]);
                     if (dx <= Math.max(3.0, width * 0.006) && dy >= height * 0.018) vertical++;
                     if (dy <= Math.max(3.0, height * 0.006) && dx >= width * 0.08) horizontal++;
+                    if (dy <= Math.max(3.0, height * 0.006)
+                            && dx >= Math.max(4.0, width * 0.005)
+                            && dx < width * 0.08) {
+                        shortBodyBins.add(Math.max(0, (int) (line[0] / Math.max(2.0, width / 90.0))));
+                    }
                 }
                 boolean coloredPixels = Core.countNonZero(candleMask) >= Math.max(35, width * height / 18000);
                 boolean coloredChart = coloredPixels && candidates >= 5 && columns >= 5
@@ -176,7 +182,11 @@ public final class ChartVisionEngine {
                         columns = Math.max(columns, fallback[0]);
                     }
                 }
-                boolean structuredChart = vertical >= 7 && horizontal >= 2
+                // Grayscale/hollow candlesticks may have no long grid lines.
+                // Repeated short horizontal body edges plus vertical wicks are
+                // an alternative structural signature.
+                boolean structuredChart = vertical >= 7
+                        && (horizontal >= 2 || shortBodyBins.size() >= 5)
                         && edgeDensity >= 0.002 && edgeDensity <= 0.28;
                 if (coloredChart && maxCandX > minCandX && maxCandY > minCandY) {
                     // Locate the actual candle plotting region, then retain margins
@@ -289,6 +299,9 @@ public final class ChartVisionEngine {
 
     private static String extractTimeframe(String text) {
         if (text == null || text.isEmpty()) return "";
+        Matcher broker = Pattern.compile("(?i)(?<![A-Z0-9])(MN1|M(?:1|2|3|5|10|15|30)|H(?:1|2|4)|D1|W1)(?![A-Z0-9])")
+                .matcher(text);
+        if (broker.find()) return broker.group(1).toUpperCase(Locale.ROOT);
         Matcher matcher = Pattern.compile("(?i)(?<![A-Z0-9])(1|2|3|5|10|15|30|45|60|120|240)\\s?(m|min|mins|h|hr|hrs)(?![A-Z])")
                 .matcher(text);
         if (!matcher.find()) return "";
