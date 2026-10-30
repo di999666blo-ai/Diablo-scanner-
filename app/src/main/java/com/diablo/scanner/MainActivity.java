@@ -389,7 +389,7 @@ public class MainActivity extends Activity {
             data.put("profile", prefs.getString("timed_analysis_profile", "BALANCED"));
             data.put("timedSmolAssist", "COMBINED".equalsIgnoreCase(prefs.getString("timed_engine", "HYBRID")));
             data.put("timedEngine", prefs.getString("timed_engine", "HYBRID"));
-            data.put("scalpingEngine", prefs.getString("scalping_engine", "SMOLVLM"));
+            data.put("scalpingEngine", "SMOLVLM");
             data.put("kronosSymbol", prefs.getString("kronos_symbol", "EURUSD"));
             data.put("kronosInterval", prefs.getString("kronos_view_interval", "1m"));
             data.put("kronosServiceConfigured", !prefs.getString("kronos_service_url", "").trim().isEmpty());
@@ -593,7 +593,8 @@ public class MainActivity extends Activity {
         modeRow.addView(timed, modeParams);
         root.addView(modeRow);
         scalping.setOnClickListener(v -> {
-            prefs.edit().putString("trading_mode", "SCALPING").apply();
+            prefs.edit().putString("trading_mode", "SCALPING")
+                    .putString("scalping_engine", "SMOLVLM").apply();
             openPage("AI SCANNER");
         });
         timed.setOnClickListener(v -> {
@@ -2314,37 +2315,15 @@ public class MainActivity extends Activity {
         startKronosContinuousMonitor();
     }
     private void showScalpingEngineSettings() {
-        final String[] engineValues = {"SMOLVLM", "KRONOS", "HYBRID"};
-        final String[] labels = {
-                "SmolVLM — visual chart analysis (on-device)",
-                "Kronos-mini — phone-fetches market candles; local model port still required",
-                "Hybrid — standalone fast chart-image analysis (independent)"
-        };
-        String selected = prefs.getString("scalping_engine", "SMOLVLM");
-        int checked = "KRONOS".equalsIgnoreCase(selected) ? 1
-                : ("HYBRID".equalsIgnoreCase(selected) ? 2 : 0);
+        // Keep the responsibilities explicit: Guide Scalping is the slow visual
+        // SmolVLM workflow; Hybrid Fast is Timed Signal; Kronos is its own market
+        // dashboard. This prevents a screen-capture scan from silently switching
+        // to a different data source.
+        prefs.edit().putString("scalping_engine", "SMOLVLM").apply();
         new AlertDialog.Builder(this)
-                .setTitle("Scalping analysis engine")
-                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    String engine = engineValues[which];
-                    prefs.edit().putString("scalping_engine", engine).apply();
-                    dialog.dismiss();
-                    if ("KRONOS".equals(engine)) {
-                        Toast.makeText(this,
-                                "Kronos phone-only mode selected. The phone fetches BiQuote candles; real local inference stays WAIT until the dedicated Kronos model/tokenizer port is bundled and validated.",
-                                Toast.LENGTH_LONG).show();
-                        showKronosCandleJsonSettings();
-                    } else if ("HYBRID".equals(engine)) {
-                        Toast.makeText(this,
-                                "Hybrid selected: standalone fast chart-image analyzer. No SmolVLM or Kronos dependency.",
-                                Toast.LENGTH_LONG).show();
-                        refreshDashboardWebView();
-                    } else {
-                        Toast.makeText(this, "SmolVLM visual engine selected.", Toast.LENGTH_SHORT).show();
-                        refreshDashboardWebView();
-                    }
-                })
-                .setNegativeButton("CANCEL", null)
+                .setTitle("Guide Scalping engine")
+                .setMessage("Guide Scalping uses SmolVLM with live broker-screen capture and your manually selected chart timeframes. Hybrid Fast is reserved for Timed Signal. Kronos remains separate on its BigQuote market dashboard.")
+                .setPositiveButton("OK", (dialog, which) -> refreshDashboardWebView())
                 .show();
     }
 

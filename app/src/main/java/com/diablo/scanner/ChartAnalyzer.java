@@ -40,6 +40,37 @@ public final class ChartAnalyzer {
                     "The image is too small or unavailable. Use a clear chart screenshot.");
         }
 
+        // Validate the chart with the shared OpenCV structure detector before
+        // the fast directional engine examines candle-colour evidence.
+        ChartVisionEngine.Report chartReport = ChartVisionEngine.inspect(context, bitmap, false);
+        if (!chartReport.isChart) {
+            return new LocalVisionAI.Result("WAIT",
+                    "NO READABLE CHART DETECTED. " + chartReport.summary
+                    + " Open the chart so its plotting area and candles are visible. No direction was generated.");
+        }
+        if (!chartReport.hasColoredCandles) {
+            return new LocalVisionAI.Result("WAIT",
+                    "CHART DETECTED, BUT HYBRID FAST CANNOT CONFIDENTLY CLASSIFY CANDLE DIRECTION "
+                    + "from this low-colour/monochrome chart. Use Guide Scalping (SmolVLM) for visual interpretation. "
+                    + chartReport.summary);
+        }
+
+        Bitmap detectedChart = ChartVisionEngine.crop(bitmap, chartReport.chartBounds);
+        if (detectedChart == null || detectedChart.isRecycled()) {
+            return new LocalVisionAI.Result("WAIT", "Chart region was detected but could not be cropped safely.");
+        }
+        if (detectedChart != bitmap) {
+            try {
+                return analyzeDetectedChart(context, detectedChart, chartReport);
+            } finally {
+                if (!detectedChart.isRecycled()) detectedChart.recycle();
+            }
+        }
+        return analyzeDetectedChart(context, bitmap, chartReport);
+    }
+
+    private static LocalVisionAI.Result analyzeDetectedChart(Context context, Bitmap bitmap,
+                                                               ChartVisionEngine.Report chartReport) {
         SharedPreferences prefs = context.getSharedPreferences("diablo_scanner", Context.MODE_PRIVATE);
         int threshold = prefs.getInt("threshold", 15);
         String timeframe = prefs.getString("chart_timeframe", "1m");
@@ -169,6 +200,7 @@ public final class ChartAnalyzer {
         String timingText="FORMING".equalsIgnoreCase(timing)?"forming-candle mode":"candle-close mode";
         StringBuilder details=new StringBuilder();
         details.append("ON-DEVICE CHART ANALYSIS\n");
+        details.append("CHART RECOGNITION: ").append(chartReport.summary).append("\n");
         details.append("Mode: ").append("SCALPING".equalsIgnoreCase(mode)?"Scalping":"Timed signal").append("\n");
         details.append("Chart timeframe setting: ").append(timeframe).append("\n");
         details.append("Trade expiry horizon: ").append(formatDuration(duration)).append("\n");
