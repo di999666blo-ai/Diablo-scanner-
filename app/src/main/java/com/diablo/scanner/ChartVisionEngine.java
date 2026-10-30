@@ -75,13 +75,13 @@ public final class ChartVisionEngine {
             return empty("Image is missing or too small to inspect.");
         }
 
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
+        int sourceWidth = bitmap.getWidth();
+        int sourceHeight = bitmap.getHeight();
         Rect bounds = new Rect(
-                Math.max(0, Math.round(width * 0.025f)),
-                Math.max(0, Math.round(height * 0.08f)),
-                Math.min(width, Math.round(width * 0.975f)),
-                Math.min(height, Math.round(height * 0.91f)));
+                Math.max(0, Math.round(sourceWidth * 0.025f)),
+                Math.max(0, Math.round(sourceHeight * 0.08f)),
+                Math.min(sourceWidth, Math.round(sourceWidth * 0.975f)),
+                Math.min(sourceHeight, Math.round(sourceHeight * 0.91f)));
 
         int candidates = 0;
         int columns = 0;
@@ -91,6 +91,7 @@ public final class ChartVisionEngine {
         boolean nativeReady = ensureOpenCv();
 
         if (nativeReady) {
+            Bitmap cvBitmap = bitmap;
             Mat rgba = new Mat();
             Mat rgb = new Mat();
             Mat hsv = new Mat();
@@ -104,7 +105,19 @@ public final class ChartVisionEngine {
             Mat lines = new Mat();
             Mat hierarchy = new Mat();
             try {
-                Utils.bitmapToMat(bitmap, rgba);
+                // Cap native working memory on older ARM phones. OCR and candle
+                // geometry remain useful at this scale; original-resolution input
+                // is retained for the caller and never modified.
+                float cvScale = Math.min(1.0f, 1200.0f / Math.max(sourceWidth, sourceHeight));
+                if (cvScale < 1.0f) {
+                    cvBitmap = Bitmap.createScaledBitmap(bitmap,
+                            Math.max(1, Math.round(sourceWidth * cvScale)),
+                            Math.max(1, Math.round(sourceHeight * cvScale)), true);
+                }
+                int width = cvBitmap.getWidth();
+                int height = cvBitmap.getHeight();
+
+                Utils.bitmapToMat(cvBitmap, rgba);
                 Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2RGB);
                 Imgproc.cvtColor(rgb, hsv, Imgproc.COLOR_RGB2HSV);
 
@@ -173,33 +186,26 @@ public final class ChartVisionEngine {
                         && maxCandX - minCandX >= width * 0.12
                         && maxCandY - minCandY >= height * 0.008;
                 if (!coloredChart) {
-                    // Some broker themes render thin/hollow candles that split into
-                    // several tiny OpenCV contours. Retain a second independent
-                    // sampled-pixel check before declaring that no coloured chart exists.
-                    int[] fallback = fallbackColorScan(bitmap);
+                    int[] fallback = fallbackColorScan(cvBitmap);
                     if (fallback[0] >= 8 && fallback[1] >= 70) {
                         coloredChart = true;
                         columns = Math.max(columns, fallback[0]);
                     }
                 }
-                // Grayscale/hollow candlesticks may have no long grid lines.
-                // Repeated short horizontal body edges plus vertical wicks are
-                // an alternative structural signature.
                 boolean structuredChart = vertical >= 7
                         && (horizontal >= 2 || shortBodyBins.size() >= 5)
                         && edgeDensity >= 0.002 && edgeDensity <= 0.28;
                 if (coloredChart && maxCandX > minCandX && maxCandY > minCandY) {
-                    // Locate the actual candle plotting region, then retain margins
-                    // for nearby chart structure. OCR still runs on the full screenshot
-                    // so price-axis labels outside the candle area are not lost.
                     int marginX = Math.max(width / 14, 12);
                     int marginY = Math.max(height / 12, 12);
-                    bounds = new Rect(Math.max(0, minCandX - marginX),
+                    Rect scaledBounds = new Rect(Math.max(0, minCandX - marginX),
                             Math.max(0, minCandY - marginY),
                             Math.min(width, maxCandX + marginX),
                             Math.min(height, maxCandY + marginY));
+                    bounds = scaleBoundsToSource(scaledBounds, sourceWidth, sourceHeight,
+                            width, height);
                 }
-                String ocr = readText ? readOcr(context, bitmap) : "";
+                String ocr = readText ? readOcr(context, cvBitmap) : "";
                 String tf = extractTimeframe(ocr);
                 boolean chart = coloredChart || structuredChart;
                 String summary = buildSummary(chart, nativeReady, candidates, columns,
@@ -212,6 +218,7 @@ public final class ChartVisionEngine {
                 rgba.release(); rgb.release(); hsv.release(); redA.release(); redB.release();
                 red.release(); green.release(); candleMask.release(); gray.release();
                 edges.release(); lines.release(); hierarchy.release();
+                if (cvBitmap != bitmap && !cvBitmap.isRecycled()) cvBitmap.recycle();
             }
         }
 
@@ -226,6 +233,17 @@ public final class ChartVisionEngine {
         if (!tf.isEmpty()) summary += " OCR timeframe candidate: " + tf + ".";
         if (!ocr.isEmpty()) summary += " Visible text: " + shorten(ocr, 450);
         return new Report(chart, chart, 0, fallback[0], 0, 0, tf, ocr, summary, bounds);
+    }
+
+    private static Rect scaleBoundsToSource(Rect bounds, int sourceWidth, int sourceHeight,
+                                              int workingWidth, int workingHeight) {
+        float sx = sourceWidth / (float) Math.max(1, workingWidth);
+        float sy = sourceHeight / (float) Math.max(1, workingHeight);
+        return new Rect(
+                Math.max(0, Math.round(bounds.left * sx)),
+                Math.max(0, Math.round(bounds.top * sy)),
+                Math.min(sourceWidth, Math.round(bounds.right * sx)),
+                Math.min(sourceHeight, Math.round(bounds.bottom * sy)));
     }
 
     public static Bitmap crop(Bitmap source, Rect bounds) {
