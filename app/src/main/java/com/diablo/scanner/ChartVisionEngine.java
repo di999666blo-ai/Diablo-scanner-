@@ -107,6 +107,7 @@ public final class ChartVisionEngine {
             Mat blue = new Mat();
             Mat yellow = new Mat();
             Mat alternate = new Mat();
+            Mat conventionalMask = new Mat();
             Mat candleMask = new Mat();
             Mat gray = new Mat();
             Mat edges = new Mat();
@@ -139,6 +140,7 @@ public final class ChartVisionEngine {
                 Core.inRange(hsv, new Scalar(32, 40, 40), new Scalar(105, 255, 255), green);
                 Core.inRange(hsv, new Scalar(90, 45, 40), new Scalar(135, 255, 255), blue);
                 Core.inRange(hsv, new Scalar(15, 55, 55), new Scalar(35, 255, 255), yellow);
+                Core.bitwise_or(red, green, conventionalMask);
                 Core.bitwise_or(red, green, alternate);
                 Core.bitwise_or(alternate, blue, alternate);
                 Core.bitwise_or(alternate, yellow, candleMask);
@@ -206,6 +208,11 @@ public final class ChartVisionEngine {
                     }
                 }
                 boolean coloredPixels = Core.countNonZero(candleMask) >= Math.max(35, width * height / 18000);
+                // Keep conventional bull/bear color evidence separate from general
+                // chart recognition. Blue/yellow candles can prove "this is a chart",
+                // but their direction depends on broker theme and must not be guessed.
+                boolean conventionalCandles = Core.countNonZero(conventionalMask)
+                        >= Math.max(25, width * height / 24000);
                 boolean coloredChart = coloredPixels && candidates >= 5 && columns >= 5
                         && maxCandX - minCandX >= width * 0.12
                         && maxCandY - minCandY >= height * 0.008;
@@ -257,14 +264,14 @@ public final class ChartVisionEngine {
                 boolean chart = coloredChart || structuredChart;
                 String summary = buildSummary(chart, nativeReady, candidates, columns,
                         vertical, horizontal, edgeDensity, tf, ocr);
-                return new Report(chart, coloredChart, candidates, columns, vertical,
+                return new Report(chart, conventionalCandles, candidates, columns, vertical,
                         horizontal, tf, ocr, summary, bounds);
             } catch (Throwable failure) {
                 // Continue to the conservative pure-Bitmap fallback below.
             } finally {
                 rgba.release(); rgb.release(); hsv.release(); redA.release(); redB.release();
                 red.release(); green.release(); blue.release(); yellow.release(); alternate.release();
-                candleMask.release(); gray.release();
+                conventionalMask.release(); candleMask.release(); gray.release();
                 edges.release(); lines.release(); hierarchy.release();
                 if (cvBitmap != bitmap && !cvBitmap.isRecycled()) cvBitmap.recycle();
             }
