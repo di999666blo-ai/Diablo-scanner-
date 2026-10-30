@@ -660,7 +660,11 @@ public final class LocalVisionAI {
             if ("SCALPING".equalsIgnoreCase(mode)) {
                 saveGuidedStage(scannerPrefs, timeframe, signal, output);
             }
-            return new Result(signal, output);
+            // Keep the independent chart-recognition evidence visible in the result
+            // so the user can see what the preprocessing stage actually detected.
+            return new Result(signal,
+                    "CHART RECOGNITION\n" + chartReport.summary
+                    + "\n\nSMOLVLM INTERPRETATION\n" + output);
 
         } catch (Exception error) {
 
