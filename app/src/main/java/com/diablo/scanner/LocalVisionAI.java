@@ -325,13 +325,25 @@ public final class LocalVisionAI {
             );
         }
 
-        // Reject empty/non-chart screens before starting the vision model. This prevents
-        // a language model from inventing a direction when no usable chart is visible.
-        if (!hasChartLikeCandleColours(chart)) {
-            return new Result(
-                    "WAIT",
-                    "NO CHART DETECTED • I could not verify enough red/green candle pixels in this screen. Open a readable chart, then tap D again."
-            );
+        // Shared vision stage verifies chart structure and reads visible chart labels.
+        // This replaces the old red/green-pixel-only gate, which rejected many valid
+        // monochrome, low-saturation and alternate broker chart themes.
+        ChartVisionEngine.Report chartReport =
+                ChartVisionEngine.inspect(context, chart, true);
+        if (!chartReport.isChart) {
+            return new Result("WAIT",
+                    "NO READABLE CHART DETECTED. " + chartReport.summary
+                    + " Open the broker chart full-screen, remove menus/pop-ups, and retry. No direction was generated.");
+        }
+
+        Bitmap modelChart;
+        try {
+            modelChart = ChartVisionEngine.crop(chart, chartReport.chartBounds);
+        } catch (Exception cropError) {
+            return new Result("WAIT", "Chart was detected but its plotting area could not be prepared. Try a clearer image.");
+        }
+        if (modelChart == null || modelChart.isRecycled()) {
+            return new Result("WAIT", "Chart was detected but its image area is unavailable. Please retry.");
         }
 
         File imageFile = null;
@@ -366,8 +378,8 @@ public final class LocalVisionAI {
                     "diablo-current-chart.jpg"
             );
 
-            int width = chart.getWidth();
-            int height = chart.getHeight();
+            int width = modelChart.getWidth();
+            int height = modelChart.getHeight();
 
             float scale = Math.min(
                     1.0f,
@@ -386,7 +398,7 @@ public final class LocalVisionAI {
             );
 
             Bitmap resized = Bitmap.createScaledBitmap(
-                    chart,
+                    modelChart,
                     newWidth,
                     newHeight,
                     true
@@ -409,7 +421,7 @@ public final class LocalVisionAI {
 
             } finally {
 
-                if (resized != chart && !resized.isRecycled()) {
+                if (resized != modelChart && !resized.isRecycled()) {
                     resized.recycle();
                 }
             }
@@ -466,6 +478,10 @@ public final class LocalVisionAI {
 
             String prompt =
                     "You are an experimental visual trading-chart assistant. " +
+                    "Independent chart-recognition preprocessing found: " + chartReport.summary + " " +
+                    "Treat OCR text as tentative labels only; if OCR timeframe differs from the user setting, report the mismatch and do not silently substitute it. " +
+                    "OCR timeframe candidate: " + (chartReport.timeframe.isEmpty() ? "not reliably read" : chartReport.timeframe) + ". " +
+                    "OCR visible labels: " + (chartReport.ocrText.isEmpty() ? "unavailable" : chartReport.ocrText) + ". " +
                     "TIMED SIGNAL only: the selected visible-chart timeframe is " + timeframe
                     + " and the requested trade expiry horizon is " + formatDuration(tradeDurationMs)
                     + ". These are independent settings: do not assume the expiry equals the candle timeframe. "
@@ -663,6 +679,9 @@ public final class LocalVisionAI {
 
             if (imageFile != null && imageFile.exists()) {
                 imageFile.delete();
+            }
+            if (modelChart != chart && !modelChart.isRecycled()) {
+                modelChart.recycle();
             }
         }
     }

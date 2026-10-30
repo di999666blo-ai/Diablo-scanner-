@@ -556,7 +556,9 @@ public class ScreenCaptureService extends Service {
         final String selectedTimedEngine = scanPrefs.getString("timed_engine", "HYBRID");
         // MainActivity keeps legacy timed_smolvlm_enabled synchronized for older UI clients.
         final boolean optionalSmolAssist = "COMBINED".equalsIgnoreCase(selectedTimedEngine);
-        final String selectedScalpingEngine = scanPrefs.getString("scalping_engine", "SMOLVLM");
+        // Guide Scalping is deliberately visual and screen-capture based. Kronos
+        // remains a separate market-data dashboard; Hybrid Fast belongs to Timed Signal.
+        final String selectedScalpingEngine = "SMOLVLM";
         if (!scalpingMode && timedObservation && optionalSmolAssist) {
             Bitmap cached = analysisBitmap.copy(Bitmap.Config.ARGB_8888, false);
             Bitmap previous = latestTimedChart;
@@ -566,11 +568,7 @@ public class ScreenCaptureService extends Service {
         scanPrefs.edit()
                 .putString("scan_status", "AI_PROCESSING")
                 .putString("scan_message", scalpingMode
-                        ? ("KRONOS".equalsIgnoreCase(selectedScalpingEngine)
-                            ? "Fetching BigQuote candles on-device; checking the local Kronos runtime..."
-                            : ("HYBRID".equalsIgnoreCase(selectedScalpingEngine)
-                                ? "Running standalone Hybrid fast candle analysis (no SmolVLM or Kronos dependency)..."
-                                : "Preparing SmolVLM AI for Scalping Setup..."))
+                        ? "Preparing SmolVLM Guide Scalping with shared chart recognition..."
                         : "Running fast Timed Signal chart strategy...")
                 .apply();
         try {
@@ -580,27 +578,9 @@ public class ScreenCaptureService extends Service {
                     // is a secondary visual check. Scalping engine selection is explicit.
                     LocalVisionAI.Result result;
                     if (scalpingMode) {
-                        String selectedEngine = selectedScalpingEngine;
-                        if ("KRONOS".equalsIgnoreCase(selectedEngine)) {
-                            // Phone-only contract: fetch structured BigQuote candles locally,
-                            // then invoke only the dedicated local Kronos runtime. Never route to a host.
-                            try {
-                                result = GuidedScalpingAnalyzer.analyze(getApplicationContext());
-                            } catch (Exception feedError) {
-                                result = new LocalVisionAI.Result("WAIT", "KRONOS MARKET/INFERENCE ERROR: "
-                                        + feedError.getClass().getSimpleName() + " — "
-                                        + (feedError.getMessage() == null ? "no details" : feedError.getMessage())
-                                        + ". No fallback engine was used.");
-                            }
-                        } else if ("HYBRID".equalsIgnoreCase(selectedEngine)) {
-                            // HYBRID_STANDALONE: this engine owns its fast chart-image
-                            // feature extraction and decision logic. It must never call
-                            // SmolVLM or Kronos as a hidden dependency.
-                            result = ChartAnalyzer.analyze(
-                                    getApplicationContext(), analysisBitmap);
-                        } else {
-                            result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
-                        }
+                        // Guide Scalping uses SmolVLM on the actual captured broker chart.
+                        // It does not call Kronos/BigQuote or substitute market-feed candles.
+                        result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     } else if ("SMOLVLM".equalsIgnoreCase(selectedTimedEngine)) {
                         result = LocalVisionAI.analyze(getApplicationContext(), analysisBitmap);
                     } else {

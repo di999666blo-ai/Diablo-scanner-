@@ -208,7 +208,15 @@ jobs:
           grep -q 'HYBRID SELECTED' app/src/main/assets/dashboard.html
           grep -q '"KRONOS"' app/src/main/java/com/diablo/scanner/MainActivity.java
           grep -q 'HYBRID'.* app/src/main/java/com/diablo/scanner/MainActivity.java
-          grep -q 'GuidedScalpingAnalyzer.analyze' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'ChartVisionEngine.inspect' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          grep -q 'ChartVisionEngine.inspect' app/src/main/java/com/diablo/scanner/ChartAnalyzer.java
+          grep -q 'ChartVisionEngine.inspect' app/src/main/java/com/diablo/scanner/LocalVisionAI.java
+          grep -q 'OpenCVLoader.initLocal' app/src/main/java/com/diablo/scanner/ChartVisionEngine.java
+          grep -q 'TextRecognition.getClient' app/src/main/java/com/diablo/scanner/ChartVisionEngine.java
+          grep -q 'LocalVisionAI.analyze(getApplicationContext(), analysisBitmap)' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
+          test -s app/src/main/java/com/diablo/scanner/ChartVisionEngine.java
+          grep -q 'org.opencv:opencv:4.10.0' app/build.gradle
+          grep -q 'com.google.mlkit:text-recognition:16.0.1' app/build.gradle
           test -s app/src/main/java/com/diablo/scanner/GuidedScalpingAnalyzer.java
           grep -q 'KronosLocalRuntime.forecast' app/src/main/java/com/diablo/scanner/MainActivity.java
           ! grep -q 'KronosRuntimeClient.forecast' app/src/main/java/com/diablo/scanner/ScreenCaptureService.java
@@ -231,6 +239,11 @@ jobs:
           start = source.index('} else if ("HYBRID".equalsIgnoreCase(selectedEngine))')
           end = source.index('} else {', start + 10)
           hybrid_branch = source[start:end]
+          scalping_start = source.index('if (scalpingMode) {', source.index('private void startAIAnalysis'))
+          scalping_end = source.index('} else if ("SMOLVLM".equalsIgnoreCase(selectedTimedEngine))', scalping_start)
+          scalping_branch = source[scalping_start:scalping_end]
+          assert "LocalVisionAI.analyze" in scalping_branch, "Guide Scalping must use SmolVLM screen vision"
+          assert "GuidedScalpingAnalyzer.analyze" not in scalping_branch, "Guide Scalping must not use Kronos market feed"
           assert "ChartAnalyzer.analyze" in hybrid_branch, "Hybrid must run its own analyzer"
           assert "LocalVisionAI.analyze" not in hybrid_branch, "Hybrid must not depend on SmolVLM"
           assert '"KRONOS"' not in hybrid_branch, "Hybrid must not invoke Kronos"
